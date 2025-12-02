@@ -110,6 +110,62 @@ def format_formula(metals: List[Dict], anion_symbol: str, metal_counts: List[int
     return formula
 
 
+def check_stoichiometry_match(
+    calculated_metals: Dict[str, float],
+    calculated_anions: float,
+    expected_metals: Dict[str, float],
+    expected_anions: float,
+    tolerance: float = 0.1
+) -> bool:
+    """
+    Check if calculated stoichiometry matches expected stoichiometry.
+    
+    Compares ratios rather than absolute values, with tolerance for rounding.
+    
+    Args:
+        calculated_metals: Dict of symbol -> count from position calculation
+        calculated_anions: Anion count from position calculation  
+        expected_metals: Dict of symbol -> count from charge balance
+        expected_anions: Anion count from charge balance
+        tolerance: Relative tolerance for ratio comparison
+    
+    Returns:
+        True if stoichiometries match within tolerance
+    """
+    # Handle edge cases
+    if calculated_anions <= 0 or expected_anions <= 0:
+        return False
+    
+    # Check all expected metals are present
+    for symbol in expected_metals:
+        if symbol not in calculated_metals:
+            return False
+    
+    # Normalize both to ratios relative to anion count
+    calc_ratios = {}
+    for symbol, count in calculated_metals.items():
+        calc_ratios[symbol] = count / calculated_anions if calculated_anions > 0 else 0
+    
+    exp_ratios = {}
+    for symbol, count in expected_metals.items():
+        exp_ratios[symbol] = count / expected_anions if expected_anions > 0 else 0
+    
+    # Compare ratios
+    for symbol in expected_metals:
+        calc_ratio = calc_ratios.get(symbol, 0)
+        exp_ratio = exp_ratios.get(symbol, 0)
+        
+        if exp_ratio == 0:
+            if calc_ratio != 0:
+                return False
+        else:
+            relative_diff = abs(calc_ratio - exp_ratio) / exp_ratio
+            if relative_diff > tolerance:
+                return False
+    
+    return True
+
+
 def main():
     st.title("🔬 Crystal Coordination & Lattice Explorer")
     st.markdown("Calculate stoichiometry, anion CN, and find minimum scale factors for target coordination")
@@ -524,12 +580,51 @@ def main():
                 if st.session_state.stoichiometry_results:
                     st.markdown("#### Stoichiometry Results")
                     
+                    # Get expected stoichiometry from initial calculation
+                    expected_metal_counts = dict(zip(
+                        [m['symbol'] for m in st.session_state.metals],
+                        st.session_state.results['metal_counts']
+                    ))
+                    expected_anion_count = st.session_state.results['anion_count']
+                    
+                    # Filter option
+                    filter_col1, filter_col2 = st.columns([1, 3])
+                    with filter_col1:
+                        filter_matching = st.checkbox(
+                            "Show only matching stoichiometry",
+                            value=False,
+                            help="Filter to show only configurations that match the expected formula"
+                        )
+                    with filter_col2:
+                        # Show expected formula
+                        expected_parts = [f"{sym}{cnt if cnt > 1 else ''}" 
+                                         for sym, cnt in expected_metal_counts.items()]
+                        expected_parts.append(f"{st.session_state.get('anion_symbol', 'O')}{expected_anion_count if expected_anion_count > 1 else ''}")
+                        st.caption(f"Expected formula: **{''.join(expected_parts)}**")
+                    
                     # Build results table
                     stoich_data = []
+                    matching_count = 0
+                    
                     for config_id, result in st.session_state.stoichiometry_results.items():
                         if result.success:
                             # Get s* from scale results
                             s_star = st.session_state.scale_results.get(config_id, {}).get('s_star', 0)
+                            
+                            # Check if stoichiometry matches expected
+                            matches = check_stoichiometry_match(
+                                result.metal_counts, 
+                                result.anion_count,
+                                expected_metal_counts,
+                                expected_anion_count
+                            )
+                            
+                            if matches:
+                                matching_count += 1
+                            
+                            # Skip if filtering and doesn't match
+                            if filter_matching and not matches:
+                                continue
                             
                             # Build metal counts string
                             metal_str = ', '.join(f"{sym}={cnt:.1f}" for sym, cnt in result.metal_counts.items())
@@ -537,20 +632,30 @@ def main():
                             stoich_data.append({
                                 'Config': config_id,
                                 'Formula': result.formula,
+                                'Match': '✓' if matches else '✗',
                                 's*': f"{s_star:.4f}",
                                 'Metals': metal_str,
                                 'Anions': f"{result.anion_count:.1f}",
                                 'Ratio': result.ratio_formula
                             })
                         else:
-                            stoich_data.append({
-                                'Config': config_id,
-                                'Formula': f"Error: {result.error}",
-                                's*': '',
-                                'Metals': '',
-                                'Anions': '',
-                                'Ratio': ''
-                            })
+                            if not filter_matching:  # Don't show errors when filtering
+                                stoich_data.append({
+                                    'Config': config_id,
+                                    'Formula': f"Error: {result.error}",
+                                    'Match': '',
+                                    's*': '',
+                                    'Metals': '',
+                                    'Anions': '',
+                                    'Ratio': ''
+                                })
+                    
+                    # Show match summary
+                    total_successful = sum(1 for r in st.session_state.stoichiometry_results.values() if r.success)
+                    if matching_count > 0:
+                        st.success(f"**{matching_count}** of **{total_successful}** configurations match the expected stoichiometry")
+                    else:
+                        st.warning(f"No configurations match the expected stoichiometry (0 of {total_successful})")
                     
                     if stoich_data:
                         df_stoich = pd.DataFrame(stoich_data)
