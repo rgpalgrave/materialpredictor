@@ -116,11 +116,12 @@ def check_stoichiometry_match(
     expected_metals: Dict[str, float],
     expected_anions: float,
     tolerance: float = 0.1
-) -> bool:
+) -> Tuple[bool, str]:
     """
     Check if calculated stoichiometry matches expected stoichiometry.
     
     Compares ratios rather than absolute values, with tolerance for rounding.
+    Also checks for half-filling case (2× anions = common structural motif).
     
     Args:
         calculated_metals: Dict of symbol -> count from position calculation
@@ -130,40 +131,54 @@ def check_stoichiometry_match(
         tolerance: Relative tolerance for ratio comparison
     
     Returns:
-        True if stoichiometries match within tolerance
+        Tuple of (matches, match_type) where match_type is:
+        - 'exact': Direct stoichiometry match
+        - 'half': Half-filling match (calculated anions = 2× expected)
+        - 'none': No match
     """
     # Handle edge cases
     if calculated_anions <= 0 or expected_anions <= 0:
-        return False
+        return False, 'none'
     
     # Check all expected metals are present
     for symbol in expected_metals:
         if symbol not in calculated_metals:
-            return False
+            return False, 'none'
     
-    # Normalize both to ratios relative to anion count
-    calc_ratios = {}
-    for symbol, count in calculated_metals.items():
-        calc_ratios[symbol] = count / calculated_anions if calculated_anions > 0 else 0
-    
-    exp_ratios = {}
-    for symbol, count in expected_metals.items():
-        exp_ratios[symbol] = count / expected_anions if expected_anions > 0 else 0
-    
-    # Compare ratios
-    for symbol in expected_metals:
-        calc_ratio = calc_ratios.get(symbol, 0)
-        exp_ratio = exp_ratios.get(symbol, 0)
+    def check_ratios(calc_anions_effective: float) -> bool:
+        """Check if metal ratios match given effective anion count."""
+        calc_ratios = {}
+        for symbol, count in calculated_metals.items():
+            calc_ratios[symbol] = count / calc_anions_effective if calc_anions_effective > 0 else 0
         
-        if exp_ratio == 0:
-            if calc_ratio != 0:
-                return False
-        else:
-            relative_diff = abs(calc_ratio - exp_ratio) / exp_ratio
-            if relative_diff > tolerance:
-                return False
+        exp_ratios = {}
+        for symbol, count in expected_metals.items():
+            exp_ratios[symbol] = count / expected_anions if expected_anions > 0 else 0
+        
+        for symbol in expected_metals:
+            calc_ratio = calc_ratios.get(symbol, 0)
+            exp_ratio = exp_ratios.get(symbol, 0)
+            
+            if exp_ratio == 0:
+                if calc_ratio != 0:
+                    return False
+            else:
+                relative_diff = abs(calc_ratio - exp_ratio) / exp_ratio
+                if relative_diff > tolerance:
+                    return False
+        return True
     
-    return True
+    # Check exact match first
+    if check_ratios(calculated_anions):
+        return True, 'exact'
+    
+    # Check half-filling case (calculated has 2× the anions)
+    # This is common: zinc blende, fluorite, wurtzite, etc.
+    half_anions = calculated_anions / 2.0
+    if check_ratios(half_anions):
+        return True, 'half'
+    
+    return False, 'none'
 
 
 def main():
@@ -660,7 +675,7 @@ def main():
                             s_star = st.session_state.scale_results.get(config_id, {}).get('s_star', 0)
                             
                             # Check if stoichiometry matches expected
-                            matches = check_stoichiometry_match(
+                            matches, match_type = check_stoichiometry_match(
                                 result.metal_counts, 
                                 result.anion_count,
                                 expected_metal_counts,
@@ -677,10 +692,18 @@ def main():
                             # Build metal counts string
                             metal_str = ', '.join(f"{sym}={cnt:.1f}" for sym, cnt in result.metal_counts.items())
                             
+                            # Format match indicator with type
+                            if match_type == 'exact':
+                                match_str = '✓'
+                            elif match_type == 'half':
+                                match_str = '½'  # Half-filling indicator
+                            else:
+                                match_str = '✗'
+                            
                             stoich_data.append({
                                 'Config': config_id,
                                 'Formula': result.formula,
-                                'Match': '✓' if matches else '✗',
+                                'Match': match_str,
                                 's*': f"{s_star:.4f}",
                                 'Metals': metal_str,
                                 'Anions': f"{result.anion_count:.1f}",
@@ -698,10 +721,21 @@ def main():
                                     'Ratio': ''
                                 })
                     
+                    # Count match types for summary
+                    exact_count = sum(1 for r in stoich_data if r.get('Match') == '✓')
+                    half_count = sum(1 for r in stoich_data if r.get('Match') == '½')
+                    
                     # Show match summary
                     total_successful = sum(1 for r in st.session_state.stoichiometry_results.values() if r.success)
                     if matching_count > 0:
-                        st.success(f"**{matching_count}** of **{total_successful}** configurations match the expected stoichiometry")
+                        summary_parts = []
+                        if exact_count > 0:
+                            summary_parts.append(f"{exact_count} exact (✓)")
+                        if half_count > 0:
+                            summary_parts.append(f"{half_count} half-filling (½)")
+                        st.success(f"**{matching_count}** of **{total_successful}** configurations match: {', '.join(summary_parts)}")
+                        if half_count > 0:
+                            st.caption("½ = Half-filling: only half the anion sites are occupied (e.g., zinc blende, fluorite)")
                     else:
                         st.warning(f"No configurations match the expected stoichiometry (0 of {total_successful})")
                     
