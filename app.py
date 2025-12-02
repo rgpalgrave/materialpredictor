@@ -5,6 +5,7 @@ Streamlit application for calculating stoichiometry, anion CN, and minimum scale
 import streamlit as st
 import numpy as np
 import pandas as pd
+import json
 from math import gcd
 from functools import reduce
 from typing import List, Dict, Optional, Tuple
@@ -22,7 +23,12 @@ from lattice_configs import (
 )
 from interstitial_engine import (
     compute_min_scale_for_cn, LatticeParams, Sublattice, find_threshold_s_for_N,
-    scan_c_ratio_for_min_scale, batch_scan_c_ratio
+    scan_c_ratio_for_min_scale, batch_scan_c_ratio, lattice_vectors
+)
+from position_calculator import (
+    calculate_complete_structure, generate_metal_positions, calculate_intersections,
+    format_position_dict, format_xyz, format_metal_atoms_csv, format_intersections_csv,
+    get_unique_intersections
 )
 
 st.set_page_config(
@@ -655,6 +661,307 @@ def main():
                             st.text(f"  • {config_id}: {error}")
         else:
             st.info("👆 Calculate stoichiometry first to determine target CN")
+    
+    # ============================================
+    # UNIT CELL VIEWER SECTION
+    # ============================================
+    st.header("🔮 Unit Cell Viewer")
+    st.markdown("""
+    Visualize metal ion and interstitial site positions in one unit cell.  
+    Sites on boundaries (e.g., at x=0) also appear at the opposite face (x=1) to show translational symmetry.
+    """)
+    
+    # Get available results from scale factor calculations
+    available_configs = []
+    if 'sf_results' in st.session_state and st.session_state.sf_results:
+        for config_id, data in st.session_state.sf_results.items():
+            if data.get('s_star') is not None:
+                available_configs.append({
+                    'id': config_id,
+                    's_star': data['s_star'],
+                    'lattice': data.get('lattice', ''),
+                    'bravais': data.get('bravais_type', ''),
+                    'offsets': data.get('offsets', [])
+                })
+    
+    if available_configs:
+        uc_cols = st.columns([2, 1, 1, 1])
+        
+        with uc_cols[0]:
+            config_options = [f"{c['id']} (s*={c['s_star']:.4f})" for c in available_configs]
+            selected_config_idx = st.selectbox(
+                "Select configuration to visualize",
+                range(len(config_options)),
+                format_func=lambda i: config_options[i],
+                key='uc_config_select'
+            )
+            selected_config = available_configs[selected_config_idx]
+        
+        with uc_cols[1]:
+            uc_scale_s = st.number_input(
+                "Scale factor s",
+                min_value=0.1,
+                max_value=2.0,
+                value=float(selected_config['s_star']),
+                step=0.01,
+                key='uc_scale_s'
+            )
+        
+        with uc_cols[2]:
+            uc_target_n = st.number_input(
+                "Min. multiplicity",
+                min_value=2,
+                max_value=12,
+                value=target_cn if 'target_cn' in dir() and target_cn else 4,
+                step=1,
+                key='uc_target_n'
+            )
+        
+        with uc_cols[3]:
+            show_boundary_equiv = st.checkbox(
+                "Show boundary equivalents",
+                value=True,
+                help="Show equivalent positions at unit cell boundaries",
+                key='uc_boundary'
+            )
+        
+        if st.button("🔮 Generate Unit Cell View", type="primary", key='uc_generate'):
+            with st.spinner("Calculating positions..."):
+                # Build sublattice from selected config
+                config_data = None
+                for config_id, data in st.session_state.sf_results.items():
+                    if config_id == selected_config['id']:
+                        config_data = data
+                        break
+                
+                if config_data:
+                    # Create sublattice
+                    offsets = config_data.get('offsets', [(0, 0, 0)])
+                    bravais = config_data.get('bravais_type', 'cubic_P')
+                    
+                    sublattice = Sublattice(
+                        name='M',
+                        offsets=tuple(tuple(o) for o in offsets),
+                        alpha_ratio=alpha_ratio if 'alpha_ratio' in dir() else 0.5,
+                        bravais_type=bravais
+                    )
+                    
+                    # Determine lattice type and set parameters
+                    lattice_type = config_data.get('lattice', 'Cubic')
+                    p_dict = {'a': 5.0, 'b_ratio': 1.0, 'c_ratio': 1.0,
+                              'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
+                    
+                    if lattice_type == 'Hexagonal':
+                        p_dict['gamma'] = 120.0
+                        p_dict['c_ratio'] = 1.633  # Ideal HCP
+                    
+                    # Check if we have c/a scan results for this config
+                    if 'ca_scan_results' in st.session_state and selected_config['id'] in st.session_state.ca_scan_results:
+                        ca_result = st.session_state.ca_scan_results[selected_config['id']]
+                        if ca_result.get('best_c_ratio') is not None:
+                            p_dict['c_ratio'] = ca_result['best_c_ratio']
+                    
+                    p = LatticeParams(**p_dict)
+                    
+                    # Calculate structure
+                    structure = calculate_complete_structure(
+                        sublattices=[sublattice],
+                        p=p,
+                        scale_s=uc_scale_s,
+                        target_N=uc_target_n,
+                        k_samples=32,
+                        include_boundary_equivalents=show_boundary_equiv
+                    )
+                    
+                    st.session_state['uc_structure'] = structure
+                    st.session_state['uc_lattice_params'] = p
+        
+        # Display results if available
+        if 'uc_structure' in st.session_state:
+            structure = st.session_state['uc_structure']
+            p = st.session_state['uc_lattice_params']
+            
+            # Summary metrics
+            unique_frac, unique_mult = get_unique_intersections(structure.intersections)
+            
+            uc_metric_cols = st.columns(4)
+            with uc_metric_cols[0]:
+                st.metric("Metal atoms", len(structure.metal_atoms.fractional))
+            with uc_metric_cols[1]:
+                st.metric("Intersections (total)", len(structure.intersections.fractional))
+            with uc_metric_cols[2]:
+                st.metric("Unique sites", len(unique_frac))
+            with uc_metric_cols[3]:
+                if len(structure.intersections.multiplicity) > 0:
+                    st.metric("Max multiplicity", int(np.max(structure.intersections.multiplicity)))
+                else:
+                    st.metric("Max multiplicity", 0)
+            
+            # 3D visualization
+            st.subheader("3D Unit Cell")
+            
+            # Create 3D plot
+            fig_3d = go.Figure()
+            
+            # Get lattice vectors for drawing unit cell
+            lat_vecs = structure.lattice_vectors
+            
+            # Draw unit cell edges
+            corners = np.array([
+                [0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0],
+                [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]
+            ])
+            cart_corners = corners @ lat_vecs
+            
+            edges = [
+                (0, 1), (1, 2), (2, 3), (3, 0),  # Bottom
+                (4, 5), (5, 6), (6, 7), (7, 4),  # Top
+                (0, 4), (1, 5), (2, 6), (3, 7)   # Verticals
+            ]
+            
+            for i, j in edges:
+                fig_3d.add_trace(go.Scatter3d(
+                    x=[cart_corners[i, 0], cart_corners[j, 0]],
+                    y=[cart_corners[i, 1], cart_corners[j, 1]],
+                    z=[cart_corners[i, 2], cart_corners[j, 2]],
+                    mode='lines',
+                    line=dict(color='gray', width=2),
+                    showlegend=False,
+                    hoverinfo='skip'
+                ))
+            
+            # Plot metal atoms
+            if len(structure.metal_atoms.cartesian) > 0:
+                fig_3d.add_trace(go.Scatter3d(
+                    x=structure.metal_atoms.cartesian[:, 0],
+                    y=structure.metal_atoms.cartesian[:, 1],
+                    z=structure.metal_atoms.cartesian[:, 2],
+                    mode='markers',
+                    marker=dict(
+                        size=10,
+                        color='blue',
+                        opacity=0.8
+                    ),
+                    name='Metal atoms',
+                    text=[f"Metal {i}<br>({structure.metal_atoms.fractional[i][0]:.3f}, {structure.metal_atoms.fractional[i][1]:.3f}, {structure.metal_atoms.fractional[i][2]:.3f})"
+                          for i in range(len(structure.metal_atoms.fractional))],
+                    hoverinfo='text'
+                ))
+            
+            # Plot intersections
+            if len(structure.intersections.cartesian) > 0:
+                # Color by multiplicity
+                mult = structure.intersections.multiplicity
+                
+                fig_3d.add_trace(go.Scatter3d(
+                    x=structure.intersections.cartesian[:, 0],
+                    y=structure.intersections.cartesian[:, 1],
+                    z=structure.intersections.cartesian[:, 2],
+                    mode='markers',
+                    marker=dict(
+                        size=8,
+                        color=mult,
+                        colorscale='Viridis',
+                        colorbar=dict(title='N'),
+                        symbol='diamond',
+                        opacity=0.9
+                    ),
+                    name='Intersections',
+                    text=[f"Site {i}<br>N={mult[i]}<br>({structure.intersections.fractional[i][0]:.3f}, {structure.intersections.fractional[i][1]:.3f}, {structure.intersections.fractional[i][2]:.3f})"
+                          for i in range(len(structure.intersections.fractional))],
+                    hoverinfo='text'
+                ))
+            
+            fig_3d.update_layout(
+                scene=dict(
+                    xaxis_title='x (Å)',
+                    yaxis_title='y (Å)',
+                    zaxis_title='z (Å)',
+                    aspectmode='data'
+                ),
+                height=500,
+                margin=dict(l=0, r=0, t=30, b=0),
+                legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+            )
+            
+            st.plotly_chart(fig_3d, use_container_width=True)
+            
+            # Position tables
+            tab_metals, tab_intersections = st.tabs(["Metal Positions", "Intersection Sites"])
+            
+            with tab_metals:
+                if len(structure.metal_atoms.fractional) > 0:
+                    metal_df = pd.DataFrame({
+                        'Index': range(len(structure.metal_atoms.fractional)),
+                        'Frac x': [f"{x:.4f}" for x in structure.metal_atoms.fractional[:, 0]],
+                        'Frac y': [f"{x:.4f}" for x in structure.metal_atoms.fractional[:, 1]],
+                        'Frac z': [f"{x:.4f}" for x in structure.metal_atoms.fractional[:, 2]],
+                        'Cart x': [f"{x:.4f}" for x in structure.metal_atoms.cartesian[:, 0]],
+                        'Cart y': [f"{x:.4f}" for x in structure.metal_atoms.cartesian[:, 1]],
+                        'Cart z': [f"{x:.4f}" for x in structure.metal_atoms.cartesian[:, 2]],
+                        'Radius (Å)': [f"{x:.4f}" for x in structure.metal_atoms.radius]
+                    })
+                    st.dataframe(metal_df, use_container_width=True, hide_index=True)
+                else:
+                    st.info("No metal atoms to display")
+            
+            with tab_intersections:
+                if len(structure.intersections.fractional) > 0:
+                    int_df = pd.DataFrame({
+                        'Index': range(len(structure.intersections.fractional)),
+                        'N': structure.intersections.multiplicity,
+                        'Frac x': [f"{x:.4f}" for x in structure.intersections.fractional[:, 0]],
+                        'Frac y': [f"{x:.4f}" for x in structure.intersections.fractional[:, 1]],
+                        'Frac z': [f"{x:.4f}" for x in structure.intersections.fractional[:, 2]],
+                        'Cart x': [f"{x:.4f}" for x in structure.intersections.cartesian[:, 0]],
+                        'Cart y': [f"{x:.4f}" for x in structure.intersections.cartesian[:, 1]],
+                        'Cart z': [f"{x:.4f}" for x in structure.intersections.cartesian[:, 2]],
+                    })
+                    st.dataframe(int_df, use_container_width=True, hide_index=True)
+                else:
+                    st.info("No intersections found at this scale factor")
+            
+            # Export options
+            st.subheader("📥 Export Data")
+            export_cols = st.columns(4)
+            
+            with export_cols[0]:
+                json_data = json.dumps(format_position_dict(structure), indent=2)
+                st.download_button(
+                    label="📄 JSON",
+                    data=json_data,
+                    file_name="unit_cell_positions.json",
+                    mime="application/json"
+                )
+            
+            with export_cols[1]:
+                csv_metals = format_metal_atoms_csv(structure)
+                st.download_button(
+                    label="📊 Metals CSV",
+                    data=csv_metals,
+                    file_name="metal_positions.csv",
+                    mime="text/csv"
+                )
+            
+            with export_cols[2]:
+                csv_intersections = format_intersections_csv(structure)
+                st.download_button(
+                    label="📊 Intersections CSV",
+                    data=csv_intersections,
+                    file_name="intersection_positions.csv",
+                    mime="text/csv"
+                )
+            
+            with export_cols[3]:
+                xyz_data = format_xyz(structure, include_intersections=True)
+                st.download_button(
+                    label="🔬 XYZ File",
+                    data=xyz_data,
+                    file_name="structure.xyz",
+                    mime="text/plain"
+                )
+    else:
+        st.info("👆 Calculate minimum scale factors first to visualize unit cell positions")
     
     # Footer
     st.markdown("---")

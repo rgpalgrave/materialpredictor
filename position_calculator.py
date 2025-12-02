@@ -1,0 +1,654 @@
+"""
+Position Calculator for Crystal Coordination Analysis
+Calculates exact positions of metal atoms and intersection sites in a unit cell.
+
+Key features:
+- Correct handling of translational symmetry (PBC)
+- Sites on unit cell boundaries appear at all equivalent positions
+- Export to JSON, CSV, XYZ formats
+"""
+
+from dataclasses import dataclass
+from typing import List, Tuple, Dict, Optional, Set
+import numpy as np
+from interstitial_engine import (
+    LatticeParams,
+    Sublattice,
+    lattice_vectors,
+    max_multiplicity_for_scale,
+    BRAVAIS_BASIS,
+    generate_shifts,
+)
+
+
+# -----------------
+# Coordinate conversion utilities
+# -----------------
+
+def frac_to_cart(frac: np.ndarray, lat_vecs: np.ndarray) -> np.ndarray:
+    """Convert fractional to Cartesian coordinates."""
+    return frac @ lat_vecs
+
+
+def cart_to_frac(cart: np.ndarray, lat_vecs: np.ndarray) -> np.ndarray:
+    """Convert Cartesian to fractional coordinates."""
+    inv = np.linalg.inv(lat_vecs)
+    if cart.ndim == 1:
+        return cart @ inv
+    return cart @ inv
+
+
+def wrap_to_unit_cell(frac: np.ndarray, tol: float = 1e-9) -> np.ndarray:
+    """
+    Wrap fractional coordinates to [0, 1).
+    Values very close to 0 or 1 are snapped.
+    """
+    wrapped = frac - np.floor(frac)
+    # Snap values very close to 0 or 1
+    wrapped = np.where(np.abs(wrapped) < tol, 0.0, wrapped)
+    wrapped = np.where(np.abs(wrapped - 1.0) < tol, 0.0, wrapped)
+    return wrapped
+
+
+def is_on_boundary(frac: np.ndarray, tol: float = 1e-6) -> np.ndarray:
+    """
+    Check which coordinates are on unit cell boundaries (close to 0).
+    Returns boolean array of shape (N, 3) indicating boundary positions.
+    """
+    if frac.ndim == 1:
+        frac = frac.reshape(1, -1)
+    return np.abs(frac) < tol
+
+
+def generate_boundary_equivalents(frac: np.ndarray, tol: float = 1e-6) -> List[np.ndarray]:
+    """
+    Generate all equivalent positions for a site considering unit cell boundaries.
+    
+    If a site is at (0, 0.5, 0), it should also appear at (1, 0.5, 0), (0, 0.5, 1), (1, 0.5, 1).
+    
+    Args:
+        frac: Single fractional coordinate (3,)
+        tol: Tolerance for boundary detection
+        
+    Returns:
+        List of all equivalent fractional positions
+    """
+    on_boundary = is_on_boundary(frac.reshape(1, -1), tol)[0]
+    
+    # Generate all combinations of 0 and 1 for boundary coordinates
+    equivalents = []
+    n_boundaries = np.sum(on_boundary)
+    
+    if n_boundaries == 0:
+        return [frac.copy()]
+    
+    # Generate 2^n combinations
+    for i in range(2 ** n_boundaries):
+        new_pos = frac.copy()
+        bit_idx = 0
+        for dim in range(3):
+            if on_boundary[dim]:
+                # Use bit i to decide if this should be 0 or 1
+                if (i >> bit_idx) & 1:
+                    new_pos[dim] = 1.0
+                else:
+                    new_pos[dim] = 0.0
+                bit_idx += 1
+        equivalents.append(new_pos)
+    
+    return equivalents
+
+
+# -----------------
+# Metal atom position generation
+# -----------------
+
+@dataclass
+class MetalAtomData:
+    """Complete information about metal atoms in the structure"""
+    fractional: np.ndarray      # (N, 3) fractional coordinates
+    cartesian: np.ndarray       # (N, 3) Cartesian coordinates
+    sublattice_id: np.ndarray   # (N,) which sublattice each atom belongs to
+    sublattice_name: List[str]  # Names of sublattices
+    radius: np.ndarray          # (N,) actual radius in Angstroms
+    alpha_ratio: np.ndarray     # (N,) alpha ratio for each atom
+
+
+def generate_metal_positions(
+    sublattices: List[Sublattice],
+    p: LatticeParams,
+    scale_s: float,
+    include_boundary_equivalents: bool = True
+) -> MetalAtomData:
+    """
+    Generate metal atom positions in one unit cell.
+    
+    Args:
+        sublattices: List of sublattice definitions
+        p: Lattice parameters
+        scale_s: Current s value (sphere radius parameter)
+        include_boundary_equivalents: Include equivalent positions at cell boundaries
+    
+    Returns:
+        MetalAtomData with all metal atom information
+    """
+    lat_vecs = lattice_vectors(p)
+    
+    all_frac = []
+    all_cart = []
+    all_sublattice_id = []
+    all_sublattice_names = []
+    all_radius = []
+    all_alpha = []
+    
+    for sub_idx, sub in enumerate(sublattices):
+        # Get basis positions for this Bravais lattice type
+        basis = BRAVAIS_BASIS.get(sub.bravais_type, [(0, 0, 0)])
+        
+        # Get the first offset (or default to origin)
+        if sub.offsets and len(sub.offsets) > 0:
+            offset = np.array(sub.offsets[0], dtype=float)
+        else:
+            offset = np.array([0.0, 0.0, 0.0])
+        
+        for basis_pos in basis:
+            # Fractional position
+            frac = np.array(basis_pos, dtype=float) + offset
+            frac = wrap_to_unit_cell(frac)
+            
+            # Generate boundary equivalents if requested
+            if include_boundary_equivalents:
+                positions = generate_boundary_equivalents(frac)
+            else:
+                positions = [frac]
+            
+            for pos in positions:
+                # Cartesian position
+                cart = frac_to_cart(pos, lat_vecs)
+                
+                all_frac.append(pos)
+                all_cart.append(cart)
+                all_sublattice_id.append(sub_idx)
+                all_sublattice_names.append(sub.name)
+                all_radius.append(sub.alpha_ratio * scale_s * p.a)
+                all_alpha.append(sub.alpha_ratio)
+    
+    if not all_frac:
+        return MetalAtomData(
+            fractional=np.empty((0, 3)),
+            cartesian=np.empty((0, 3)),
+            sublattice_id=np.empty((0,), dtype=int),
+            sublattice_name=[],
+            radius=np.empty((0,)),
+            alpha_ratio=np.empty((0,))
+        )
+    
+    return MetalAtomData(
+        fractional=np.array(all_frac),
+        cartesian=np.array(all_cart),
+        sublattice_id=np.array(all_sublattice_id, dtype=int),
+        sublattice_name=all_sublattice_names,
+        radius=np.array(all_radius),
+        alpha_ratio=np.array(all_alpha)
+    )
+
+
+# -----------------
+# Intersection position calculation
+# -----------------
+
+@dataclass
+class IntersectionData:
+    """Complete information about intersection sites"""
+    fractional: np.ndarray          # (N, 3) fractional coordinates
+    cartesian: np.ndarray           # (N, 3) Cartesian coordinates
+    multiplicity: np.ndarray        # (N,) number of spheres intersecting
+    contributing_atoms: List[List[int]]  # Indices of atoms forming each intersection
+
+
+def cluster_intersections_pbc(
+    positions_frac: np.ndarray,
+    multiplicities: np.ndarray,
+    eps_frac: float = 0.02
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Cluster intersection positions accounting for PBC.
+    
+    Args:
+        positions_frac: Fractional coordinates (N, 3)
+        multiplicities: Multiplicity values (N,)
+        eps_frac: Clustering threshold in fractional coordinates
+    
+    Returns:
+        unique_positions: Fractional coordinates of cluster centers (wrapped to [0,1))
+        unique_multiplicities: Maximum multiplicity in each cluster
+    """
+    if len(positions_frac) == 0:
+        return np.empty((0, 3)), np.empty((0,), dtype=int)
+    
+    # Wrap to unit cell
+    wrapped = wrap_to_unit_cell(positions_frac)
+    
+    used = np.zeros(len(wrapped), dtype=bool)
+    unique_pos = []
+    unique_mult = []
+    
+    eps2 = eps_frac ** 2
+    
+    for i in range(len(wrapped)):
+        if used[i]:
+            continue
+        
+        # Find all positions within eps of this one (considering PBC)
+        cluster = [i]
+        for j in range(i + 1, len(wrapped)):
+            if used[j]:
+                continue
+            
+            # Compute distance considering PBC wrapping
+            diff = wrapped[j] - wrapped[i]
+            # Handle periodic wrapping
+            diff = diff - np.round(diff)
+            dist2 = np.sum(diff ** 2)
+            
+            if dist2 < eps2:
+                cluster.append(j)
+        
+        # Mark as used
+        used[cluster] = True
+        
+        # Compute cluster representative
+        cluster_positions = wrapped[cluster]
+        
+        # Handle PBC in averaging: unwrap relative to first point
+        ref = cluster_positions[0]
+        unwrapped = cluster_positions.copy()
+        for k in range(1, len(unwrapped)):
+            diff = unwrapped[k] - ref
+            diff = diff - np.round(diff)
+            unwrapped[k] = ref + diff
+        
+        # Average and wrap back
+        mean_pos = np.mean(unwrapped, axis=0)
+        mean_pos = wrap_to_unit_cell(mean_pos)
+        
+        # Snap to high-symmetry positions if close
+        mean_pos = snap_to_symmetry(mean_pos)
+        
+        # Maximum multiplicity in cluster
+        max_mult = int(np.max(multiplicities[cluster]))
+        
+        unique_pos.append(mean_pos)
+        unique_mult.append(max_mult)
+    
+    return np.array(unique_pos), np.array(unique_mult, dtype=int)
+
+
+def snap_to_symmetry(frac: np.ndarray, tol: float = 0.02) -> np.ndarray:
+    """
+    Snap fractional coordinates to common high-symmetry values.
+    
+    Common values: 0, 0.25, 0.333, 0.5, 0.667, 0.75, 1
+    """
+    symmetry_values = [0.0, 0.25, 1/3, 0.5, 2/3, 0.75, 1.0]
+    
+    result = frac.copy()
+    for i in range(3):
+        for sym_val in symmetry_values:
+            if abs(result[i] - sym_val) < tol:
+                result[i] = sym_val
+                break
+    
+    # Wrap 1.0 to 0.0
+    result = np.where(np.abs(result - 1.0) < 1e-9, 0.0, result)
+    
+    return result
+
+
+def calculate_intersections(
+    sublattices: List[Sublattice],
+    p: LatticeParams,
+    scale_s: float,
+    target_N: Optional[int] = None,
+    k_samples: int = 24,
+    cluster_eps_frac: float = 0.02,
+    include_boundary_equivalents: bool = True
+) -> IntersectionData:
+    """
+    Calculate intersection positions in one unit cell.
+    
+    Args:
+        sublattices: List of sublattice definitions
+        p: Lattice parameters
+        scale_s: Current s value
+        target_N: Optional minimum multiplicity filter
+        k_samples: Number of samples per sphere pair
+        cluster_eps_frac: Clustering epsilon in fractional coordinates
+        include_boundary_equivalents: Include equivalent positions at cell boundaries
+    
+    Returns:
+        IntersectionData with all intersection information
+    """
+    lat_vecs = lattice_vectors(p)
+    
+    # Use existing engine to get raw intersection samples
+    max_mult, sample_positions, sample_counts = max_multiplicity_for_scale(
+        sublattices=sublattices,
+        p=p,
+        scale_s=scale_s,
+        k_samples=k_samples,
+        tol_inside=1e-3,
+        early_stop_at=None
+    )
+    
+    if len(sample_positions) == 0:
+        return IntersectionData(
+            fractional=np.empty((0, 3)),
+            cartesian=np.empty((0, 3)),
+            multiplicity=np.empty((0,), dtype=int),
+            contributing_atoms=[]
+        )
+    
+    # Convert to fractional coordinates
+    frac_positions = cart_to_frac(sample_positions, lat_vecs)
+    
+    # Cluster in fractional space with PBC
+    unique_frac, unique_mult = cluster_intersections_pbc(
+        frac_positions,
+        sample_counts,
+        eps_frac=cluster_eps_frac
+    )
+    
+    # Filter by target multiplicity if specified
+    if target_N is not None:
+        mask = unique_mult >= target_N
+        unique_frac = unique_frac[mask]
+        unique_mult = unique_mult[mask]
+    
+    # Filter to unit cell [0, 1)
+    mask = np.all((unique_frac >= 0) & (unique_frac < 1.0 - 1e-9), axis=1)
+    unique_frac = unique_frac[mask]
+    unique_mult = unique_mult[mask]
+    
+    # Now expand boundary equivalents for visualization
+    final_frac = []
+    final_mult = []
+    
+    for i in range(len(unique_frac)):
+        if include_boundary_equivalents:
+            equivalents = generate_boundary_equivalents(unique_frac[i])
+        else:
+            equivalents = [unique_frac[i]]
+        
+        for eq in equivalents:
+            final_frac.append(eq)
+            final_mult.append(unique_mult[i])
+    
+    if len(final_frac) == 0:
+        return IntersectionData(
+            fractional=np.empty((0, 3)),
+            cartesian=np.empty((0, 3)),
+            multiplicity=np.empty((0,), dtype=int),
+            contributing_atoms=[]
+        )
+    
+    final_frac = np.array(final_frac)
+    final_mult = np.array(final_mult, dtype=int)
+    
+    # Convert to Cartesian
+    final_cart = np.array([frac_to_cart(f, lat_vecs) for f in final_frac])
+    
+    # Contributing atoms - compute for unique sites
+    contributing = identify_contributing_atoms(
+        final_cart, sublattices, p, scale_s
+    )
+    
+    return IntersectionData(
+        fractional=final_frac,
+        cartesian=final_cart,
+        multiplicity=final_mult,
+        contributing_atoms=contributing
+    )
+
+
+def identify_contributing_atoms(
+    intersection_points: np.ndarray,
+    sublattices: List[Sublattice],
+    p: LatticeParams,
+    scale_s: float,
+    tol: float = 0.05
+) -> List[List[int]]:
+    """
+    Identify which metal atoms contribute to each intersection.
+    """
+    if len(intersection_points) == 0:
+        return []
+    
+    lat_vecs = lattice_vectors(p)
+    shifts = generate_shifts(lat_vecs)
+    
+    # Generate metal positions (without boundary equivalents for cleaner indexing)
+    metals = generate_metal_positions(sublattices, p, scale_s, include_boundary_equivalents=False)
+    
+    if len(metals.cartesian) == 0:
+        return [[] for _ in range(len(intersection_points))]
+    
+    contributing = []
+    for pt in intersection_points:
+        atoms = []
+        for atom_idx in range(len(metals.cartesian)):
+            center = metals.cartesian[atom_idx]
+            radius = metals.radius[atom_idx]
+            
+            # Check all periodic images
+            for shift in shifts:
+                dist = np.linalg.norm(pt - (center + shift))
+                if abs(dist - radius) < tol * radius:
+                    if atom_idx not in atoms:
+                        atoms.append(atom_idx)
+                    break
+        
+        contributing.append(atoms)
+    
+    return contributing
+
+
+# -----------------
+# Complete structure calculation
+# -----------------
+
+@dataclass
+class CompleteStructureData:
+    """Complete structure with metal atoms and intersections"""
+    metal_atoms: MetalAtomData
+    intersections: IntersectionData
+    lattice_params: LatticeParams
+    scale_s: float
+    lattice_vectors: np.ndarray
+
+
+def calculate_complete_structure(
+    sublattices: List[Sublattice],
+    p: LatticeParams,
+    scale_s: float,
+    target_N: Optional[int] = None,
+    k_samples: int = 24,
+    include_boundary_equivalents: bool = True
+) -> CompleteStructureData:
+    """
+    Calculate complete structure: metal atoms + intersections for one unit cell.
+    
+    Args:
+        sublattices: List of sublattice definitions
+        p: Lattice parameters
+        scale_s: Current s value
+        target_N: Optional minimum multiplicity for intersections
+        k_samples: Sampling density for intersections
+        include_boundary_equivalents: Show equivalent positions at cell boundaries
+    
+    Returns:
+        CompleteStructureData with all structural information
+    """
+    # Generate metal positions
+    metal_atoms = generate_metal_positions(
+        sublattices=sublattices,
+        p=p,
+        scale_s=scale_s,
+        include_boundary_equivalents=include_boundary_equivalents
+    )
+    
+    # Calculate intersections
+    intersections = calculate_intersections(
+        sublattices=sublattices,
+        p=p,
+        scale_s=scale_s,
+        target_N=target_N,
+        k_samples=k_samples,
+        include_boundary_equivalents=include_boundary_equivalents
+    )
+    
+    # Get lattice vectors
+    vecs = lattice_vectors(p)
+    
+    return CompleteStructureData(
+        metal_atoms=metal_atoms,
+        intersections=intersections,
+        lattice_params=p,
+        scale_s=scale_s,
+        lattice_vectors=vecs
+    )
+
+
+# -----------------
+# Export utilities
+# -----------------
+
+def format_position_dict(data: CompleteStructureData) -> Dict:
+    """Format structure data as dictionary for JSON export."""
+    p = data.lattice_params
+    lat_vecs = data.lattice_vectors
+    
+    result = {
+        'lattice_parameters': {
+            'a': float(p.a),
+            'b': float(p.a * p.b_ratio),
+            'c': float(p.a * p.c_ratio),
+            'alpha': float(p.alpha),
+            'beta': float(p.beta),
+            'gamma': float(p.gamma),
+            'b_ratio': float(p.b_ratio),
+            'c_ratio': float(p.c_ratio),
+        },
+        'lattice_vectors': {
+            'a': lat_vecs[0].tolist(),
+            'b': lat_vecs[1].tolist(),
+            'c': lat_vecs[2].tolist(),
+        },
+        'scale_s': float(data.scale_s),
+        'metal_atoms': {
+            'count': len(data.metal_atoms.fractional),
+            'positions': {
+                'fractional': data.metal_atoms.fractional.tolist() if len(data.metal_atoms.fractional) > 0 else [],
+                'cartesian': data.metal_atoms.cartesian.tolist() if len(data.metal_atoms.cartesian) > 0 else [],
+            },
+            'sublattice_id': data.metal_atoms.sublattice_id.tolist() if len(data.metal_atoms.sublattice_id) > 0 else [],
+            'sublattice_name': data.metal_atoms.sublattice_name,
+            'radius_angstrom': data.metal_atoms.radius.tolist() if len(data.metal_atoms.radius) > 0 else [],
+            'alpha_ratio': data.metal_atoms.alpha_ratio.tolist() if len(data.metal_atoms.alpha_ratio) > 0 else [],
+        },
+        'intersections': {
+            'count': len(data.intersections.fractional),
+            'positions': {
+                'fractional': data.intersections.fractional.tolist() if len(data.intersections.fractional) > 0 else [],
+                'cartesian': data.intersections.cartesian.tolist() if len(data.intersections.cartesian) > 0 else [],
+            },
+            'multiplicity': data.intersections.multiplicity.tolist() if len(data.intersections.multiplicity) > 0 else [],
+            'contributing_atoms': data.intersections.contributing_atoms,
+        }
+    }
+    
+    return result
+
+
+def format_metal_atoms_csv(data: CompleteStructureData) -> str:
+    """Format metal atoms as CSV string."""
+    lines = []
+    lines.append("atom_index,sublattice_name,sublattice_id,frac_x,frac_y,frac_z,cart_x,cart_y,cart_z,radius_angstrom,alpha_ratio")
+    
+    for i in range(len(data.metal_atoms.fractional)):
+        frac = data.metal_atoms.fractional[i]
+        cart = data.metal_atoms.cartesian[i]
+        lines.append(
+            f"{i},{data.metal_atoms.sublattice_name[i]},{data.metal_atoms.sublattice_id[i]},"
+            f"{frac[0]:.6f},{frac[1]:.6f},{frac[2]:.6f},"
+            f"{cart[0]:.6f},{cart[1]:.6f},{cart[2]:.6f},"
+            f"{data.metal_atoms.radius[i]:.6f},{data.metal_atoms.alpha_ratio[i]:.6f}"
+        )
+    
+    return "\n".join(lines)
+
+
+def format_intersections_csv(data: CompleteStructureData) -> str:
+    """Format intersections as CSV string."""
+    lines = []
+    lines.append("intersection_index,multiplicity,frac_x,frac_y,frac_z,cart_x,cart_y,cart_z,contributing_atom_indices")
+    
+    for i in range(len(data.intersections.fractional)):
+        frac = data.intersections.fractional[i]
+        cart = data.intersections.cartesian[i]
+        mult = data.intersections.multiplicity[i]
+        contrib = ";".join(map(str, data.intersections.contributing_atoms[i]))
+        
+        lines.append(
+            f"{i},{mult},"
+            f"{frac[0]:.6f},{frac[1]:.6f},{frac[2]:.6f},"
+            f"{cart[0]:.6f},{cart[1]:.6f},{cart[2]:.6f},"
+            f"{contrib}"
+        )
+    
+    return "\n".join(lines)
+
+
+def format_xyz(data: CompleteStructureData, include_intersections: bool = True) -> str:
+    """Format structure as XYZ file for visualization."""
+    lines = []
+    
+    # Count atoms
+    n_atoms = len(data.metal_atoms.cartesian)
+    n_intersections = len(data.intersections.cartesian) if include_intersections else 0
+    total = n_atoms + n_intersections
+    
+    lines.append(str(total))
+    lines.append(f"s={data.scale_s:.6f} a={data.lattice_params.a:.6f}")
+    
+    # Metal atoms - use element symbol from sublattice name
+    for i in range(len(data.metal_atoms.cartesian)):
+        cart = data.metal_atoms.cartesian[i]
+        name = data.metal_atoms.sublattice_name[i]
+        # Use first 2 characters as element symbol
+        symbol = name[:2] if len(name) >= 2 else name
+        lines.append(f"{symbol}  {cart[0]:.6f}  {cart[1]:.6f}  {cart[2]:.6f}")
+    
+    # Intersections (as X with multiplicity)
+    if include_intersections:
+        for i in range(len(data.intersections.cartesian)):
+            cart = data.intersections.cartesian[i]
+            mult = data.intersections.multiplicity[i]
+            lines.append(f"X{mult}  {cart[0]:.6f}  {cart[1]:.6f}  {cart[2]:.6f}")
+    
+    return "\n".join(lines)
+
+
+def get_unique_intersections(data: IntersectionData) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Get unique intersection sites (excluding boundary duplicates).
+    
+    Returns only sites in [0, 1) for each coordinate.
+    """
+    if len(data.fractional) == 0:
+        return np.empty((0, 3)), np.empty((0,), dtype=int)
+    
+    # Filter to sites strictly in [0, 1)
+    mask = np.all((data.fractional >= 0) & (data.fractional < 1.0 - 1e-6), axis=1)
+    
+    return data.fractional[mask], data.multiplicity[mask]
