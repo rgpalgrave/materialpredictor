@@ -655,3 +655,88 @@ def get_unique_intersections(data: IntersectionData) -> Tuple[np.ndarray, np.nda
     mask = np.all((data.fractional >= 0) & (data.fractional < 1.0 - 1e-6), axis=1)
     
     return data.fractional[mask], data.multiplicity[mask]
+
+
+def calculate_site_weight(frac_coord: np.ndarray, tol: float = 1e-6) -> float:
+    """
+    Calculate the fractional weight of a site based on its position.
+    
+    Sites on boundaries are shared between unit cells:
+    - Interior (no coords at 0 or 1): weight = 1
+    - Face (1 coord at 0 or 1): weight = 1/2
+    - Edge (2 coords at 0 or 1): weight = 1/4
+    - Corner (3 coords at 0 or 1): weight = 1/8
+    
+    Args:
+        frac_coord: Fractional coordinate (3,)
+        tol: Tolerance for detecting boundary positions
+    
+    Returns:
+        Fractional weight (1, 0.5, 0.25, or 0.125)
+    """
+    # Count how many coordinates are on boundaries (0 or 1)
+    on_boundary = 0
+    for x in frac_coord:
+        if abs(x) < tol or abs(x - 1.0) < tol:
+            on_boundary += 1
+    
+    # Weight is 1/2^(number of boundary coordinates)
+    return 1.0 / (2 ** on_boundary)
+
+
+def calculate_weighted_counts(structure: CompleteStructureData, tol: float = 1e-6) -> dict:
+    """
+    Calculate weighted atom and site counts for correct stoichiometry.
+    
+    Sites on boundaries are weighted fractionally:
+    - Interior: weight 1
+    - Face (1 coord at 0 or 1): weight 1/2  
+    - Edge (2 coords at 0 or 1): weight 1/4
+    - Corner (3 coords at 0 or 1): weight 1/8
+    
+    Args:
+        structure: Complete structure data
+        tol: Tolerance for boundary detection
+    
+    Returns:
+        Dictionary with:
+        - metal_count: Weighted count of metal atoms per unit cell
+        - intersection_count: Weighted count of intersection sites per unit cell
+        - metal_weights: Array of individual weights for each metal atom
+        - intersection_weights: Array of individual weights for each intersection
+    """
+    # Calculate metal weights - sum over all positions including boundary equivalents
+    metal_weights = np.array([
+        calculate_site_weight(frac, tol) 
+        for frac in structure.metal_atoms.fractional
+    ])
+    
+    # Calculate intersection weights - sum over all positions including boundary equivalents
+    # This gives correct stoichiometry (e.g., 4 octahedral sites in FCC)
+    intersection_weights = np.array([
+        calculate_site_weight(frac, tol) 
+        for frac in structure.intersections.fractional
+    ])
+    
+    # Also compute unique site mask for reference
+    unique_mask = np.all(
+        (structure.intersections.fractional >= 0) & 
+        (structure.intersections.fractional < 1.0 - tol), 
+        axis=1
+    )
+    
+    return {
+        'metal_count': float(np.sum(metal_weights)),
+        'intersection_count': float(np.sum(intersection_weights)),
+        'metal_weights': metal_weights,
+        'intersection_weights': intersection_weights,
+        'unique_intersection_mask': unique_mask
+    }
+    
+    return {
+        'metal_count': float(np.sum(metal_weights)),
+        'intersection_count': float(np.sum(intersection_weights)),
+        'metal_weights': metal_weights,
+        'intersection_weights': intersection_weights,
+        'unique_intersection_mask': unique_mask
+    }

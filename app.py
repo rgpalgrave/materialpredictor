@@ -28,7 +28,7 @@ from interstitial_engine import (
 from position_calculator import (
     calculate_complete_structure, generate_metal_positions, calculate_intersections,
     format_position_dict, format_xyz, format_metal_atoms_csv, format_intersections_csv,
-    get_unique_intersections
+    get_unique_intersections, calculate_weighted_counts
 )
 
 st.set_page_config(
@@ -807,14 +807,24 @@ def main():
             structure = st.session_state['uc_structure']
             p = st.session_state['uc_lattice_params']
             
-            # Summary metrics
+            # Calculate weighted counts for correct stoichiometry
+            weighted = calculate_weighted_counts(structure)
             unique_frac, unique_mult = get_unique_intersections(structure.intersections)
             
             uc_metric_cols = st.columns(4)
             with uc_metric_cols[0]:
-                st.metric("Metal atoms", len(structure.metal_atoms.fractional))
+                metal_count = weighted['metal_count']
+                # Display as integer if whole number, else 1 decimal
+                if abs(metal_count - round(metal_count)) < 0.01:
+                    st.metric("Metal atoms/cell", f"{int(round(metal_count))}")
+                else:
+                    st.metric("Metal atoms/cell", f"{metal_count:.2f}")
             with uc_metric_cols[1]:
-                st.metric("Intersections (total)", len(structure.intersections.fractional))
+                site_count = weighted['intersection_count']
+                if abs(site_count - round(site_count)) < 0.01:
+                    st.metric("Interstitial sites/cell", f"{int(round(site_count))}")
+                else:
+                    st.metric("Interstitial sites/cell", f"{site_count:.2f}")
             with uc_metric_cols[2]:
                 st.metric("Unique sites", len(unique_frac))
             with uc_metric_cols[3]:
