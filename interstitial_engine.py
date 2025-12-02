@@ -453,3 +453,248 @@ def batch_compute_min_scales(configs: List[dict], target_cn: int,
         results[config['id']] = s_star
     
     return results
+
+
+def scan_c_ratio_for_min_scale(
+    config_offsets: List[Tuple[float, float, float]],
+    target_cn: int,
+    lattice_type: str,
+    alpha_ratio: float = 0.5,
+    bravais_type: Optional[str] = None,
+    c_ratio_min: float = 0.5,
+    c_ratio_max: float = 2.0,
+    scan_level: str = 'fine',  # 'coarse', 'medium', 'fine', 'ultrafine'
+    lattice_params: Optional[dict] = None,
+    progress_callback: Optional[callable] = None
+) -> Dict:
+    """
+    Scan c/a ratio to find the minimum scale factor for a target CN.
+    
+    Uses hierarchical scanning:
+    - Coarse: 5 points
+    - Medium: 5 points between best two from coarse
+    - Fine: 10 points between best two from medium
+    - Ultrafine: 10 additional points between best two from fine
+    
+    Args:
+        config_offsets: List of fractional coordinate offsets
+        target_cn: Target coordination number (intersection multiplicity)
+        lattice_type: 'Tetragonal', 'Hexagonal', etc.
+        alpha_ratio: r = alpha * s * a
+        bravais_type: Specific Bravais type
+        c_ratio_min: Minimum c/a ratio to scan
+        c_ratio_max: Maximum c/a ratio to scan
+        scan_level: 'coarse', 'medium', 'fine', or 'ultrafine'
+        lattice_params: Optional dict with other lattice parameters
+        progress_callback: Optional callback(current, total, message) for progress updates
+    
+    Returns:
+        Dict with:
+            'best_c_ratio': Optimal c/a ratio
+            'best_s_star': Minimum scale factor at optimal c/a
+            'scan_results': List of (c_ratio, s_star) tuples from all scans
+            'scan_history': Dict with results from each scan level
+    """
+    # Set up base lattice parameters
+    params = {'a': 5.0, 'b_ratio': 1.0, 'c_ratio': 1.0, 
+              'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
+    
+    if lattice_type == 'Hexagonal':
+        params['gamma'] = 120.0
+    elif lattice_type == 'Rhombohedral':
+        params['alpha'] = params['beta'] = params['gamma'] = 80.0
+    elif lattice_type == 'Monoclinic':
+        params['beta'] = 100.0
+    
+    if lattice_params:
+        params.update(lattice_params)
+    
+    if bravais_type is None:
+        bravais_type = lattice_type.lower() + '_P'
+    
+    all_results = []
+    scan_history = {}
+    
+    def evaluate_c_ratio(c_ratio: float) -> Optional[float]:
+        """Evaluate s* for a given c/a ratio."""
+        params['c_ratio'] = c_ratio
+        p = LatticeParams(**params)
+        
+        sub = Sublattice(
+            name='M',
+            offsets=tuple(tuple(o) for o in config_offsets),
+            alpha_ratio=alpha_ratio,
+            bravais_type=bravais_type
+        )
+        
+        s_star = find_threshold_s_for_N([sub], p, target_cn)
+        return s_star
+    
+    def scan_range(c_min: float, c_max: float, n_points: int, level_name: str) -> List[Tuple[float, Optional[float]]]:
+        """Scan a range of c/a ratios."""
+        results = []
+        c_ratios = np.linspace(c_min, c_max, n_points)
+        
+        for i, c_ratio in enumerate(c_ratios):
+            if progress_callback:
+                progress_callback(i + 1, n_points, f"{level_name}: c/a = {c_ratio:.3f}")
+            
+            s_star = evaluate_c_ratio(c_ratio)
+            results.append((c_ratio, s_star))
+            all_results.append((c_ratio, s_star))
+        
+        return results
+    
+    def find_best_two(results: List[Tuple[float, Optional[float]]]) -> Tuple[float, float]:
+        """Find the two c/a values with the lowest s* values."""
+        valid = [(c, s) for c, s in results if s is not None]
+        if len(valid) < 2:
+            # If not enough valid results, return the full range
+            return c_ratio_min, c_ratio_max
+        
+        # Sort by s_star
+        sorted_results = sorted(valid, key=lambda x: x[1])
+        
+        # Get the two best c_ratio values
+        best_c = sorted_results[0][0]
+        second_c = sorted_results[1][0] if len(sorted_results) > 1 else sorted_results[0][0]
+        
+        # Return in order (min, max)
+        return (min(best_c, second_c), max(best_c, second_c))
+    
+    # Coarse scan (5 points)
+    coarse_results = scan_range(c_ratio_min, c_ratio_max, 5, "Coarse")
+    scan_history['coarse'] = coarse_results
+    
+    if scan_level == 'coarse':
+        valid = [(c, s) for c, s in all_results if s is not None]
+        if valid:
+            best = min(valid, key=lambda x: x[1])
+            return {
+                'best_c_ratio': best[0],
+                'best_s_star': best[1],
+                'scan_results': all_results,
+                'scan_history': scan_history
+            }
+        return {'best_c_ratio': None, 'best_s_star': None, 'scan_results': all_results, 'scan_history': scan_history}
+    
+    # Medium scan (5 points between best two from coarse)
+    c_min_med, c_max_med = find_best_two(coarse_results)
+    # Expand range slightly to avoid missing the optimum
+    margin = (c_max_med - c_min_med) * 0.2
+    c_min_med = max(c_ratio_min, c_min_med - margin)
+    c_max_med = min(c_ratio_max, c_max_med + margin)
+    
+    medium_results = scan_range(c_min_med, c_max_med, 5, "Medium")
+    scan_history['medium'] = medium_results
+    
+    if scan_level == 'medium':
+        valid = [(c, s) for c, s in all_results if s is not None]
+        if valid:
+            best = min(valid, key=lambda x: x[1])
+            return {
+                'best_c_ratio': best[0],
+                'best_s_star': best[1],
+                'scan_results': all_results,
+                'scan_history': scan_history
+            }
+        return {'best_c_ratio': None, 'best_s_star': None, 'scan_results': all_results, 'scan_history': scan_history}
+    
+    # Fine scan (10 points between best two from medium)
+    c_min_fine, c_max_fine = find_best_two(medium_results)
+    margin = (c_max_fine - c_min_fine) * 0.1
+    c_min_fine = max(c_ratio_min, c_min_fine - margin)
+    c_max_fine = min(c_ratio_max, c_max_fine + margin)
+    
+    fine_results = scan_range(c_min_fine, c_max_fine, 10, "Fine")
+    scan_history['fine'] = fine_results
+    
+    if scan_level == 'fine':
+        valid = [(c, s) for c, s in all_results if s is not None]
+        if valid:
+            best = min(valid, key=lambda x: x[1])
+            return {
+                'best_c_ratio': best[0],
+                'best_s_star': best[1],
+                'scan_results': all_results,
+                'scan_history': scan_history
+            }
+        return {'best_c_ratio': None, 'best_s_star': None, 'scan_results': all_results, 'scan_history': scan_history}
+    
+    # Ultrafine scan (10 additional points)
+    c_min_uf, c_max_uf = find_best_two(fine_results)
+    margin = (c_max_uf - c_min_uf) * 0.05
+    c_min_uf = max(c_ratio_min, c_min_uf - margin)
+    c_max_uf = min(c_ratio_max, c_max_uf + margin)
+    
+    ultrafine_results = scan_range(c_min_uf, c_max_uf, 10, "Ultrafine")
+    scan_history['ultrafine'] = ultrafine_results
+    
+    # Find overall best
+    valid = [(c, s) for c, s in all_results if s is not None]
+    if valid:
+        best = min(valid, key=lambda x: x[1])
+        return {
+            'best_c_ratio': best[0],
+            'best_s_star': best[1],
+            'scan_results': all_results,
+            'scan_history': scan_history
+        }
+    
+    return {'best_c_ratio': None, 'best_s_star': None, 'scan_results': all_results, 'scan_history': scan_history}
+
+
+def batch_scan_c_ratio(
+    configs: List[dict],
+    target_cn: int,
+    alpha_ratio: float = 0.5,
+    c_ratio_min: float = 0.5,
+    c_ratio_max: float = 2.0,
+    scan_level: str = 'fine',
+    lattice_params: Optional[dict] = None,
+    progress_callback: Optional[callable] = None
+) -> Dict[str, Dict]:
+    """
+    Scan c/a ratio for multiple configurations.
+    Only scans configs where c/a is relevant (Tetragonal, Hexagonal, Orthorhombic).
+    
+    Args:
+        configs: List of config dicts with 'id', 'lattice', 'offsets', 'bravais_type'
+        target_cn: Target coordination number
+        alpha_ratio: Sphere radius ratio
+        c_ratio_min: Minimum c/a ratio
+        c_ratio_max: Maximum c/a ratio
+        scan_level: Scan resolution level
+        lattice_params: Optional additional parameters
+        progress_callback: Optional callback(config_id, current, total)
+    
+    Returns:
+        Dict mapping config ID to scan results
+    """
+    # Lattices where c/a scanning is relevant
+    scannable_lattices = {'Tetragonal', 'Hexagonal', 'Orthorhombic'}
+    
+    results = {}
+    scannable_configs = [c for c in configs 
+                        if c.get('lattice') in scannable_lattices 
+                        and c.get('offsets') is not None]
+    
+    for i, config in enumerate(scannable_configs):
+        if progress_callback:
+            progress_callback(config['id'], i + 1, len(scannable_configs))
+        
+        scan_result = scan_c_ratio_for_min_scale(
+            config['offsets'],
+            target_cn,
+            config['lattice'],
+            alpha_ratio,
+            config.get('bravais_type'),
+            c_ratio_min,
+            c_ratio_max,
+            scan_level,
+            lattice_params
+        )
+        
+        results[config['id']] = scan_result
+    
+    return results

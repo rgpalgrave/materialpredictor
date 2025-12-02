@@ -21,7 +21,8 @@ from lattice_configs import (
     LATTICE_COLORS, BRAVAIS_LABELS, LatticeConfig
 )
 from interstitial_engine import (
-    compute_min_scale_for_cn, LatticeParams, Sublattice, find_threshold_s_for_N
+    compute_min_scale_for_cn, LatticeParams, Sublattice, find_threshold_s_for_N,
+    scan_c_ratio_for_min_scale, batch_scan_c_ratio
 )
 
 st.set_page_config(
@@ -445,6 +446,179 @@ def main():
                     with st.expander(f"⚠️ {len(failures)} configurations could not achieve CN={target_cn}"):
                         for config_id, data in failures:
                             st.text(f"  • {config_id}: {data.get('status', 'unknown')}")
+            
+            # c/a Ratio Scanning Section
+            st.markdown("---")
+            st.header("📊 c/a Ratio Optimization")
+            st.markdown("Scan c/a ratios to find optimal parameters for tetragonal, hexagonal, and orthorhombic lattices.")
+            
+            # Initialize c/a scan results in session state
+            if 'ca_scan_results' not in st.session_state:
+                st.session_state.ca_scan_results = {}
+            
+            # c/a scan settings
+            ca_cols = st.columns(4)
+            with ca_cols[0]:
+                c_ratio_min = st.number_input("c/a min", min_value=0.1, max_value=1.5, 
+                                              value=0.5, step=0.1, key='ca_min')
+            with ca_cols[1]:
+                c_ratio_max = st.number_input("c/a max", min_value=0.5, max_value=3.0,
+                                              value=2.0, step=0.1, key='ca_max')
+            with ca_cols[2]:
+                scan_level = st.selectbox("Scan Level", 
+                                         ['coarse', 'medium', 'fine', 'ultrafine'],
+                                         index=2, key='scan_level')
+            with ca_cols[3]:
+                st.markdown("")
+                st.markdown("")
+                # Get configs that support c/a scanning
+                scannable_lattices = {'Tetragonal', 'Hexagonal', 'Orthorhombic'}
+                scannable_configs = [c for c in configs['arity0'] 
+                                    if c.lattice in scannable_lattices and c.offsets is not None]
+                
+                scan_disabled = len(scannable_configs) == 0
+                if st.button("🔬 Scan c/a Ratios", type="primary", use_container_width=True, 
+                            disabled=scan_disabled):
+                    progress_bar = st.progress(0)
+                    status_text = st.empty()
+                    
+                    ca_results = {}
+                    
+                    for i, config in enumerate(scannable_configs):
+                        status_text.text(f"Scanning {config.id}...")
+                        progress_bar.progress((i + 1) / len(scannable_configs))
+                        
+                        try:
+                            scan_result = scan_c_ratio_for_min_scale(
+                                config.offsets,
+                                target_cn,
+                                config.lattice,
+                                alpha_ratio,
+                                bravais_type=config.bravais_type,
+                                c_ratio_min=c_ratio_min,
+                                c_ratio_max=c_ratio_max,
+                                scan_level=scan_level
+                            )
+                            ca_results[config.id] = {
+                                **scan_result,
+                                'lattice': config.lattice,
+                                'bravais_type': config.bravais_type,
+                                'pattern': config.pattern
+                            }
+                        except Exception as e:
+                            ca_results[config.id] = {
+                                'best_c_ratio': None,
+                                'best_s_star': None,
+                                'error': str(e)
+                            }
+                    
+                    progress_bar.empty()
+                    status_text.empty()
+                    st.session_state.ca_scan_results = ca_results
+            
+            if scan_disabled:
+                st.caption("No tetragonal, hexagonal, or orthorhombic configurations available for c/a scanning.")
+            
+            # Display c/a scan results
+            if st.session_state.ca_scan_results:
+                st.subheader(f"c/a Scan Results for CN = {target_cn}")
+                
+                # Sort by best s_star
+                sorted_ca_results = sorted(
+                    [(k, v) for k, v in st.session_state.ca_scan_results.items() 
+                     if v.get('best_s_star') is not None],
+                    key=lambda x: x[1]['best_s_star']
+                )
+                
+                if sorted_ca_results:
+                    # Best result
+                    best_id, best_data = sorted_ca_results[0]
+                    st.success(f"**Best: {best_id}** — c/a = {best_data['best_c_ratio']:.4f}, s* = {best_data['best_s_star']:.4f}")
+                    
+                    # Results table
+                    ca_df_data = []
+                    for config_id, data in sorted_ca_results:
+                        bravais = data.get('bravais_type', '')
+                        bravais_label = BRAVAIS_LABELS.get(bravais, bravais)
+                        ca_df_data.append({
+                            'Configuration': config_id,
+                            'Optimal c/a': f"{data['best_c_ratio']:.4f}",
+                            's*': f"{data['best_s_star']:.4f}",
+                            'Lattice': data.get('lattice', ''),
+                            'Bravais': bravais_label
+                        })
+                    
+                    ca_df = pd.DataFrame(ca_df_data)
+                    st.dataframe(ca_df, use_container_width=True, hide_index=True)
+                    
+                    # Detailed view for selected configuration
+                    st.markdown("#### Detailed Scan Results")
+                    selected_config = st.selectbox(
+                        "Select configuration to view scan details:",
+                        [r[0] for r in sorted_ca_results],
+                        key='ca_detail_select'
+                    )
+                    
+                    if selected_config:
+                        detail_data = st.session_state.ca_scan_results[selected_config]
+                        scan_results = detail_data.get('scan_results', [])
+                        
+                        if scan_results:
+                            # Create scan plot
+                            valid_scans = [(c, s) for c, s in scan_results if s is not None]
+                            if valid_scans:
+                                c_vals, s_vals = zip(*valid_scans)
+                                
+                                fig_scan = go.Figure()
+                                fig_scan.add_trace(go.Scatter(
+                                    x=c_vals,
+                                    y=s_vals,
+                                    mode='markers+lines',
+                                    marker=dict(size=8, color='#667eea'),
+                                    line=dict(width=1, color='#667eea', dash='dot'),
+                                    name='Scan points'
+                                ))
+                                
+                                # Mark the optimum
+                                if detail_data.get('best_c_ratio') and detail_data.get('best_s_star'):
+                                    fig_scan.add_trace(go.Scatter(
+                                        x=[detail_data['best_c_ratio']],
+                                        y=[detail_data['best_s_star']],
+                                        mode='markers',
+                                        marker=dict(size=15, color='#22c55e', symbol='star'),
+                                        name=f"Optimum (c/a={detail_data['best_c_ratio']:.3f})"
+                                    ))
+                                
+                                fig_scan.update_layout(
+                                    title=f"s* vs c/a for {selected_config}",
+                                    xaxis_title="c/a ratio",
+                                    yaxis_title="s*",
+                                    height=350,
+                                    showlegend=True
+                                )
+                                st.plotly_chart(fig_scan, use_container_width=True)
+                            
+                            # Show scan history
+                            scan_history = detail_data.get('scan_history', {})
+                            if scan_history:
+                                with st.expander("View scan history by level"):
+                                    for level, level_results in scan_history.items():
+                                        valid_level = [(c, s) for c, s in level_results if s is not None]
+                                        if valid_level:
+                                            st.markdown(f"**{level.capitalize()}** ({len(valid_level)} points)")
+                                            level_df = pd.DataFrame(valid_level, columns=['c/a', 's*'])
+                                            level_df['s*'] = level_df['s*'].apply(lambda x: f"{x:.4f}")
+                                            level_df['c/a'] = level_df['c/a'].apply(lambda x: f"{x:.4f}")
+                                            st.dataframe(level_df, use_container_width=True, hide_index=True)
+                
+                # Show failures
+                ca_failures = [(k, v) for k, v in st.session_state.ca_scan_results.items() 
+                              if v.get('best_s_star') is None]
+                if ca_failures:
+                    with st.expander(f"⚠️ {len(ca_failures)} configurations could not achieve CN={target_cn}"):
+                        for config_id, data in ca_failures:
+                            error = data.get('error', 'not achievable in c/a range')
+                            st.text(f"  • {config_id}: {error}")
         else:
             st.info("👆 Calculate stoichiometry first to determine target CN")
     
