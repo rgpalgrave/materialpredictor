@@ -17,7 +17,8 @@ from ionic_radii import (
     get_all_cations, get_all_anions, IONIC_RADII
 )
 from lattice_configs import (
-    get_configs_for_n, get_all_lattice_types, LATTICE_COLORS, LatticeConfig
+    get_configs_for_n, get_all_lattice_types, get_all_bravais_types,
+    LATTICE_COLORS, BRAVAIS_LABELS, LatticeConfig
 )
 from interstitial_engine import (
     compute_min_scale_for_cn, LatticeParams, Sublattice, find_threshold_s_for_N
@@ -366,14 +367,16 @@ def main():
                                 config.offsets,
                                 target_cn,
                                 config.lattice,
-                                alpha_ratio
+                                alpha_ratio,
+                                bravais_type=config.bravais_type
                             )
                             if s_star is not None:
                                 results[config.id] = {
                                     's_star': s_star,
                                     'status': 'found',
                                     'lattice': config.lattice,
-                                    'pattern': config.pattern
+                                    'pattern': config.pattern,
+                                    'bravais_type': config.bravais_type
                                 }
                             else:
                                 results[config.id] = {'s_star': None, 'status': 'not_achievable'}
@@ -402,10 +405,13 @@ def main():
                     # Results table
                     df_data = []
                     for config_id, data in sorted_results:
+                        bravais = data.get('bravais_type', '')
+                        bravais_label = BRAVAIS_LABELS.get(bravais, bravais)
                         df_data.append({
                             'Configuration': config_id,
                             's*': f"{data['s_star']:.4f}",
                             'Lattice': data.get('lattice', ''),
+                            'Bravais': bravais_label,
                             'Pattern': data.get('pattern', '')
                         })
                     

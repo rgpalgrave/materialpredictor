@@ -28,17 +28,72 @@ class LatticeParams:
         return self.a * self.c_ratio
 
 
+# Bravais lattice basis points (fractional coordinates)
+# These are the centering translations that define each Bravais type
+BRAVAIS_BASIS = {
+    # Cubic
+    'cubic_P': [(0, 0, 0)],
+    'cubic_I': [(0, 0, 0), (0.5, 0.5, 0.5)],  # BCC
+    'cubic_F': [(0, 0, 0), (0.5, 0.5, 0), (0.5, 0, 0.5), (0, 0.5, 0.5)],  # FCC
+    
+    # Tetragonal
+    'tetragonal_P': [(0, 0, 0)],
+    'tetragonal_I': [(0, 0, 0), (0.5, 0.5, 0.5)],  # Body-centered tetragonal
+    
+    # Orthorhombic
+    'orthorhombic_P': [(0, 0, 0)],
+    'orthorhombic_I': [(0, 0, 0), (0.5, 0.5, 0.5)],  # Body-centered
+    'orthorhombic_F': [(0, 0, 0), (0.5, 0.5, 0), (0.5, 0, 0.5), (0, 0.5, 0.5)],  # Face-centered
+    'orthorhombic_C': [(0, 0, 0), (0.5, 0.5, 0)],  # C-centered (base-centered)
+    'orthorhombic_A': [(0, 0, 0), (0, 0.5, 0.5)],  # A-centered
+    'orthorhombic_B': [(0, 0, 0), (0.5, 0, 0.5)],  # B-centered
+    
+    # Hexagonal
+    'hexagonal_P': [(0, 0, 0)],
+    'hexagonal_H': [(0, 0, 0), (2/3, 1/3, 0.5)],  # HCP - note: requires c/a ~ 1.633 for ideal
+    
+    # Rhombohedral
+    'rhombohedral_P': [(0, 0, 0)],
+    
+    # Monoclinic
+    'monoclinic_P': [(0, 0, 0)],
+    'monoclinic_C': [(0, 0, 0), (0.5, 0.5, 0)],  # C-centered
+    
+    # Triclinic
+    'triclinic_P': [(0, 0, 0)],
+}
+
+
 @dataclass(frozen=True)
 class Sublattice:
     """A sublattice with positions and sphere parameters."""
     name: str
     offsets: Tuple[Tuple[float, float, float], ...]  # Fractional coordinates
     alpha_ratio: float = 0.5  # Sphere radius = alpha_ratio * scale * a
+    bravais_type: str = 'cubic_P'  # Bravais lattice type for centering
     
     def __post_init__(self):
         # Convert list to tuple if needed
         if isinstance(self.offsets, list):
             object.__setattr__(self, 'offsets', tuple(tuple(o) for o in self.offsets))
+    
+    def get_all_positions(self) -> List[Tuple[float, float, float]]:
+        """Get all atomic positions including Bravais centering."""
+        basis = BRAVAIS_BASIS.get(self.bravais_type, [(0, 0, 0)])
+        positions = []
+        for offset in self.offsets:
+            for b in basis:
+                # Add basis translation to offset, wrap to [0, 1)
+                pos = tuple((offset[i] + b[i]) % 1.0 for i in range(3))
+                # Avoid duplicates (within tolerance)
+                is_dup = False
+                for existing in positions:
+                    if all(abs((pos[i] - existing[i] + 0.5) % 1.0 - 0.5) < 1e-6 for i in range(3)):
+                        is_dup = True
+                        break
+                if not is_dup:
+                    positions.append(pos)
+        return positions
 
 
 def lattice_vectors(p: LatticeParams) -> np.ndarray:
@@ -131,8 +186,10 @@ def build_centers_and_radii(sublattices: List[Sublattice], p: LatticeParams,
     radii = []
     
     for sub in sublattices:
-        for offset in sub.offsets:
-            cart = frac_to_cart(np.array(offset), lat_vecs)
+        # Get all positions including Bravais centering
+        all_positions = sub.get_all_positions()
+        for pos in all_positions:
+            cart = frac_to_cart(np.array(pos), lat_vecs)
             centers.append(cart)
             radii.append(sub.alpha_ratio * scale_s * p.a)
     
@@ -311,6 +368,7 @@ def compute_min_scale_for_cn(config_offsets: List[Tuple[float, float, float]],
                              target_cn: int,
                              lattice_type: str,
                              alpha_ratio: float = 0.5,
+                             bravais_type: Optional[str] = None,
                              lattice_params: Optional[dict] = None) -> Optional[float]:
     """
     Compute minimum scale factor for a specific lattice configuration to achieve target CN.
@@ -320,6 +378,7 @@ def compute_min_scale_for_cn(config_offsets: List[Tuple[float, float, float]],
         target_cn: Target coordination number (intersection multiplicity)
         lattice_type: 'Cubic', 'Tetragonal', 'Hexagonal', etc.
         alpha_ratio: r = alpha * s * a
+        bravais_type: Specific Bravais type (e.g., 'cubic_F', 'tetragonal_I')
         lattice_params: Optional dict with 'b_ratio', 'c_ratio', 'alpha', 'beta', 'gamma'
     
     Returns:
@@ -331,10 +390,13 @@ def compute_min_scale_for_cn(config_offsets: List[Tuple[float, float, float]],
     
     if lattice_type == 'Hexagonal':
         params['gamma'] = 120.0
+        # For HCP, use ideal c/a ratio
+        if bravais_type == 'hexagonal_H':
+            params['c_ratio'] = 1.633
     elif lattice_type == 'Rhombohedral':
-        params['alpha'] = params['beta'] = params['gamma'] = 80.0  # Default rhombohedral angle
+        params['alpha'] = params['beta'] = params['gamma'] = 80.0
     elif lattice_type == 'Monoclinic':
-        params['beta'] = 100.0  # Default monoclinic angle
+        params['beta'] = 100.0
     
     # Override with user params
     if lattice_params:
@@ -342,11 +404,16 @@ def compute_min_scale_for_cn(config_offsets: List[Tuple[float, float, float]],
     
     p = LatticeParams(**params)
     
+    # Determine Bravais type if not specified
+    if bravais_type is None:
+        bravais_type = lattice_type.lower() + '_P'
+    
     # Create sublattice
     sub = Sublattice(
         name='M',
         offsets=tuple(tuple(o) for o in config_offsets),
-        alpha_ratio=alpha_ratio
+        alpha_ratio=alpha_ratio,
+        bravais_type=bravais_type
     )
     
     # Find threshold
@@ -361,7 +428,7 @@ def batch_compute_min_scales(configs: List[dict], target_cn: int,
     Compute minimum scale factors for multiple configurations.
     
     Args:
-        configs: List of dicts with 'id', 'lattice', 'offsets'
+        configs: List of dicts with 'id', 'lattice', 'offsets', optionally 'bravais_type'
         target_cn: Target coordination number
         alpha_ratio: Sphere radius ratio
         lattice_params: Optional additional lattice parameters
@@ -371,7 +438,7 @@ def batch_compute_min_scales(configs: List[dict], target_cn: int,
     """
     results = {}
     for config in configs:
-        if config['offsets'] is None:  # Parametric config
+        if config.get('offsets') is None:  # Parametric config
             results[config['id']] = None
             continue
         
@@ -380,6 +447,7 @@ def batch_compute_min_scales(configs: List[dict], target_cn: int,
             target_cn,
             config['lattice'],
             alpha_ratio,
+            config.get('bravais_type'),
             lattice_params
         )
         results[config['id']] = s_star

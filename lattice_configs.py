@@ -16,6 +16,7 @@ class LatticeConfig:
     params: str
     pattern: str = ""
     free_param: Optional[str] = None  # For arity-1 configs
+    bravais_type: str = ""  # e.g., 'cubic_P', 'cubic_F', 'cubic_I'
     
     @property
     def is_parametric(self) -> bool:
@@ -24,6 +25,11 @@ class LatticeConfig:
     @property
     def arity(self) -> int:
         return 1 if self.is_parametric else 0
+    
+    def __post_init__(self):
+        # Set default bravais_type if not specified
+        if not self.bravais_type:
+            self.bravais_type = self.lattice.lower() + '_P'
 
 
 def parse_offset(s: str) -> tuple[float, float, float]:
@@ -57,15 +63,29 @@ def parse_offset(s: str) -> tuple[float, float, float]:
     return tuple(result)
 
 
-# N=1 configurations
+# N=1 configurations - includes all 14 Bravais lattices
 N1_CONFIGS = {
     'arity0': [
-        LatticeConfig('N1-C', 'Cubic', [(0,0,0)], 'a'),
-        LatticeConfig('N1-T', 'Tetragonal', [(0,0,0)], 'a, c/a'),
-        LatticeConfig('N1-H', 'Hexagonal', [(0,0,0)], 'a, c/a'),
-        LatticeConfig('N1-O', 'Orthorhombic', [(0,0,0)], 'a, b/a, c/a'),
-        LatticeConfig('N1-R', 'Rhombohedral', [(0,0,0)], 'a, α'),
-        LatticeConfig('N1-M', 'Monoclinic', [(0,0,0)], 'a, b/a, c/a, β'),
+        # Cubic
+        LatticeConfig('N1-cP', 'Cubic', [(0,0,0)], 'a', 'Primitive', bravais_type='cubic_P'),
+        LatticeConfig('N1-cI', 'Cubic', [(0,0,0)], 'a', 'BCC', bravais_type='cubic_I'),
+        LatticeConfig('N1-cF', 'Cubic', [(0,0,0)], 'a', 'FCC', bravais_type='cubic_F'),
+        # Tetragonal
+        LatticeConfig('N1-tP', 'Tetragonal', [(0,0,0)], 'a, c/a', 'Primitive', bravais_type='tetragonal_P'),
+        LatticeConfig('N1-tI', 'Tetragonal', [(0,0,0)], 'a, c/a', 'Body-centered', bravais_type='tetragonal_I'),
+        # Orthorhombic
+        LatticeConfig('N1-oP', 'Orthorhombic', [(0,0,0)], 'a, b/a, c/a', 'Primitive', bravais_type='orthorhombic_P'),
+        LatticeConfig('N1-oI', 'Orthorhombic', [(0,0,0)], 'a, b/a, c/a', 'Body-centered', bravais_type='orthorhombic_I'),
+        LatticeConfig('N1-oF', 'Orthorhombic', [(0,0,0)], 'a, b/a, c/a', 'Face-centered', bravais_type='orthorhombic_F'),
+        LatticeConfig('N1-oC', 'Orthorhombic', [(0,0,0)], 'a, b/a, c/a', 'C-centered', bravais_type='orthorhombic_C'),
+        # Hexagonal
+        LatticeConfig('N1-hP', 'Hexagonal', [(0,0,0)], 'a, c/a', 'Primitive', bravais_type='hexagonal_P'),
+        LatticeConfig('N1-hR', 'Hexagonal', [(0,0,0)], 'a, c/a', 'HCP', bravais_type='hexagonal_H'),
+        # Rhombohedral
+        LatticeConfig('N1-rP', 'Rhombohedral', [(0,0,0)], 'a, α', 'Primitive', bravais_type='rhombohedral_P'),
+        # Monoclinic
+        LatticeConfig('N1-mP', 'Monoclinic', [(0,0,0)], 'a, b/a, c/a, β', 'Primitive', bravais_type='monoclinic_P'),
+        LatticeConfig('N1-mC', 'Monoclinic', [(0,0,0)], 'a, b/a, c/a, β', 'C-centered', bravais_type='monoclinic_C'),
     ],
     'arity1': []
 }
@@ -73,46 +93,76 @@ N1_CONFIGS = {
 # N=2 configurations
 N2_CONFIGS = {
     'arity0': [
-        LatticeConfig('N2-C1', 'Cubic', [(0,0,0), (0.5,0.5,0.5)], 'a', 'Body center (CsCl)'),
-        LatticeConfig('N2-C2', 'Cubic', [(0,0,0), (0.5,0.5,0)], 'a', 'Face center'),
-        LatticeConfig('N2-C3', 'Cubic', [(0,0,0), (0.5,0,0)], 'a', 'Edge center'),
-        LatticeConfig('N2-C4', 'Cubic', [(0,0,0), (0.25,0.25,0.25)], 'a', 'Quarter diagonal'),
-        LatticeConfig('N2-T1', 'Tetragonal', [(0,0,0), (0,0,0.5)], 'a, c/a', 'c-stack'),
-        LatticeConfig('N2-T2', 'Tetragonal', [(0,0,0), (0.5,0.5,0)], 'a, c/a', 'In-plane center'),
-        LatticeConfig('N2-T3', 'Tetragonal', [(0,0,0), (0.5,0.5,0.5)], 'a, c/a', 'Body center'),
-        LatticeConfig('N2-T4', 'Tetragonal', [(0,0,0), (0,0.5,0)], 'a, c/a', 'Edge'),
-        LatticeConfig('N2-T5', 'Tetragonal', [(0,0,0), (0,0.5,0.5)], 'a, c/a', 'Edge + c/2'),
-        LatticeConfig('N2-H1', 'Hexagonal', [(0,0,0), (0,0,0.5)], 'a, c/a', 'c-stack'),
-        LatticeConfig('N2-H2', 'Hexagonal', [(0,0,0), (1/3,2/3,0)], 'a, c/a', 'Triangular'),
-        LatticeConfig('N2-H3', 'Hexagonal', [(0,0,0), (1/3,2/3,0.5)], 'a, c/a', 'Triangular + c/2'),
-        LatticeConfig('N2-H4', 'Hexagonal', [(0,0,0), (0.5,0,0)], 'a, c/a', 'Edge'),
-        LatticeConfig('N2-H5', 'Hexagonal', [(0,0,0), (0.5,0.5,0)], 'a, c/a', ''),
-        LatticeConfig('N2-O1', 'Orthorhombic', [(0,0,0), (0,0,0.5)], 'a, b/a, c/a', 'c-stack'),
-        LatticeConfig('N2-O2', 'Orthorhombic', [(0,0,0), (0,0.5,0)], 'a, b/a, c/a', 'b-stack'),
-        LatticeConfig('N2-O3', 'Orthorhombic', [(0,0,0), (0.5,0,0)], 'a, b/a, c/a', 'a-stack'),
-        LatticeConfig('N2-O4', 'Orthorhombic', [(0,0,0), (0.5,0.5,0.5)], 'a, b/a, c/a', 'Body center'),
-        LatticeConfig('N2-O5', 'Orthorhombic', [(0,0,0), (0.5,0.5,0)], 'a, b/a, c/a', 'ab-face'),
-        LatticeConfig('N2-O6', 'Orthorhombic', [(0,0,0), (0.5,0,0.5)], 'a, b/a, c/a', 'ac-face'),
-        LatticeConfig('N2-O7', 'Orthorhombic', [(0,0,0), (0,0.5,0.5)], 'a, b/a, c/a', 'bc-face'),
-        LatticeConfig('N2-R1', 'Rhombohedral', [(0,0,0), (0,0,0.5)], 'a, α', 'c-stack'),
-        LatticeConfig('N2-R2', 'Rhombohedral', [(0,0,0), (1/3,2/3,1/3)], 'a, α', 'R-offset'),
-        LatticeConfig('N2-M1', 'Monoclinic', [(0,0,0), (0,0.5,0)], 'a, b/a, c/a, β', 'b-stack'),
-        LatticeConfig('N2-M2', 'Monoclinic', [(0,0,0), (0,0,0.5)], 'a, b/a, c/a, β', 'c-stack'),
-        LatticeConfig('N2-M3', 'Monoclinic', [(0,0,0), (0.5,0,0)], 'a, b/a, c/a, β', 'a-stack'),
-        LatticeConfig('N2-M4', 'Monoclinic', [(0,0,0), (0.5,0.5,0.5)], 'a, b/a, c/a, β', 'Body center'),
-        LatticeConfig('N2-M5', 'Monoclinic', [(0,0,0), (0.5,0,0.5)], 'a, b/a, c/a, β', 'ac-face'),
+        # Cubic Primitive
+        LatticeConfig('N2-cP1', 'Cubic', [(0,0,0), (0.5,0.5,0.5)], 'a', 'Body center (CsCl)', bravais_type='cubic_P'),
+        LatticeConfig('N2-cP2', 'Cubic', [(0,0,0), (0.5,0.5,0)], 'a', 'Face center', bravais_type='cubic_P'),
+        LatticeConfig('N2-cP3', 'Cubic', [(0,0,0), (0.5,0,0)], 'a', 'Edge center', bravais_type='cubic_P'),
+        LatticeConfig('N2-cP4', 'Cubic', [(0,0,0), (0.25,0.25,0.25)], 'a', 'Quarter diagonal', bravais_type='cubic_P'),
+        # Cubic BCC
+        LatticeConfig('N2-cI1', 'Cubic', [(0,0,0), (0.5,0.5,0)], 'a', 'Face center', bravais_type='cubic_I'),
+        LatticeConfig('N2-cI2', 'Cubic', [(0,0,0), (0.25,0.25,0.25)], 'a', 'Quarter diagonal', bravais_type='cubic_I'),
+        # Cubic FCC
+        LatticeConfig('N2-cF1', 'Cubic', [(0,0,0), (0.5,0.5,0.5)], 'a', 'Body center', bravais_type='cubic_F'),
+        LatticeConfig('N2-cF2', 'Cubic', [(0,0,0), (0.25,0.25,0.25)], 'a', 'Quarter diagonal', bravais_type='cubic_F'),
+        # Tetragonal Primitive
+        LatticeConfig('N2-tP1', 'Tetragonal', [(0,0,0), (0,0,0.5)], 'a, c/a', 'c-stack', bravais_type='tetragonal_P'),
+        LatticeConfig('N2-tP2', 'Tetragonal', [(0,0,0), (0.5,0.5,0)], 'a, c/a', 'In-plane center', bravais_type='tetragonal_P'),
+        LatticeConfig('N2-tP3', 'Tetragonal', [(0,0,0), (0.5,0.5,0.5)], 'a, c/a', 'Body center', bravais_type='tetragonal_P'),
+        LatticeConfig('N2-tP4', 'Tetragonal', [(0,0,0), (0,0.5,0)], 'a, c/a', 'Edge', bravais_type='tetragonal_P'),
+        LatticeConfig('N2-tP5', 'Tetragonal', [(0,0,0), (0,0.5,0.5)], 'a, c/a', 'Edge + c/2', bravais_type='tetragonal_P'),
+        # Tetragonal Body-centered
+        LatticeConfig('N2-tI1', 'Tetragonal', [(0,0,0), (0,0,0.5)], 'a, c/a', 'c-stack', bravais_type='tetragonal_I'),
+        LatticeConfig('N2-tI2', 'Tetragonal', [(0,0,0), (0.5,0.5,0)], 'a, c/a', 'In-plane center', bravais_type='tetragonal_I'),
+        # Hexagonal Primitive
+        LatticeConfig('N2-hP1', 'Hexagonal', [(0,0,0), (0,0,0.5)], 'a, c/a', 'c-stack', bravais_type='hexagonal_P'),
+        LatticeConfig('N2-hP2', 'Hexagonal', [(0,0,0), (1/3,2/3,0)], 'a, c/a', 'Triangular', bravais_type='hexagonal_P'),
+        LatticeConfig('N2-hP3', 'Hexagonal', [(0,0,0), (1/3,2/3,0.5)], 'a, c/a', 'Triangular + c/2', bravais_type='hexagonal_P'),
+        LatticeConfig('N2-hP4', 'Hexagonal', [(0,0,0), (0.5,0,0)], 'a, c/a', 'Edge', bravais_type='hexagonal_P'),
+        LatticeConfig('N2-hP5', 'Hexagonal', [(0,0,0), (0.5,0.5,0)], 'a, c/a', '', bravais_type='hexagonal_P'),
+        # Hexagonal HCP
+        LatticeConfig('N2-hR1', 'Hexagonal', [(0,0,0), (0,0,0.5)], 'a, c/a', 'c-stack', bravais_type='hexagonal_H'),
+        LatticeConfig('N2-hR2', 'Hexagonal', [(0,0,0), (1/3,2/3,0)], 'a, c/a', 'Triangular', bravais_type='hexagonal_H'),
+        # Orthorhombic Primitive
+        LatticeConfig('N2-oP1', 'Orthorhombic', [(0,0,0), (0,0,0.5)], 'a, b/a, c/a', 'c-stack', bravais_type='orthorhombic_P'),
+        LatticeConfig('N2-oP2', 'Orthorhombic', [(0,0,0), (0,0.5,0)], 'a, b/a, c/a', 'b-stack', bravais_type='orthorhombic_P'),
+        LatticeConfig('N2-oP3', 'Orthorhombic', [(0,0,0), (0.5,0,0)], 'a, b/a, c/a', 'a-stack', bravais_type='orthorhombic_P'),
+        LatticeConfig('N2-oP4', 'Orthorhombic', [(0,0,0), (0.5,0.5,0.5)], 'a, b/a, c/a', 'Body center', bravais_type='orthorhombic_P'),
+        LatticeConfig('N2-oP5', 'Orthorhombic', [(0,0,0), (0.5,0.5,0)], 'a, b/a, c/a', 'ab-face', bravais_type='orthorhombic_P'),
+        LatticeConfig('N2-oP6', 'Orthorhombic', [(0,0,0), (0.5,0,0.5)], 'a, b/a, c/a', 'ac-face', bravais_type='orthorhombic_P'),
+        LatticeConfig('N2-oP7', 'Orthorhombic', [(0,0,0), (0,0.5,0.5)], 'a, b/a, c/a', 'bc-face', bravais_type='orthorhombic_P'),
+        # Orthorhombic Body-centered
+        LatticeConfig('N2-oI1', 'Orthorhombic', [(0,0,0), (0,0,0.5)], 'a, b/a, c/a', 'c-stack', bravais_type='orthorhombic_I'),
+        LatticeConfig('N2-oI2', 'Orthorhombic', [(0,0,0), (0.5,0.5,0)], 'a, b/a, c/a', 'ab-face', bravais_type='orthorhombic_I'),
+        # Orthorhombic Face-centered
+        LatticeConfig('N2-oF1', 'Orthorhombic', [(0,0,0), (0,0,0.5)], 'a, b/a, c/a', 'c-stack', bravais_type='orthorhombic_F'),
+        LatticeConfig('N2-oF2', 'Orthorhombic', [(0,0,0), (0.5,0.5,0.5)], 'a, b/a, c/a', 'Body center', bravais_type='orthorhombic_F'),
+        # Orthorhombic C-centered
+        LatticeConfig('N2-oC1', 'Orthorhombic', [(0,0,0), (0,0,0.5)], 'a, b/a, c/a', 'c-stack', bravais_type='orthorhombic_C'),
+        LatticeConfig('N2-oC2', 'Orthorhombic', [(0,0,0), (0.5,0.5,0.5)], 'a, b/a, c/a', 'Body center', bravais_type='orthorhombic_C'),
+        # Rhombohedral
+        LatticeConfig('N2-rP1', 'Rhombohedral', [(0,0,0), (0,0,0.5)], 'a, α', 'c-stack', bravais_type='rhombohedral_P'),
+        LatticeConfig('N2-rP2', 'Rhombohedral', [(0,0,0), (1/3,2/3,1/3)], 'a, α', 'R-offset', bravais_type='rhombohedral_P'),
+        # Monoclinic Primitive
+        LatticeConfig('N2-mP1', 'Monoclinic', [(0,0,0), (0,0.5,0)], 'a, b/a, c/a, β', 'b-stack', bravais_type='monoclinic_P'),
+        LatticeConfig('N2-mP2', 'Monoclinic', [(0,0,0), (0,0,0.5)], 'a, b/a, c/a, β', 'c-stack', bravais_type='monoclinic_P'),
+        LatticeConfig('N2-mP3', 'Monoclinic', [(0,0,0), (0.5,0,0)], 'a, b/a, c/a, β', 'a-stack', bravais_type='monoclinic_P'),
+        LatticeConfig('N2-mP4', 'Monoclinic', [(0,0,0), (0.5,0.5,0.5)], 'a, b/a, c/a, β', 'Body center', bravais_type='monoclinic_P'),
+        LatticeConfig('N2-mP5', 'Monoclinic', [(0,0,0), (0.5,0,0.5)], 'a, b/a, c/a, β', 'ac-face', bravais_type='monoclinic_P'),
+        # Monoclinic C-centered
+        LatticeConfig('N2-mC1', 'Monoclinic', [(0,0,0), (0,0,0.5)], 'a, b/a, c/a, β', 'c-stack', bravais_type='monoclinic_C'),
+        LatticeConfig('N2-mC2', 'Monoclinic', [(0,0,0), (0.5,0.5,0.5)], 'a, b/a, c/a, β', 'Body center', bravais_type='monoclinic_C'),
     ],
     'arity1': [
-        LatticeConfig('N2-C5', 'Cubic', None, 'a', '', 'x ∈ (0, ½]'),
-        LatticeConfig('N2-T6', 'Tetragonal', None, 'a, c/a', '', 'z ∈ (0, ½]'),
-        LatticeConfig('N2-T7', 'Tetragonal', None, 'a, c/a', '', 'z ∈ (0, ½]'),
-        LatticeConfig('N2-H6', 'Hexagonal', None, 'a, c/a', '', 'z ∈ (0, ½]'),
-        LatticeConfig('N2-H7', 'Hexagonal', None, 'a, c/a', '', 'z ∈ (0, ½]'),
-        LatticeConfig('N2-O8', 'Orthorhombic', None, 'a, b/a, c/a', '', 'z ∈ (0, ½]'),
-        LatticeConfig('N2-O9', 'Orthorhombic', None, 'a, b/a, c/a', '', 'y ∈ (0, ½]'),
-        LatticeConfig('N2-O10', 'Orthorhombic', None, 'a, b/a, c/a', '', 'x ∈ (0, ½]'),
-        LatticeConfig('N2-R3', 'Rhombohedral', None, 'a, α', '', 'z ∈ (0, ½]'),
-        LatticeConfig('N2-M6', 'Monoclinic', None, 'a, b/a, c/a, β', '', 'y ∈ (0, ½]'),
+        LatticeConfig('N2-cP5', 'Cubic', None, 'a', '', 'x ∈ (0, ½]', bravais_type='cubic_P'),
+        LatticeConfig('N2-tP6', 'Tetragonal', None, 'a, c/a', '', 'z ∈ (0, ½]', bravais_type='tetragonal_P'),
+        LatticeConfig('N2-tP7', 'Tetragonal', None, 'a, c/a', '', 'z ∈ (0, ½]', bravais_type='tetragonal_P'),
+        LatticeConfig('N2-hP6', 'Hexagonal', None, 'a, c/a', '', 'z ∈ (0, ½]', bravais_type='hexagonal_P'),
+        LatticeConfig('N2-hP7', 'Hexagonal', None, 'a, c/a', '', 'z ∈ (0, ½]', bravais_type='hexagonal_P'),
+        LatticeConfig('N2-oP8', 'Orthorhombic', None, 'a, b/a, c/a', '', 'z ∈ (0, ½]', bravais_type='orthorhombic_P'),
+        LatticeConfig('N2-oP9', 'Orthorhombic', None, 'a, b/a, c/a', '', 'y ∈ (0, ½]', bravais_type='orthorhombic_P'),
+        LatticeConfig('N2-oP10', 'Orthorhombic', None, 'a, b/a, c/a', '', 'x ∈ (0, ½]', bravais_type='orthorhombic_P'),
+        LatticeConfig('N2-rP3', 'Rhombohedral', None, 'a, α', '', 'z ∈ (0, ½]', bravais_type='rhombohedral_P'),
+        LatticeConfig('N2-mP6', 'Monoclinic', None, 'a, b/a, c/a, β', '', 'y ∈ (0, ½]', bravais_type='monoclinic_P'),
     ]
 }
 
@@ -295,6 +345,36 @@ def get_configs_for_n(n: int, lattice_filter: str = 'all', arity_filter: str = '
 def get_all_lattice_types() -> list[str]:
     """Get list of all lattice types."""
     return ['Cubic', 'Tetragonal', 'Hexagonal', 'Orthorhombic', 'Rhombohedral', 'Monoclinic']
+
+
+def get_all_bravais_types() -> dict[str, list[str]]:
+    """Get dict of lattice type -> list of Bravais centering types."""
+    return {
+        'Cubic': ['cubic_P', 'cubic_I', 'cubic_F'],
+        'Tetragonal': ['tetragonal_P', 'tetragonal_I'],
+        'Orthorhombic': ['orthorhombic_P', 'orthorhombic_I', 'orthorhombic_F', 'orthorhombic_C'],
+        'Hexagonal': ['hexagonal_P', 'hexagonal_H'],
+        'Rhombohedral': ['rhombohedral_P'],
+        'Monoclinic': ['monoclinic_P', 'monoclinic_C'],
+    }
+
+
+BRAVAIS_LABELS = {
+    'cubic_P': 'cP (Primitive)',
+    'cubic_I': 'cI (BCC)',
+    'cubic_F': 'cF (FCC)',
+    'tetragonal_P': 'tP (Primitive)',
+    'tetragonal_I': 'tI (Body-centered)',
+    'orthorhombic_P': 'oP (Primitive)',
+    'orthorhombic_I': 'oI (Body-centered)',
+    'orthorhombic_F': 'oF (Face-centered)',
+    'orthorhombic_C': 'oC (C-centered)',
+    'hexagonal_P': 'hP (Primitive)',
+    'hexagonal_H': 'hR (HCP)',
+    'rhombohedral_P': 'rP (Primitive)',
+    'monoclinic_P': 'mP (Primitive)',
+    'monoclinic_C': 'mC (C-centered)',
+}
 
 
 LATTICE_COLORS = {
