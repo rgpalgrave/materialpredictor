@@ -1344,6 +1344,11 @@ def main():
                 else:
                     half_fill_fraction = 0.5
             
+            # Get expected CN from stoichiometry calculation
+            expected_cn = 6  # Default
+            if 'results' in st.session_state and st.session_state.results:
+                expected_cn = int(round(st.session_state.results.get('anion_cn', 6)))
+            
             # Calculate optimized half-filling if enabled
             half_filling_result = None
             if show_half_filling:
@@ -1352,7 +1357,7 @@ def main():
                     half_filling_result = find_optimal_half_filling(
                         structure=structure,
                         metals=metals,
-                        max_coord_sites=12,
+                        max_coord_sites=expected_cn,  # Use expected CN from stoichiometry
                         target_fraction=half_fill_fraction
                     )
                     st.session_state['half_filling_result'] = half_filling_result
@@ -1362,14 +1367,16 @@ def main():
                     improvement = half_filling_result.mean_regularity_after - half_filling_result.mean_regularity_before
                     delta_str = f"+{improvement:.3f}" if improvement > 0 else f"{improvement:.3f}"
                     
-                    hf_metric_cols = st.columns(4)
+                    hf_metric_cols = st.columns(5)
                     with hf_metric_cols[0]:
                         st.metric("Sites kept", f"{half_filling_result.kept_count}/{half_filling_result.original_count}")
                     with hf_metric_cols[1]:
-                        st.metric("Regularity (before)", f"{half_filling_result.mean_regularity_before:.3f}")
+                        st.metric("Target CN", expected_cn)
                     with hf_metric_cols[2]:
-                        st.metric("Regularity (after)", f"{half_filling_result.mean_regularity_after:.3f}", delta=delta_str)
+                        st.metric("Regularity (before)", f"{half_filling_result.mean_regularity_before:.3f}")
                     with hf_metric_cols[3]:
+                        st.metric("Regularity (after)", f"{half_filling_result.mean_regularity_after:.3f}", delta=delta_str)
+                    with hf_metric_cols[4]:
                         # Show per-metal CNs
                         cn_strs = [f"{m['symbol']}:{m['cn']}" for m in half_filling_result.per_metal_scores]
                         st.metric("CNs", ", ".join(cn_strs))
@@ -1612,13 +1619,18 @@ def main():
             
             coord_cols = st.columns([1, 1, 2])
             with coord_cols[0]:
+                # Get expected CN from stoichiometry as default
+                default_coord_cn = 6
+                if 'results' in st.session_state and st.session_state.results:
+                    default_coord_cn = int(round(st.session_state.results.get('anion_cn', 6)))
+                
                 max_coord_sites = st.number_input(
                     "Max coordination sites",
                     min_value=4,
                     max_value=12,
-                    value=12,
+                    value=min(12, max(4, default_coord_cn)),  # Use expected CN, clamped to 4-12
                     step=1,
-                    help="Maximum number of nearest intersection sites to consider per metal",
+                    help=f"Maximum nearest sites to consider (expected CN from stoichiometry: {default_coord_cn})",
                     key='coord_max_sites'
                 )
             
