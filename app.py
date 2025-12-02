@@ -698,6 +698,12 @@ def main():
                 key='uc_config_select'
             )
             selected_config = available_configs[selected_config_idx]
+            
+            # Update scale factor when config changes
+            if 'uc_last_config' not in st.session_state or st.session_state.uc_last_config != selected_config['id']:
+                st.session_state.uc_last_config = selected_config['id']
+                st.session_state.uc_scale_s = float(selected_config['s_star'])
+                st.rerun()
         
         with uc_cols[1]:
             uc_scale_s = st.number_input(
