@@ -4,6 +4,7 @@ A Streamlit application for crystallographic analysis that calculates:
 - **Stoichiometry** from metal ratios and charges
 - **Anion coordination number** from charge balance and metal CNs
 - **Minimum scale factors** to achieve target intersection multiplicities
+- **Coordination environment regularity** for assessing polyhedron geometry
 
 ## Features
 
@@ -24,6 +25,20 @@ A Streamlit application for crystallographic analysis that calculates:
 - Uses sphere intersection analysis with periodic boundary conditions
 - Binary search algorithm with coarse sweep refinement
 - Results sorted by s* to identify optimal configurations
+
+### 4. c/a Ratio Optimization
+- Scan c/a ratios for tetragonal, hexagonal, and orthorhombic lattices
+- Optimize for s³/V (packing efficiency) or minimum s*
+- Interactive scan plots with detailed history
+
+### 5. Coordination Environment Analysis (NEW)
+- Analyzes the regularity of coordination polyhedra around each metal type
+- Uses periodic boundary conditions to find the 12 nearest intersection sites
+- Calculates distance metrics: mean, std deviation, range, coefficient of variation
+- Calculates angular metrics: all inter-ligand angles, comparison to ideal polyhedra
+- Provides regularity scores (0-1) for distance uniformity and angular regularity
+- Compares to ideal polyhedra: tetrahedron (CN=4), octahedron (CN=6), cube (CN=8), cuboctahedron (CN=12)
+- 3D visualization of coordination environment with distance coloring
 
 ## Local Development
 

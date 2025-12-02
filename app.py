@@ -28,7 +28,7 @@ from interstitial_engine import (
 from position_calculator import (
     calculate_complete_structure, generate_metal_positions, calculate_intersections,
     format_position_dict, format_xyz, format_metal_atoms_csv, format_intersections_csv,
-    get_unique_intersections, calculate_weighted_counts
+    get_unique_intersections, calculate_weighted_counts, analyze_all_coordination_environments
 )
 
 st.set_page_config(
@@ -1541,6 +1541,200 @@ def main():
                     file_name="structure.xyz",
                     mime="text/plain"
                 )
+            
+            # ============================================
+            # COORDINATION ENVIRONMENT ANALYSIS
+            # ============================================
+            st.markdown("---")
+            st.subheader("🎯 Coordination Environment Analysis")
+            st.markdown("""
+            Analyze the regularity of coordination environments around each metal type.
+            For each metal, finds the nearest intersection sites using periodic boundary conditions
+            and calculates distance and angular metrics to assess polyhedron regularity.
+            """)
+            
+            coord_cols = st.columns([1, 1, 2])
+            with coord_cols[0]:
+                max_coord_sites = st.number_input(
+                    "Max coordination sites",
+                    min_value=4,
+                    max_value=12,
+                    value=12,
+                    step=1,
+                    help="Maximum number of nearest intersection sites to consider per metal",
+                    key='coord_max_sites'
+                )
+            
+            if st.button("🔍 Analyze Coordination Environments", type="secondary", key='coord_analyze'):
+                with st.spinner("Analyzing coordination environments..."):
+                    metals = st.session_state.get('metals', [{'symbol': 'M'}])
+                    
+                    coord_result = analyze_all_coordination_environments(
+                        structure=structure,
+                        metals=metals,
+                        max_sites=max_coord_sites
+                    )
+                    
+                    st.session_state['coord_analysis'] = coord_result
+            
+            # Display coordination analysis results
+            if 'coord_analysis' in st.session_state:
+                coord_result = st.session_state['coord_analysis']
+                
+                if coord_result.success and coord_result.environments:
+                    # Overall summary
+                    st.success(f"**Overall structure regularity: {coord_result.summary['mean_overall_regularity']:.2f}** (1.0 = ideal)")
+                    
+                    # Results for each metal type
+                    for env in coord_result.environments:
+                        with st.expander(f"**{env.metal_symbol}** — CN={len(env.coordination_sites)}, Regularity={env.overall_regularity:.2f}", expanded=True):
+                            
+                            # Metrics row
+                            env_cols = st.columns(4)
+                            with env_cols[0]:
+                                st.metric("Coordination #", len(env.coordination_sites))
+                            with env_cols[1]:
+                                st.metric("Ideal Polyhedron", env.ideal_polyhedron.replace('_', ' ').title())
+                            with env_cols[2]:
+                                st.metric("Distance Regularity", f"{env.distance_regularity:.2f}")
+                            with env_cols[3]:
+                                st.metric("Angular Regularity", f"{env.angular_regularity:.2f}")
+                            
+                            # Distance statistics
+                            st.markdown("**Distance Statistics**")
+                            dist_cols = st.columns(5)
+                            with dist_cols[0]:
+                                st.metric("Mean", f"{env.mean_distance:.3f} Å")
+                            with dist_cols[1]:
+                                st.metric("Std Dev", f"{env.std_distance:.3f} Å")
+                            with dist_cols[2]:
+                                st.metric("Min", f"{env.min_distance:.3f} Å")
+                            with dist_cols[3]:
+                                st.metric("Max", f"{env.max_distance:.3f} Å")
+                            with dist_cols[4]:
+                                st.metric("CV", f"{env.cv_distance:.3f}")
+                            
+                            # Angular statistics
+                            if len(env.angles) > 0:
+                                st.markdown("**Angular Statistics**")
+                                ang_cols = st.columns(4)
+                                with ang_cols[0]:
+                                    st.metric("Mean Angle", f"{env.mean_angle:.1f}°")
+                                with ang_cols[1]:
+                                    st.metric("Std Dev", f"{env.std_angle:.1f}°")
+                                with ang_cols[2]:
+                                    ideal_str = ", ".join([f"{a:.1f}°" for a in env.ideal_angles])
+                                    st.metric("Ideal Angles", ideal_str)
+                                with ang_cols[3]:
+                                    st.metric("RMS Deviation", f"{env.angle_deviation:.1f}°")
+                            
+                            # Coordination sites table
+                            if env.coordination_sites:
+                                st.markdown("**Coordination Sites**")
+                                site_data = []
+                                for i, site in enumerate(env.coordination_sites):
+                                    img_str = f"({site.image[0]},{site.image[1]},{site.image[2]})"
+                                    site_data.append({
+                                        '#': i + 1,
+                                        'Distance (Å)': f"{site.distance:.4f}",
+                                        'N': site.multiplicity,
+                                        'Frac x': f"{site.fractional[0]:.4f}",
+                                        'Frac y': f"{site.fractional[1]:.4f}",
+                                        'Frac z': f"{site.fractional[2]:.4f}",
+                                        'Image': img_str
+                                    })
+                                site_df = pd.DataFrame(site_data)
+                                st.dataframe(site_df, use_container_width=True, hide_index=True)
+                            
+                            # 3D visualization of coordination environment
+                            st.markdown("**3D Coordination Environment**")
+                            
+                            fig_coord = go.Figure()
+                            
+                            # Plot metal center
+                            fig_coord.add_trace(go.Scatter3d(
+                                x=[env.metal_cartesian[0]],
+                                y=[env.metal_cartesian[1]],
+                                z=[env.metal_cartesian[2]],
+                                mode='markers',
+                                marker=dict(size=12, color='blue', symbol='circle'),
+                                name=f'{env.metal_symbol} center',
+                                hovertext=f"{env.metal_symbol}<br>({env.metal_fractional[0]:.3f}, {env.metal_fractional[1]:.3f}, {env.metal_fractional[2]:.3f})"
+                            ))
+                            
+                            # Plot coordination sites
+                            if env.coordination_sites:
+                                coord_x = [s.cartesian[0] for s in env.coordination_sites]
+                                coord_y = [s.cartesian[1] for s in env.coordination_sites]
+                                coord_z = [s.cartesian[2] for s in env.coordination_sites]
+                                coord_dist = [s.distance for s in env.coordination_sites]
+                                
+                                fig_coord.add_trace(go.Scatter3d(
+                                    x=coord_x,
+                                    y=coord_y,
+                                    z=coord_z,
+                                    mode='markers',
+                                    marker=dict(
+                                        size=8,
+                                        color=coord_dist,
+                                        colorscale='Viridis',
+                                        colorbar=dict(title='Dist (Å)', x=1.02),
+                                        symbol='diamond'
+                                    ),
+                                    name='Coordination sites',
+                                    hovertext=[f"Site {i+1}<br>d={s.distance:.3f} Å<br>N={s.multiplicity}" 
+                                              for i, s in enumerate(env.coordination_sites)]
+                                ))
+                                
+                                # Draw lines from metal to each coordination site
+                                for site in env.coordination_sites:
+                                    fig_coord.add_trace(go.Scatter3d(
+                                        x=[env.metal_cartesian[0], site.cartesian[0]],
+                                        y=[env.metal_cartesian[1], site.cartesian[1]],
+                                        z=[env.metal_cartesian[2], site.cartesian[2]],
+                                        mode='lines',
+                                        line=dict(color='rgba(100,100,100,0.4)', width=2),
+                                        showlegend=False,
+                                        hoverinfo='skip'
+                                    ))
+                            
+                            fig_coord.update_layout(
+                                scene=dict(
+                                    xaxis_title='x (Å)',
+                                    yaxis_title='y (Å)',
+                                    zaxis_title='z (Å)',
+                                    aspectmode='data'
+                                ),
+                                height=400,
+                                margin=dict(l=0, r=0, t=30, b=0),
+                                showlegend=True
+                            )
+                            
+                            st.plotly_chart(fig_coord, use_container_width=True)
+                    
+                    # Summary table
+                    st.markdown("---")
+                    st.markdown("**Summary Table**")
+                    summary_data = []
+                    for env_summary in coord_result.summary['environments']:
+                        summary_data.append({
+                            'Metal': env_summary['symbol'],
+                            'CN': env_summary['cn'],
+                            'Mean Dist (Å)': f"{env_summary['mean_distance']:.3f}",
+                            'CV': f"{env_summary['cv_distance']:.3f}",
+                            'Ideal Polyhedron': env_summary['ideal_polyhedron'].replace('_', ' ').title(),
+                            'Angle Dev (°)': f"{env_summary['angle_deviation']:.1f}",
+                            'Dist. Reg.': f"{env_summary['distance_regularity']:.2f}",
+                            'Ang. Reg.': f"{env_summary['angular_regularity']:.2f}",
+                            'Overall': f"{env_summary['overall_regularity']:.2f}"
+                        })
+                    summary_df = pd.DataFrame(summary_data)
+                    st.dataframe(summary_df, use_container_width=True, hide_index=True)
+                    
+                elif coord_result.error:
+                    st.error(f"Analysis failed: {coord_result.error}")
+                else:
+                    st.warning("No coordination environments could be analyzed.")
     else:
         st.info("👆 Calculate minimum scale factors first to visualize unit cell positions")
     

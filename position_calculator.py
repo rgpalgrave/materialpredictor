@@ -1164,3 +1164,463 @@ def scan_ca_for_stoichiometry(
             success=False,
             error=str(e)
         )
+
+
+# -----------------
+# Coordination Environment Analysis
+# -----------------
+
+@dataclass
+class CoordinationSite:
+    """Information about a single coordination site (intersection) around a metal."""
+    fractional: np.ndarray          # Fractional coordinates
+    cartesian: np.ndarray           # Cartesian coordinates  
+    distance: float                 # Distance from metal center
+    multiplicity: int               # Intersection multiplicity (N value)
+    image: Tuple[int, int, int]     # Periodic image offset (0,0,0 = primary cell)
+
+
+@dataclass 
+class CoordinationEnvironment:
+    """Complete coordination environment for a single metal site."""
+    metal_index: int                        # Index in metal atoms array
+    metal_symbol: str                       # Element symbol
+    metal_fractional: np.ndarray            # Metal fractional position
+    metal_cartesian: np.ndarray             # Metal Cartesian position
+    coordination_sites: List[CoordinationSite]  # List of coordinating intersection sites
+    
+    # Distance metrics
+    distances: np.ndarray                   # Array of distances
+    mean_distance: float                    # Mean coordination distance
+    std_distance: float                     # Standard deviation of distances
+    min_distance: float                     # Minimum distance
+    max_distance: float                     # Maximum distance
+    distance_range: float                   # max - min
+    cv_distance: float                      # Coefficient of variation (std/mean)
+    
+    # Angular metrics
+    angles: np.ndarray                      # All unique angles between coordination vectors
+    mean_angle: float                       # Mean angle (degrees)
+    std_angle: float                        # Standard deviation of angles
+    
+    # Regularity scores
+    distance_regularity: float              # 0-1 score (1 = perfectly regular)
+    angular_regularity: float               # 0-1 score based on ideal polyhedra
+    overall_regularity: float               # Combined score
+    
+    # Ideal polyhedron comparison
+    ideal_polyhedron: str                   # Name of closest ideal polyhedron
+    ideal_angles: List[float]               # Expected angles for ideal polyhedron
+    angle_deviation: float                  # RMS deviation from ideal angles
+
+
+@dataclass
+class CoordinationAnalysisResult:
+    """Results of coordination environment analysis for entire structure."""
+    environments: List[CoordinationEnvironment]  # One per unique metal type
+    summary: Dict                                 # Summary statistics
+    success: bool
+    error: Optional[str] = None
+
+
+# Ideal polyhedra definitions: CN -> (name, characteristic_angles)
+IDEAL_POLYHEDRA = {
+    2: ('linear', [180.0]),
+    3: ('trigonal_planar', [120.0]),
+    4: ('tetrahedron', [109.47]),  # arccos(-1/3)
+    5: ('trigonal_bipyramid', [90.0, 120.0, 180.0]),
+    6: ('octahedron', [90.0, 180.0]),
+    7: ('pentagonal_bipyramid', [72.0, 90.0, 144.0]),
+    8: ('cube', [70.53, 109.47]),  # face diagonal, body diagonal
+    9: ('tricapped_trigonal_prism', [70.0, 82.0, 118.0, 136.0]),
+    10: ('bicapped_square_antiprism', [65.0, 75.0, 115.0, 140.0]),
+    12: ('cuboctahedron', [60.0, 90.0, 120.0, 180.0]),
+}
+
+
+def find_nearest_intersections_pbc(
+    metal_pos_cart: np.ndarray,
+    intersection_frac: np.ndarray,
+    intersection_cart: np.ndarray,
+    intersection_mult: np.ndarray,
+    lat_vecs: np.ndarray,
+    max_sites: int = 12,
+    dedup_tol: float = 0.01
+) -> List[CoordinationSite]:
+    """
+    Find the N nearest intersection sites to a metal position using PBC.
+    
+    Args:
+        metal_pos_cart: Cartesian position of metal atom
+        intersection_frac: Fractional coordinates of all intersections (N, 3)
+        intersection_cart: Cartesian coordinates of all intersections (N, 3)
+        intersection_mult: Multiplicities of intersections (N,)
+        lat_vecs: Lattice vectors (3, 3)
+        max_sites: Maximum number of coordination sites to return
+        dedup_tol: Tolerance for considering two sites as duplicates (Angstrom)
+    
+    Returns:
+        List of CoordinationSite objects, sorted by distance
+    """
+    if len(intersection_frac) == 0:
+        return []
+    
+    # Generate all periodic images within a reasonable range
+    # Use 27 images (3x3x3 supercell) centered on origin
+    images = []
+    for i in [-1, 0, 1]:
+        for j in [-1, 0, 1]:
+            for k in [-1, 0, 1]:
+                images.append((i, j, k))
+    
+    # Compute all distances considering periodic images
+    all_sites = []
+    
+    for int_idx in range(len(intersection_frac)):
+        frac = intersection_frac[int_idx]
+        mult = intersection_mult[int_idx]
+        
+        for img in images:
+            # Shift fractional coordinate by image
+            shifted_frac = frac + np.array(img)
+            # Convert to Cartesian
+            shifted_cart = shifted_frac @ lat_vecs
+            
+            # Calculate distance
+            dist = np.linalg.norm(shifted_cart - metal_pos_cart)
+            
+            # Skip if too close (on top of metal) or very far
+            if dist < 0.1:  # Skip if essentially at the metal position
+                continue
+            
+            all_sites.append(CoordinationSite(
+                fractional=shifted_frac,
+                cartesian=shifted_cart,
+                distance=dist,
+                multiplicity=int(mult),
+                image=img
+            ))
+    
+    # Sort by distance
+    all_sites.sort(key=lambda s: s.distance)
+    
+    # Remove duplicates: sites at effectively the same Cartesian position
+    # This happens when periodic images of different fractional sites overlap
+    unique_sites = []
+    for site in all_sites:
+        is_duplicate = False
+        for existing in unique_sites:
+            # Check if Cartesian positions are essentially the same
+            if np.linalg.norm(site.cartesian - existing.cartesian) < dedup_tol:
+                is_duplicate = True
+                break
+        if not is_duplicate:
+            unique_sites.append(site)
+        
+        # Stop early if we have enough
+        if len(unique_sites) >= max_sites:
+            break
+    
+    return unique_sites[:max_sites]
+
+
+def calculate_angles(metal_pos: np.ndarray, coord_positions: np.ndarray) -> np.ndarray:
+    """
+    Calculate all unique angles between coordination vectors from metal center.
+    
+    Args:
+        metal_pos: Cartesian position of metal atom
+        coord_positions: Cartesian positions of coordinating sites (N, 3)
+    
+    Returns:
+        Array of unique angles in degrees
+    """
+    if len(coord_positions) < 2:
+        return np.array([])
+    
+    # Calculate unit vectors from metal to each coordination site
+    vectors = coord_positions - metal_pos
+    norms = np.linalg.norm(vectors, axis=1, keepdims=True)
+    norms = np.where(norms < 1e-10, 1.0, norms)  # Avoid division by zero
+    unit_vectors = vectors / norms
+    
+    # Calculate all unique angles
+    angles = []
+    n = len(unit_vectors)
+    for i in range(n):
+        for j in range(i + 1, n):
+            dot = np.clip(np.dot(unit_vectors[i], unit_vectors[j]), -1.0, 1.0)
+            angle = np.degrees(np.arccos(dot))
+            angles.append(angle)
+    
+    return np.array(angles)
+
+
+def find_closest_ideal_polyhedron(cn: int, observed_angles: np.ndarray) -> Tuple[str, List[float], float]:
+    """
+    Find the closest ideal polyhedron for a given coordination number.
+    
+    Args:
+        cn: Coordination number
+        observed_angles: Observed angles in degrees
+    
+    Returns:
+        Tuple of (polyhedron_name, ideal_angles, rms_deviation)
+    """
+    if cn not in IDEAL_POLYHEDRA:
+        # Find closest CN
+        available_cns = list(IDEAL_POLYHEDRA.keys())
+        cn = min(available_cns, key=lambda x: abs(x - cn))
+    
+    name, ideal_angles = IDEAL_POLYHEDRA[cn]
+    
+    if len(observed_angles) == 0:
+        return name, ideal_angles, 0.0
+    
+    # Calculate RMS deviation: for each observed angle, find nearest ideal angle
+    deviations = []
+    for obs in observed_angles:
+        min_dev = min(abs(obs - ideal) for ideal in ideal_angles)
+        deviations.append(min_dev ** 2)
+    
+    rms = np.sqrt(np.mean(deviations)) if deviations else 0.0
+    
+    return name, ideal_angles, rms
+
+
+def calculate_coordination_environment(
+    metal_idx: int,
+    metal_symbol: str,
+    metal_frac: np.ndarray,
+    metal_cart: np.ndarray,
+    intersection_frac: np.ndarray,
+    intersection_cart: np.ndarray,
+    intersection_mult: np.ndarray,
+    lat_vecs: np.ndarray,
+    max_sites: int = 12
+) -> CoordinationEnvironment:
+    """
+    Calculate complete coordination environment for a single metal site.
+    
+    Args:
+        metal_idx: Index of metal in the metal atoms array
+        metal_symbol: Element symbol
+        metal_frac: Fractional coordinates of metal
+        metal_cart: Cartesian coordinates of metal
+        intersection_frac: All intersection fractional coordinates
+        intersection_cart: All intersection Cartesian coordinates
+        intersection_mult: All intersection multiplicities
+        lat_vecs: Lattice vectors
+        max_sites: Maximum coordination sites to consider
+    
+    Returns:
+        CoordinationEnvironment with all metrics calculated
+    """
+    # Find nearest coordination sites
+    coord_sites = find_nearest_intersections_pbc(
+        metal_cart, intersection_frac, intersection_cart, 
+        intersection_mult, lat_vecs, max_sites
+    )
+    
+    if len(coord_sites) == 0:
+        # Return empty environment
+        return CoordinationEnvironment(
+            metal_index=metal_idx,
+            metal_symbol=metal_symbol,
+            metal_fractional=metal_frac,
+            metal_cartesian=metal_cart,
+            coordination_sites=[],
+            distances=np.array([]),
+            mean_distance=0.0,
+            std_distance=0.0,
+            min_distance=0.0,
+            max_distance=0.0,
+            distance_range=0.0,
+            cv_distance=0.0,
+            angles=np.array([]),
+            mean_angle=0.0,
+            std_angle=0.0,
+            distance_regularity=0.0,
+            angular_regularity=0.0,
+            overall_regularity=0.0,
+            ideal_polyhedron='none',
+            ideal_angles=[],
+            angle_deviation=0.0
+        )
+    
+    # Extract distances
+    distances = np.array([s.distance for s in coord_sites])
+    
+    # Distance metrics
+    mean_dist = np.mean(distances)
+    std_dist = np.std(distances)
+    min_dist = np.min(distances)
+    max_dist = np.max(distances)
+    dist_range = max_dist - min_dist
+    cv_dist = std_dist / mean_dist if mean_dist > 0 else 0.0
+    
+    # Calculate angles
+    coord_positions = np.array([s.cartesian for s in coord_sites])
+    angles = calculate_angles(metal_cart, coord_positions)
+    
+    mean_angle = np.mean(angles) if len(angles) > 0 else 0.0
+    std_angle = np.std(angles) if len(angles) > 0 else 0.0
+    
+    # Find ideal polyhedron and compare
+    cn = len(coord_sites)
+    ideal_name, ideal_angles, angle_deviation = find_closest_ideal_polyhedron(cn, angles)
+    
+    # Calculate regularity scores
+    # Distance regularity: 1 - CV (capped at 0)
+    distance_regularity = max(0.0, 1.0 - cv_dist * 2)  # Scale CV for sensitivity
+    
+    # Angular regularity: based on deviation from ideal (max deviation ~60° gives 0)
+    angular_regularity = max(0.0, 1.0 - angle_deviation / 30.0)
+    
+    # Overall regularity: weighted combination
+    overall_regularity = 0.5 * distance_regularity + 0.5 * angular_regularity
+    
+    return CoordinationEnvironment(
+        metal_index=metal_idx,
+        metal_symbol=metal_symbol,
+        metal_fractional=metal_frac,
+        metal_cartesian=metal_cart,
+        coordination_sites=coord_sites,
+        distances=distances,
+        mean_distance=mean_dist,
+        std_distance=std_dist,
+        min_distance=min_dist,
+        max_distance=max_dist,
+        distance_range=dist_range,
+        cv_distance=cv_dist,
+        angles=angles,
+        mean_angle=mean_angle,
+        std_angle=std_angle,
+        distance_regularity=distance_regularity,
+        angular_regularity=angular_regularity,
+        overall_regularity=overall_regularity,
+        ideal_polyhedron=ideal_name,
+        ideal_angles=ideal_angles,
+        angle_deviation=angle_deviation
+    )
+
+
+def get_unique_metal_sites(metal_atoms: MetalAtomData) -> List[int]:
+    """
+    Get indices of unique metal sites (one per offset type).
+    
+    For structures with multiple metals, we want one representative
+    site per metal type (offset_idx).
+    """
+    unique_indices = []
+    seen_offsets = set()
+    
+    for i in range(len(metal_atoms.fractional)):
+        offset_idx = metal_atoms.offset_idx[i]
+        if offset_idx not in seen_offsets:
+            seen_offsets.add(offset_idx)
+            unique_indices.append(i)
+    
+    return unique_indices
+
+
+def analyze_all_coordination_environments(
+    structure: CompleteStructureData,
+    metals: List[Dict],
+    max_sites: int = 12
+) -> CoordinationAnalysisResult:
+    """
+    Analyze coordination environments for all unique metal types in a structure.
+    
+    Args:
+        structure: Complete structure data with metal atoms and intersections
+        metals: List of metal dictionaries with 'symbol' keys
+        max_sites: Maximum coordination sites per metal
+    
+    Returns:
+        CoordinationAnalysisResult with all environments and summary
+    """
+    try:
+        metal_atoms = structure.metal_atoms
+        intersections = structure.intersections
+        lat_vecs = structure.lattice_vectors
+        
+        if len(metal_atoms.fractional) == 0:
+            return CoordinationAnalysisResult(
+                environments=[],
+                summary={'error': 'No metal atoms in structure'},
+                success=False,
+                error='No metal atoms in structure'
+            )
+        
+        if len(intersections.fractional) == 0:
+            return CoordinationAnalysisResult(
+                environments=[],
+                summary={'error': 'No intersection sites found'},
+                success=False,
+                error='No intersection sites found'
+            )
+        
+        # Get unique metal sites (one per type)
+        unique_indices = get_unique_metal_sites(metal_atoms)
+        
+        environments = []
+        for idx in unique_indices:
+            # Get metal info
+            offset_idx = metal_atoms.offset_idx[idx]
+            symbol = metals[offset_idx]['symbol'] if offset_idx < len(metals) else f'M{offset_idx+1}'
+            
+            # Calculate coordination environment
+            env = calculate_coordination_environment(
+                metal_idx=idx,
+                metal_symbol=symbol,
+                metal_frac=metal_atoms.fractional[idx],
+                metal_cart=metal_atoms.cartesian[idx],
+                intersection_frac=intersections.fractional,
+                intersection_cart=intersections.cartesian,
+                intersection_mult=intersections.multiplicity,
+                lat_vecs=lat_vecs,
+                max_sites=max_sites
+            )
+            environments.append(env)
+        
+        # Generate summary statistics
+        summary = {
+            'num_metal_types': len(environments),
+            'environments': []
+        }
+        
+        for env in environments:
+            env_summary = {
+                'symbol': env.metal_symbol,
+                'cn': len(env.coordination_sites),
+                'mean_distance': env.mean_distance,
+                'cv_distance': env.cv_distance,
+                'ideal_polyhedron': env.ideal_polyhedron,
+                'angle_deviation': env.angle_deviation,
+                'distance_regularity': env.distance_regularity,
+                'angular_regularity': env.angular_regularity,
+                'overall_regularity': env.overall_regularity
+            }
+            summary['environments'].append(env_summary)
+        
+        # Overall structure regularity
+        if environments:
+            summary['mean_overall_regularity'] = np.mean([e.overall_regularity for e in environments])
+        else:
+            summary['mean_overall_regularity'] = 0.0
+        
+        return CoordinationAnalysisResult(
+            environments=environments,
+            summary=summary,
+            success=True,
+            error=None
+        )
+        
+    except Exception as e:
+        return CoordinationAnalysisResult(
+            environments=[],
+            summary={'error': str(e)},
+            success=False,
+            error=str(e)
+        )
