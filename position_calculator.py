@@ -962,3 +962,205 @@ def build_ratio_string(metal_counts: Dict[str, float], anion_count: float) -> st
         scaled = [s // common_divisor for s in scaled]
     
     return ':'.join(str(s) for s in scaled)
+
+
+# -----------------
+# Stoichiometry-based c/a scanning
+# -----------------
+
+@dataclass
+class StoichiometryScanResult:
+    """Result of scanning c/a ratios for target stoichiometry."""
+    config_id: str
+    target_mx_ratio: float  # Target M/X ratio
+    best_c_ratio: Optional[float]
+    best_s_star: Optional[float]
+    best_mx_ratio: Optional[float]  # Achieved M/X ratio
+    best_mx_error: Optional[float]  # |achieved - target|
+    matching_ranges: List[Tuple[float, float]]  # c/a ranges where stoichiometry matches
+    scan_data: List[Tuple[float, float, float, float]]  # (c/a, s*, M/X, error)
+    success: bool
+    error: Optional[str] = None
+
+
+def scan_ca_for_stoichiometry(
+    config_id: str,
+    offsets: List[Tuple[float, float, float]],
+    bravais_type: str,
+    lattice_type: str,
+    metals: List[Dict],
+    target_mx_ratio: float,
+    target_cn: int,
+    base_alpha: float = 0.5,
+    c_ratio_min: float = 0.5,
+    c_ratio_max: float = 2.0,
+    n_points: int = 50,
+    cluster_eps_frac: float = 0.05,
+    tolerance: float = 0.1,
+    check_half_filling: bool = True
+) -> StoichiometryScanResult:
+    """
+    Scan c/a ratios to find regions where stoichiometry matches target.
+    
+    Args:
+        config_id: Configuration identifier
+        offsets: Metal position offsets
+        bravais_type: Bravais lattice type
+        lattice_type: Lattice system
+        metals: List of metal definitions
+        target_mx_ratio: Target M/X ratio (total metals / anions)
+        target_cn: Target coordination number
+        base_alpha: Base alpha ratio
+        c_ratio_min/max: c/a scan range
+        n_points: Number of scan points
+        cluster_eps_frac: Clustering tolerance
+        tolerance: Relative tolerance for M/X match
+        check_half_filling: Also check if half the anions gives correct stoichiometry
+    
+    Returns:
+        StoichiometryScanResult with scan data and matching ranges
+    """
+    try:
+        from interstitial_engine import (
+            LatticeParams, Sublattice, compute_min_scale_for_cn
+        )
+        
+        # Compute per-offset alpha ratios
+        metal_radii = [m['radius'] for m in metals]
+        if len(metal_radii) > 1:
+            max_radius = max(metal_radii)
+            alpha_ratios = tuple(base_alpha * (r / max_radius) for r in metal_radii)
+        else:
+            alpha_ratios = base_alpha
+        
+        scan_data = []
+        matching_ranges = []
+        in_matching_range = False
+        range_start = None
+        
+        best_c_ratio = None
+        best_s_star = None
+        best_mx_ratio = None
+        best_mx_error = float('inf')
+        
+        c_ratios = np.linspace(c_ratio_min, c_ratio_max, n_points)
+        
+        for c_ratio in c_ratios:
+            # Set up lattice parameters
+            p_dict = {'a': 5.0, 'b_ratio': 1.0, 'c_ratio': c_ratio,
+                      'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
+            
+            if lattice_type == 'Hexagonal':
+                p_dict['gamma'] = 120.0
+            
+            p = LatticeParams(**p_dict)
+            
+            # Get s* for this c/a
+            s_star = compute_min_scale_for_cn(
+                config_offsets=offsets,
+                target_cn=target_cn,
+                lattice_type=lattice_type,
+                alpha_ratio=alpha_ratios,
+                bravais_type=bravais_type,
+                c_ratio=c_ratio
+            )
+            
+            if s_star is None:
+                scan_data.append((c_ratio, None, None, None))
+                # End matching range if we were in one
+                if in_matching_range:
+                    matching_ranges.append((range_start, c_ratios[list(c_ratios).index(c_ratio) - 1]))
+                    in_matching_range = False
+                continue
+            
+            # Create sublattice and calculate structure
+            sublattice = Sublattice(
+                name='M',
+                offsets=tuple(tuple(o) for o in offsets),
+                alpha_ratio=alpha_ratios,
+                bravais_type=bravais_type
+            )
+            
+            structure = calculate_complete_structure(
+                sublattices=[sublattice],
+                p=p,
+                scale_s=s_star,
+                target_N=target_cn,
+                k_samples=24,
+                cluster_eps_frac=cluster_eps_frac,
+                include_boundary_equivalents=True
+            )
+            
+            # Calculate weighted counts
+            weighted = calculate_weighted_counts(structure)
+            metal_count = weighted['metal_count']
+            anion_count = weighted['intersection_count']
+            
+            if anion_count <= 0:
+                scan_data.append((c_ratio, s_star, None, None))
+                if in_matching_range:
+                    matching_ranges.append((range_start, c_ratios[list(c_ratios).index(c_ratio) - 1]))
+                    in_matching_range = False
+                continue
+            
+            # Calculate M/X ratio (also check half-filling)
+            mx_ratio = metal_count / anion_count
+            mx_error = abs(mx_ratio - target_mx_ratio) / target_mx_ratio if target_mx_ratio > 0 else float('inf')
+            
+            # Check half-filling case
+            if check_half_filling:
+                mx_ratio_half = metal_count / (anion_count / 2.0)
+                mx_error_half = abs(mx_ratio_half - target_mx_ratio) / target_mx_ratio if target_mx_ratio > 0 else float('inf')
+                
+                if mx_error_half < mx_error:
+                    mx_ratio = mx_ratio_half
+                    mx_error = mx_error_half
+            
+            scan_data.append((c_ratio, s_star, mx_ratio, mx_error))
+            
+            # Track best result
+            if mx_error < best_mx_error:
+                best_mx_error = mx_error
+                best_c_ratio = c_ratio
+                best_s_star = s_star
+                best_mx_ratio = mx_ratio
+            
+            # Track matching ranges
+            is_match = mx_error <= tolerance
+            if is_match and not in_matching_range:
+                range_start = c_ratio
+                in_matching_range = True
+            elif not is_match and in_matching_range:
+                matching_ranges.append((range_start, c_ratios[list(c_ratios).index(c_ratio) - 1]))
+                in_matching_range = False
+        
+        # Close any open range
+        if in_matching_range:
+            matching_ranges.append((range_start, c_ratios[-1]))
+        
+        return StoichiometryScanResult(
+            config_id=config_id,
+            target_mx_ratio=target_mx_ratio,
+            best_c_ratio=best_c_ratio,
+            best_s_star=best_s_star,
+            best_mx_ratio=best_mx_ratio,
+            best_mx_error=best_mx_error if best_mx_error != float('inf') else None,
+            matching_ranges=matching_ranges,
+            scan_data=scan_data,
+            success=best_c_ratio is not None,
+            error=None
+        )
+        
+    except Exception as e:
+        return StoichiometryScanResult(
+            config_id=config_id,
+            target_mx_ratio=target_mx_ratio,
+            best_c_ratio=None,
+            best_s_star=None,
+            best_mx_ratio=None,
+            best_mx_error=None,
+            matching_ranges=[],
+            scan_data=[],
+            success=False,
+            error=str(e)
+        )

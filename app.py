@@ -955,6 +955,198 @@ def main():
                         for config_id, data in ca_failures:
                             error = data.get('error', 'not achievable in c/a range')
                             st.text(f"  • {config_id}: {error}")
+        
+            # ============================================
+            # STOICHIOMETRY-BASED c/a SCANNING
+            # ============================================
+            st.markdown("---")
+            st.subheader("🎯 c/a Scan for Target Stoichiometry")
+            st.markdown("""
+            Scan c/a ratios to find regions where the calculated stoichiometry matches the target formula.
+            This searches for c/a values where the M/X ratio (metals/anions) equals the expected value.
+            """)
+        
+            # Initialize stoichiometry scan results
+            if 'stoich_ca_scan_results' not in st.session_state:
+                st.session_state.stoich_ca_scan_results = {}
+        
+            # Calculate target M/X ratio from results
+            total_metals = sum(st.session_state.results['metal_counts'])
+            total_anions = st.session_state.results['anion_count']
+            target_mx = total_metals / total_anions if total_anions > 0 else 1.0
+        
+            st.info(f"**Target M/X ratio:** {target_mx:.4f} (from {total_metals} metals : {total_anions} anions)")
+        
+            # Scan settings
+            stoich_cols = st.columns(4)
+            with stoich_cols[0]:
+                stoich_c_min = st.number_input("c/a min", min_value=0.1, max_value=1.5, 
+                                               value=0.5, step=0.1, key='stoich_ca_min')
+                with stoich_cols[1]:
+                    stoich_c_max = st.number_input("c/a max", min_value=0.5, max_value=3.0,
+                                                   value=2.0, step=0.1, key='stoich_ca_max')
+                with stoich_cols[2]:
+                    stoich_n_points = st.number_input("Scan points", min_value=20, max_value=200,
+                                                      value=50, step=10, key='stoich_n_points')
+                with stoich_cols[3]:
+                    stoich_tolerance = st.number_input("M/X tolerance", min_value=0.01, max_value=0.5,
+                                                       value=0.1, step=0.01, key='stoich_tolerance',
+                                                       help="Relative tolerance for M/X match (0.1 = 10%)")
+            
+                # Check half-filling option
+                check_half = st.checkbox("Check half-filling", value=True, key='stoich_check_half',
+                                        help="Also check if half the anion sites gives correct stoichiometry")
+            
+                # Scan button
+                scannable_configs = [c for c in configs['arity0'] 
+                                    if c.lattice in {'Tetragonal', 'Hexagonal', 'Orthorhombic'} 
+                                    and c.offsets is not None]
+            
+                if st.button("🎯 Scan c/a for Stoichiometry", type="secondary", 
+                            disabled=len(scannable_configs) == 0):
+                    from position_calculator import scan_ca_for_stoichiometry
+                
+                    progress_bar = st.progress(0)
+                    status_text = st.empty()
+                
+                    stoich_ca_results = {}
+                    metals = st.session_state.metals
+                
+                    for i, config in enumerate(scannable_configs):
+                        status_text.text(f"Scanning {config.id} for stoichiometry...")
+                        progress_bar.progress((i + 1) / len(scannable_configs))
+                    
+                        result = scan_ca_for_stoichiometry(
+                            config_id=config.id,
+                            offsets=config.offsets,
+                            bravais_type=config.bravais_type,
+                            lattice_type=config.lattice,
+                            metals=metals,
+                            target_mx_ratio=target_mx,
+                            target_cn=target_cn,
+                            base_alpha=base_alpha,
+                            c_ratio_min=stoich_c_min,
+                            c_ratio_max=stoich_c_max,
+                            n_points=stoich_n_points,
+                            tolerance=stoich_tolerance,
+                            check_half_filling=check_half
+                        )
+                        stoich_ca_results[config.id] = result
+                
+                    progress_bar.empty()
+                    status_text.empty()
+                    st.session_state.stoich_ca_scan_results = stoich_ca_results
+            
+                # Display results
+                if st.session_state.stoich_ca_scan_results:
+                    st.markdown("#### Stoichiometry Scan Results")
+                
+                    # Sort by best M/X error
+                    sorted_results = sorted(
+                        [(k, v) for k, v in st.session_state.stoich_ca_scan_results.items() if v.success],
+                        key=lambda x: x[1].best_mx_error if x[1].best_mx_error is not None else float('inf')
+                    )
+                
+                    if sorted_results:
+                        # Count matches
+                        matches = [(k, v) for k, v in sorted_results if v.best_mx_error is not None and v.best_mx_error <= stoich_tolerance]
+                    
+                        if matches:
+                            st.success(f"**{len(matches)}** configurations have c/a ranges with matching stoichiometry!")
+                        else:
+                            st.warning("No configurations found with matching stoichiometry in the scanned range.")
+                    
+                        # Results table
+                        stoich_df_data = []
+                        for config_id, result in sorted_results:
+                            match_str = "✓" if result.best_mx_error is not None and result.best_mx_error <= stoich_tolerance else "✗"
+                            ranges_str = ", ".join([f"{r[0]:.3f}-{r[1]:.3f}" for r in result.matching_ranges]) if result.matching_ranges else "—"
+                        
+                            stoich_df_data.append({
+                                'Config': config_id,
+                                'Match': match_str,
+                                'Best c/a': f"{result.best_c_ratio:.4f}" if result.best_c_ratio else "—",
+                                's*': f"{result.best_s_star:.4f}" if result.best_s_star else "—",
+                                'M/X': f"{result.best_mx_ratio:.4f}" if result.best_mx_ratio else "—",
+                                'Error': f"{result.best_mx_error:.4f}" if result.best_mx_error is not None else "—",
+                                'Matching c/a ranges': ranges_str
+                            })
+                    
+                        stoich_df = pd.DataFrame(stoich_df_data)
+                        st.dataframe(stoich_df, use_container_width=True, hide_index=True)
+                    
+                        # Detailed view
+                        st.markdown("#### Scan Details")
+                        selected_stoich_config = st.selectbox(
+                            "Select configuration to view scan plot:",
+                            [r[0] for r in sorted_results],
+                            key='stoich_detail_select'
+                        )
+                    
+                        if selected_stoich_config:
+                            result = st.session_state.stoich_ca_scan_results[selected_stoich_config]
+                        
+                            # Filter valid scan data
+                            valid_data = [(c, s, mx, err) for c, s, mx, err in result.scan_data 
+                                         if mx is not None and err is not None]
+                        
+                            if valid_data:
+                                c_vals = [x[0] for x in valid_data]
+                                mx_vals = [x[2] for x in valid_data]
+                                err_vals = [x[3] for x in valid_data]
+                            
+                                # Create plot
+                                fig_stoich = go.Figure()
+                            
+                                # M/X ratio vs c/a
+                                fig_stoich.add_trace(go.Scatter(
+                                    x=c_vals,
+                                    y=mx_vals,
+                                    mode='lines+markers',
+                                    name='M/X ratio',
+                                    line=dict(color='blue'),
+                                    marker=dict(size=4)
+                                ))
+                            
+                                # Target line
+                                fig_stoich.add_hline(
+                                    y=target_mx, 
+                                    line_dash="dash", 
+                                    line_color="green",
+                                    annotation_text=f"Target M/X = {target_mx:.4f}"
+                                )
+                            
+                                # Tolerance band
+                                fig_stoich.add_hrect(
+                                    y0=target_mx * (1 - stoich_tolerance),
+                                    y1=target_mx * (1 + stoich_tolerance),
+                                    fillcolor="green",
+                                    opacity=0.1,
+                                    line_width=0
+                                )
+                            
+                                # Highlight matching ranges
+                                for r_start, r_end in result.matching_ranges:
+                                    fig_stoich.add_vrect(
+                                        x0=r_start,
+                                        x1=r_end,
+                                        fillcolor="green",
+                                        opacity=0.2,
+                                        line_width=0
+                                    )
+                            
+                                fig_stoich.update_layout(
+                                    title=f"M/X Ratio vs c/a for {selected_stoich_config}",
+                                    xaxis_title="c/a ratio",
+                                    yaxis_title="M/X ratio",
+                                    height=400
+                                )
+                            
+                                st.plotly_chart(fig_stoich, use_container_width=True)
+                            
+                                # Show matching ranges info
+                                if result.matching_ranges:
+                                    st.success(f"Matching c/a ranges: {', '.join([f'{r[0]:.3f} - {r[1]:.3f}' for r in result.matching_ranges])}")
         else:
             st.info("👆 Calculate stoichiometry first to determine target CN")
     
