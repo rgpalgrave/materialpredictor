@@ -738,6 +738,17 @@ def main():
                 key='uc_boundary'
             )
         
+        # Second row for clustering control
+        uc_cols2 = st.columns([2, 2])
+        with uc_cols2[0]:
+            cluster_eps = st.select_slider(
+                "Merge tolerance (fractional)",
+                options=[0.01, 0.02, 0.03, 0.05, 0.075, 0.10],
+                value=0.05,
+                help="Sites within this distance (in fractional coords) are merged. Larger = fewer sites.",
+                key='uc_cluster_eps'
+            )
+        
         if st.button("🔮 Generate Unit Cell View", type="primary", key='uc_generate'):
             with st.spinner("Calculating positions..."):
                 # Build sublattice from selected config
@@ -784,6 +795,7 @@ def main():
                         scale_s=uc_scale_s,
                         target_N=uc_target_n,
                         k_samples=32,
+                        cluster_eps_frac=cluster_eps,
                         include_boundary_equivalents=show_boundary_equiv
                     )
                     

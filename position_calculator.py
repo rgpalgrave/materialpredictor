@@ -473,6 +473,7 @@ def calculate_complete_structure(
     scale_s: float,
     target_N: Optional[int] = None,
     k_samples: int = 24,
+    cluster_eps_frac: float = 0.05,
     include_boundary_equivalents: bool = True
 ) -> CompleteStructureData:
     """
@@ -484,6 +485,7 @@ def calculate_complete_structure(
         scale_s: Current s value
         target_N: Optional minimum multiplicity for intersections
         k_samples: Sampling density for intersections
+        cluster_eps_frac: Clustering epsilon in fractional coords (default 0.05)
         include_boundary_equivalents: Show equivalent positions at cell boundaries
     
     Returns:
@@ -504,6 +506,7 @@ def calculate_complete_structure(
         scale_s=scale_s,
         target_N=target_N,
         k_samples=k_samples,
+        cluster_eps_frac=cluster_eps_frac,
         include_boundary_equivalents=include_boundary_equivalents
     )
     
