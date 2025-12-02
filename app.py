@@ -471,6 +471,96 @@ def main():
                     with st.expander(f"⚠️ {len(failures)} configurations could not achieve CN={target_cn}"):
                         for config_id, data in failures:
                             st.text(f"  • {config_id}: {data.get('status', 'unknown')}")
+                
+                # Stoichiometry Calculation Section
+                st.markdown("---")
+                st.subheader("🧮 Calculate Stoichiometries")
+                st.markdown("Calculate the chemical formula for each successful configuration based on weighted atom counts.")
+                
+                # Initialize stoichiometry results in session state
+                if 'stoichiometry_results' not in st.session_state:
+                    st.session_state.stoichiometry_results = {}
+                
+                if st.button("🧮 Calculate Stoichiometries for All Configs", type="secondary"):
+                    from position_calculator import calculate_stoichiometry_for_config
+                    
+                    # Get successful configs
+                    successful_configs = [(k, v) for k, v in st.session_state.scale_results.items() 
+                                         if v.get('s_star') is not None]
+                    
+                    if successful_configs:
+                        progress_bar = st.progress(0)
+                        status_text = st.empty()
+                        
+                        stoich_results = {}
+                        metals = st.session_state.metals
+                        anion_symbol = st.session_state.get('anion_symbol', 'O')
+                        
+                        for i, (config_id, config_data) in enumerate(successful_configs):
+                            status_text.text(f"Calculating stoichiometry for {config_id}...")
+                            progress_bar.progress((i + 1) / len(successful_configs))
+                            
+                            result = calculate_stoichiometry_for_config(
+                                config_id=config_id,
+                                offsets=config_data['offsets'],
+                                bravais_type=config_data['bravais_type'],
+                                lattice_type=config_data['lattice'],
+                                metals=metals,
+                                anion_symbol=anion_symbol,
+                                scale_s=config_data['s_star'],
+                                target_cn=target_cn,
+                                base_alpha=base_alpha,
+                                cluster_eps_frac=0.05
+                            )
+                            stoich_results[config_id] = result
+                        
+                        progress_bar.empty()
+                        status_text.empty()
+                        st.session_state.stoichiometry_results = stoich_results
+                    else:
+                        st.warning("No successful configurations to calculate stoichiometry for.")
+                
+                # Display stoichiometry results
+                if st.session_state.stoichiometry_results:
+                    st.markdown("#### Stoichiometry Results")
+                    
+                    # Build results table
+                    stoich_data = []
+                    for config_id, result in st.session_state.stoichiometry_results.items():
+                        if result.success:
+                            # Get s* from scale results
+                            s_star = st.session_state.scale_results.get(config_id, {}).get('s_star', 0)
+                            
+                            # Build metal counts string
+                            metal_str = ', '.join(f"{sym}={cnt:.1f}" for sym, cnt in result.metal_counts.items())
+                            
+                            stoich_data.append({
+                                'Config': config_id,
+                                'Formula': result.formula,
+                                's*': f"{s_star:.4f}",
+                                'Metals': metal_str,
+                                'Anions': f"{result.anion_count:.1f}",
+                                'Ratio': result.ratio_formula
+                            })
+                        else:
+                            stoich_data.append({
+                                'Config': config_id,
+                                'Formula': f"Error: {result.error}",
+                                's*': '',
+                                'Metals': '',
+                                'Anions': '',
+                                'Ratio': ''
+                            })
+                    
+                    if stoich_data:
+                        df_stoich = pd.DataFrame(stoich_data)
+                        st.dataframe(df_stoich, use_container_width=True, hide_index=True)
+                        
+                        # Summary of unique formulas
+                        successful_formulas = [r['Formula'] for r in stoich_data if not r['Formula'].startswith('Error')]
+                        if successful_formulas:
+                            unique_formulas = list(set(successful_formulas))
+                            st.info(f"**Unique formulas found:** {', '.join(unique_formulas)}")
             
             # c/a Ratio Scanning Section
             st.markdown("---")

@@ -735,11 +735,225 @@ def calculate_weighted_counts(structure: CompleteStructureData, tol: float = 1e-
         'intersection_weights': intersection_weights,
         'unique_intersection_mask': unique_mask
     }
+
+
+# -----------------
+# Stoichiometry calculation
+# -----------------
+
+@dataclass
+class StoichiometryResult:
+    """Result of stoichiometry calculation for a configuration."""
+    config_id: str
+    metal_counts: Dict[str, float]  # Symbol -> weighted count per unit cell
+    anion_count: float  # Weighted intersection count per unit cell
+    formula: str  # e.g., "LaAl₂O₄"
+    ratio_formula: str  # Simplified ratio, e.g., "1:2:4"
+    success: bool
+    error: Optional[str] = None
+
+
+def calculate_stoichiometry_for_config(
+    config_id: str,
+    offsets: List[Tuple[float, float, float]],
+    bravais_type: str,
+    lattice_type: str,
+    metals: List[Dict],  # List of {'symbol': str, 'radius': float, ...}
+    anion_symbol: str,
+    scale_s: float,
+    target_cn: int,
+    base_alpha: float = 0.5,
+    cluster_eps_frac: float = 0.05
+) -> StoichiometryResult:
+    """
+    Calculate stoichiometry for a single configuration.
     
-    return {
-        'metal_count': float(np.sum(metal_weights)),
-        'intersection_count': float(np.sum(intersection_weights)),
-        'metal_weights': metal_weights,
-        'intersection_weights': intersection_weights,
-        'unique_intersection_mask': unique_mask
-    }
+    Args:
+        config_id: Configuration identifier
+        offsets: List of fractional coordinate offsets for metal positions
+        bravais_type: Bravais lattice type (e.g., 'cubic_F')
+        lattice_type: Lattice system (e.g., 'Cubic', 'Tetragonal')
+        metals: List of metal definitions with 'symbol' and 'radius'
+        anion_symbol: Anion symbol (e.g., 'O')
+        scale_s: Scale factor to use (typically s*)
+        target_cn: Target coordination number for filtering intersections
+        base_alpha: Base alpha ratio
+        cluster_eps_frac: Clustering tolerance
+    
+    Returns:
+        StoichiometryResult with formula and counts
+    """
+    try:
+        # Compute per-offset alpha ratios based on metal radii
+        metal_radii = [m['radius'] for m in metals]
+        if len(metal_radii) > 1:
+            max_radius = max(metal_radii)
+            alpha_ratios = tuple(base_alpha * (r / max_radius) for r in metal_radii)
+        else:
+            alpha_ratios = base_alpha
+        
+        # Set up lattice parameters
+        p_dict = {'a': 5.0, 'b_ratio': 1.0, 'c_ratio': 1.0,
+                  'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
+        
+        if lattice_type == 'Hexagonal':
+            p_dict['gamma'] = 120.0
+            p_dict['c_ratio'] = 1.633
+        elif lattice_type == 'Rhombohedral':
+            p_dict['alpha'] = p_dict['beta'] = p_dict['gamma'] = 80.0
+        elif lattice_type == 'Monoclinic':
+            p_dict['beta'] = 100.0
+        
+        p = LatticeParams(**p_dict)
+        
+        # Create sublattice
+        sublattice = Sublattice(
+            name='M',
+            offsets=tuple(tuple(o) for o in offsets),
+            alpha_ratio=alpha_ratios,
+            bravais_type=bravais_type
+        )
+        
+        # Calculate structure
+        structure = calculate_complete_structure(
+            sublattices=[sublattice],
+            p=p,
+            scale_s=scale_s,
+            target_N=target_cn,
+            k_samples=24,
+            cluster_eps_frac=cluster_eps_frac,
+            include_boundary_equivalents=True
+        )
+        
+        # Calculate weighted counts per metal type
+        # We need to track which atoms came from which offset
+        metal_counts = {}
+        lat_vecs = lattice_vectors(p)
+        basis = BRAVAIS_BASIS.get(bravais_type, [(0, 0, 0)])
+        
+        for offset_idx, offset in enumerate(offsets):
+            # Get metal symbol for this offset
+            if offset_idx < len(metals):
+                symbol = metals[offset_idx]['symbol']
+            else:
+                symbol = f"M{offset_idx+1}"
+            
+            if symbol not in metal_counts:
+                metal_counts[symbol] = 0.0
+            
+            offset_arr = np.array(offset, dtype=float)
+            
+            # Count atoms from this offset (with all basis positions)
+            for basis_pos in basis:
+                frac = np.array(basis_pos, dtype=float) + offset_arr
+                frac = wrap_to_unit_cell(frac)
+                
+                # Generate boundary equivalents and sum weights
+                equivalents = generate_boundary_equivalents(frac)
+                for equiv in equivalents:
+                    weight = calculate_site_weight(equiv)
+                    metal_counts[symbol] += weight
+        
+        # Calculate anion count from intersections
+        weighted = calculate_weighted_counts(structure)
+        anion_count = weighted['intersection_count']
+        
+        # Build formula string
+        formula = build_formula_string(metal_counts, anion_symbol, anion_count)
+        ratio_formula = build_ratio_string(metal_counts, anion_count)
+        
+        return StoichiometryResult(
+            config_id=config_id,
+            metal_counts=metal_counts,
+            anion_count=anion_count,
+            formula=formula,
+            ratio_formula=ratio_formula,
+            success=True
+        )
+        
+    except Exception as e:
+        return StoichiometryResult(
+            config_id=config_id,
+            metal_counts={},
+            anion_count=0.0,
+            formula="",
+            ratio_formula="",
+            success=False,
+            error=str(e)
+        )
+
+
+def build_formula_string(metal_counts: Dict[str, float], anion_symbol: str, anion_count: float) -> str:
+    """
+    Build a chemical formula string like "LaAl₂O₄".
+    
+    Subscript digits: ₀₁₂₃₄₅₆₇₈₉
+    """
+    subscript_map = str.maketrans('0123456789', '₀₁₂₃₄₅₆₇₈₉')
+    
+    # Find GCD to simplify if all are integers
+    all_counts = list(metal_counts.values()) + [anion_count]
+    
+    # Check if we can express as simple integers
+    # Try multiplying by small factors to get integers
+    best_multiplier = 1
+    for mult in [1, 2, 3, 4, 6, 8, 12]:
+        scaled = [c * mult for c in all_counts]
+        if all(abs(s - round(s)) < 0.05 for s in scaled):
+            best_multiplier = mult
+            break
+    
+    # Apply multiplier and round
+    metal_counts_int = {k: round(v * best_multiplier) for k, v in metal_counts.items()}
+    anion_count_int = round(anion_count * best_multiplier)
+    
+    # Find GCD of all counts
+    from math import gcd
+    from functools import reduce
+    all_int_counts = list(metal_counts_int.values()) + [anion_count_int]
+    all_int_counts = [c for c in all_int_counts if c > 0]
+    
+    if all_int_counts:
+        common_divisor = reduce(gcd, all_int_counts)
+        metal_counts_int = {k: v // common_divisor for k, v in metal_counts_int.items()}
+        anion_count_int = anion_count_int // common_divisor
+    
+    # Build formula
+    parts = []
+    for symbol, count in metal_counts_int.items():
+        if count == 1:
+            parts.append(symbol)
+        elif count > 0:
+            parts.append(f"{symbol}{str(count).translate(subscript_map)}")
+    
+    if anion_count_int == 1:
+        parts.append(anion_symbol)
+    elif anion_count_int > 0:
+        parts.append(f"{anion_symbol}{str(anion_count_int).translate(subscript_map)}")
+    
+    return ''.join(parts)
+
+
+def build_ratio_string(metal_counts: Dict[str, float], anion_count: float) -> str:
+    """Build a ratio string like "1:2:4"."""
+    all_counts = list(metal_counts.values()) + [anion_count]
+    
+    # Try to express as simple integers
+    best_multiplier = 1
+    for mult in [1, 2, 3, 4, 6, 8, 12]:
+        scaled = [c * mult for c in all_counts]
+        if all(abs(s - round(s)) < 0.05 for s in scaled):
+            best_multiplier = mult
+            break
+    
+    scaled = [round(c * best_multiplier) for c in all_counts]
+    
+    # Simplify by GCD
+    from math import gcd
+    from functools import reduce
+    non_zero = [s for s in scaled if s > 0]
+    if non_zero:
+        common_divisor = reduce(gcd, non_zero)
+        scaled = [s // common_divisor for s in scaled]
+    
+    return ':'.join(str(s) for s in scaled)
