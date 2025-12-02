@@ -465,6 +465,7 @@ def scan_c_ratio_for_min_scale(
     c_ratio_max: float = 2.0,
     scan_level: str = 'fine',  # 'coarse', 'medium', 'fine', 'ultrafine'
     lattice_params: Optional[dict] = None,
+    optimize_metric: str = 's3_over_volume',  # 's_star' or 's3_over_volume'
     progress_callback: Optional[callable] = None
 ) -> Dict:
     """
@@ -486,13 +487,17 @@ def scan_c_ratio_for_min_scale(
         c_ratio_max: Maximum c/a ratio to scan
         scan_level: 'coarse', 'medium', 'fine', or 'ultrafine'
         lattice_params: Optional dict with other lattice parameters
+        optimize_metric: 's_star' to minimize s*, or 's3_over_volume' to minimize s³/V
+                        (s³/V is proportional to packing fraction)
         progress_callback: Optional callback(current, total, message) for progress updates
     
     Returns:
         Dict with:
             'best_c_ratio': Optimal c/a ratio
             'best_s_star': Minimum scale factor at optimal c/a
-            'scan_results': List of (c_ratio, s_star) tuples from all scans
+            'best_volume': Unit cell volume at optimal c/a (a²c for tetragonal)
+            'best_metric': The optimized metric value (s* or s³/V)
+            'scan_results': List of (c_ratio, s_star, volume, metric) tuples from all scans
             'scan_history': Dict with results from each scan level
     """
     # Set up base lattice parameters
@@ -515,8 +520,27 @@ def scan_c_ratio_for_min_scale(
     all_results = []
     scan_history = {}
     
-    def evaluate_c_ratio(c_ratio: float) -> Optional[float]:
-        """Evaluate s* for a given c/a ratio."""
+    def compute_volume(c_ratio: float, b_ratio: float = 1.0) -> float:
+        """Compute unit cell volume. For tetragonal/hex: a²c, for ortho: abc."""
+        a = params['a']
+        b = a * b_ratio
+        c = a * c_ratio
+        
+        if lattice_type == 'Hexagonal':
+            # Hexagonal: V = (√3/2) * a² * c
+            return (np.sqrt(3) / 2) * a * a * c
+        elif lattice_type == 'Tetragonal':
+            # Tetragonal: V = a² * c
+            return a * a * c
+        elif lattice_type == 'Orthorhombic':
+            # Orthorhombic: V = a * b * c
+            return a * b * c
+        else:
+            # Default cubic-like
+            return a * a * c
+    
+    def evaluate_c_ratio(c_ratio: float) -> Tuple[Optional[float], float, Optional[float]]:
+        """Evaluate s* for a given c/a ratio. Returns (s_star, volume, metric)."""
         params['c_ratio'] = c_ratio
         p = LatticeParams(**params)
         
@@ -528,10 +552,21 @@ def scan_c_ratio_for_min_scale(
         )
         
         s_star = find_threshold_s_for_N([sub], p, target_cn)
-        return s_star
+        volume = compute_volume(c_ratio, params.get('b_ratio', 1.0))
+        
+        if s_star is not None:
+            if optimize_metric == 's3_over_volume':
+                # s³/V is proportional to packing fraction
+                metric = (s_star ** 3) / volume
+            else:
+                metric = s_star
+        else:
+            metric = None
+        
+        return s_star, volume, metric
     
-    def scan_range(c_min: float, c_max: float, n_points: int, level_name: str) -> List[Tuple[float, Optional[float]]]:
-        """Scan a range of c/a ratios."""
+    def scan_range(c_min: float, c_max: float, n_points: int, level_name: str) -> List[Tuple[float, Optional[float], float, Optional[float]]]:
+        """Scan a range of c/a ratios. Returns (c_ratio, s_star, volume, metric)."""
         results = []
         c_ratios = np.linspace(c_min, c_max, n_points)
         
@@ -539,48 +574,59 @@ def scan_c_ratio_for_min_scale(
             if progress_callback:
                 progress_callback(i + 1, n_points, f"{level_name}: c/a = {c_ratio:.3f}")
             
-            s_star = evaluate_c_ratio(c_ratio)
-            results.append((c_ratio, s_star))
-            all_results.append((c_ratio, s_star))
+            s_star, volume, metric = evaluate_c_ratio(c_ratio)
+            results.append((c_ratio, s_star, volume, metric))
+            all_results.append((c_ratio, s_star, volume, metric))
         
         return results
     
-    def find_best_two(results: List[Tuple[float, Optional[float]]]) -> Tuple[float, float]:
-        """Find the two c/a values with the lowest s* values."""
-        valid = [(c, s) for c, s in results if s is not None]
+    def find_best_two(results: List[Tuple[float, Optional[float], float, Optional[float]]]) -> Tuple[float, float]:
+        """Find the two c/a values with the lowest metric values."""
+        valid = [(c, s, v, m) for c, s, v, m in results if m is not None]
         if len(valid) < 2:
-            # If not enough valid results, return the full range
             return c_ratio_min, c_ratio_max
         
-        # Sort by s_star
-        sorted_results = sorted(valid, key=lambda x: x[1])
+        # Sort by metric (s* or s³/V)
+        sorted_results = sorted(valid, key=lambda x: x[3])
         
-        # Get the two best c_ratio values
         best_c = sorted_results[0][0]
         second_c = sorted_results[1][0] if len(sorted_results) > 1 else sorted_results[0][0]
         
-        # Return in order (min, max)
         return (min(best_c, second_c), max(best_c, second_c))
+    
+    def get_best_result():
+        """Get the best result from all scans."""
+        valid = [(c, s, v, m) for c, s, v, m in all_results if m is not None]
+        if valid:
+            best = min(valid, key=lambda x: x[3])
+            return {
+                'best_c_ratio': best[0],
+                'best_s_star': best[1],
+                'best_volume': best[2],
+                'best_metric': best[3],
+                'scan_results': all_results,
+                'scan_history': scan_history,
+                'optimize_metric': optimize_metric
+            }
+        return {
+            'best_c_ratio': None, 
+            'best_s_star': None, 
+            'best_volume': None,
+            'best_metric': None,
+            'scan_results': all_results, 
+            'scan_history': scan_history,
+            'optimize_metric': optimize_metric
+        }
     
     # Coarse scan (5 points)
     coarse_results = scan_range(c_ratio_min, c_ratio_max, 5, "Coarse")
     scan_history['coarse'] = coarse_results
     
     if scan_level == 'coarse':
-        valid = [(c, s) for c, s in all_results if s is not None]
-        if valid:
-            best = min(valid, key=lambda x: x[1])
-            return {
-                'best_c_ratio': best[0],
-                'best_s_star': best[1],
-                'scan_results': all_results,
-                'scan_history': scan_history
-            }
-        return {'best_c_ratio': None, 'best_s_star': None, 'scan_results': all_results, 'scan_history': scan_history}
+        return get_best_result()
     
     # Medium scan (5 points between best two from coarse)
     c_min_med, c_max_med = find_best_two(coarse_results)
-    # Expand range slightly to avoid missing the optimum
     margin = (c_max_med - c_min_med) * 0.2
     c_min_med = max(c_ratio_min, c_min_med - margin)
     c_max_med = min(c_ratio_max, c_max_med + margin)
@@ -589,16 +635,7 @@ def scan_c_ratio_for_min_scale(
     scan_history['medium'] = medium_results
     
     if scan_level == 'medium':
-        valid = [(c, s) for c, s in all_results if s is not None]
-        if valid:
-            best = min(valid, key=lambda x: x[1])
-            return {
-                'best_c_ratio': best[0],
-                'best_s_star': best[1],
-                'scan_results': all_results,
-                'scan_history': scan_history
-            }
-        return {'best_c_ratio': None, 'best_s_star': None, 'scan_results': all_results, 'scan_history': scan_history}
+        return get_best_result()
     
     # Fine scan (10 points between best two from medium)
     c_min_fine, c_max_fine = find_best_two(medium_results)
@@ -610,16 +647,7 @@ def scan_c_ratio_for_min_scale(
     scan_history['fine'] = fine_results
     
     if scan_level == 'fine':
-        valid = [(c, s) for c, s in all_results if s is not None]
-        if valid:
-            best = min(valid, key=lambda x: x[1])
-            return {
-                'best_c_ratio': best[0],
-                'best_s_star': best[1],
-                'scan_results': all_results,
-                'scan_history': scan_history
-            }
-        return {'best_c_ratio': None, 'best_s_star': None, 'scan_results': all_results, 'scan_history': scan_history}
+        return get_best_result()
     
     # Ultrafine scan (10 additional points)
     c_min_uf, c_max_uf = find_best_two(fine_results)
@@ -630,18 +658,7 @@ def scan_c_ratio_for_min_scale(
     ultrafine_results = scan_range(c_min_uf, c_max_uf, 10, "Ultrafine")
     scan_history['ultrafine'] = ultrafine_results
     
-    # Find overall best
-    valid = [(c, s) for c, s in all_results if s is not None]
-    if valid:
-        best = min(valid, key=lambda x: x[1])
-        return {
-            'best_c_ratio': best[0],
-            'best_s_star': best[1],
-            'scan_results': all_results,
-            'scan_history': scan_history
-        }
-    
-    return {'best_c_ratio': None, 'best_s_star': None, 'scan_results': all_results, 'scan_history': scan_history}
+    return get_best_result()
 
 
 def batch_scan_c_ratio(

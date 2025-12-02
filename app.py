@@ -456,7 +456,7 @@ def main():
             if 'ca_scan_results' not in st.session_state:
                 st.session_state.ca_scan_results = {}
             
-            # c/a scan settings
+            # c/a scan settings - row 1
             ca_cols = st.columns(4)
             with ca_cols[0]:
                 c_ratio_min = st.number_input("c/a min", min_value=0.1, max_value=1.5, 
@@ -469,52 +469,61 @@ def main():
                                          ['coarse', 'medium', 'fine', 'ultrafine'],
                                          index=2, key='scan_level')
             with ca_cols[3]:
-                st.markdown("")
-                st.markdown("")
-                # Get configs that support c/a scanning
-                scannable_lattices = {'Tetragonal', 'Hexagonal', 'Orthorhombic'}
-                scannable_configs = [c for c in configs['arity0'] 
-                                    if c.lattice in scannable_lattices and c.offsets is not None]
+                optimize_metric = st.selectbox("Optimize For",
+                                              ['s³/Volume', 's* only'],
+                                              index=0, key='optimize_metric',
+                                              help="s³/V ∝ packing fraction (minimizes atom volume per unit cell); s* only finds minimum scale factor")
+            
+            # Convert UI selection to engine parameter
+            metric_param = 's3_over_volume' if optimize_metric == 's³/Volume' else 's_star'
+            
+            # Scan button
+            scannable_lattices = {'Tetragonal', 'Hexagonal', 'Orthorhombic'}
+            scannable_configs = [c for c in configs['arity0'] 
+                                if c.lattice in scannable_lattices and c.offsets is not None]
+            
+            scan_disabled = len(scannable_configs) == 0
+            if st.button("🔬 Scan c/a Ratios", type="primary", use_container_width=True, 
+                        disabled=scan_disabled):
+                progress_bar = st.progress(0)
+                status_text = st.empty()
                 
-                scan_disabled = len(scannable_configs) == 0
-                if st.button("🔬 Scan c/a Ratios", type="primary", use_container_width=True, 
-                            disabled=scan_disabled):
-                    progress_bar = st.progress(0)
-                    status_text = st.empty()
+                ca_results = {}
+                
+                for i, config in enumerate(scannable_configs):
+                    status_text.text(f"Scanning {config.id}...")
+                    progress_bar.progress((i + 1) / len(scannable_configs))
                     
-                    ca_results = {}
-                    
-                    for i, config in enumerate(scannable_configs):
-                        status_text.text(f"Scanning {config.id}...")
-                        progress_bar.progress((i + 1) / len(scannable_configs))
-                        
-                        try:
-                            scan_result = scan_c_ratio_for_min_scale(
-                                config.offsets,
-                                target_cn,
-                                config.lattice,
-                                alpha_ratio,
-                                bravais_type=config.bravais_type,
-                                c_ratio_min=c_ratio_min,
-                                c_ratio_max=c_ratio_max,
-                                scan_level=scan_level
-                            )
-                            ca_results[config.id] = {
-                                **scan_result,
-                                'lattice': config.lattice,
-                                'bravais_type': config.bravais_type,
-                                'pattern': config.pattern
-                            }
-                        except Exception as e:
-                            ca_results[config.id] = {
-                                'best_c_ratio': None,
-                                'best_s_star': None,
-                                'error': str(e)
-                            }
-                    
-                    progress_bar.empty()
-                    status_text.empty()
-                    st.session_state.ca_scan_results = ca_results
+                    try:
+                        scan_result = scan_c_ratio_for_min_scale(
+                            config.offsets,
+                            target_cn,
+                            config.lattice,
+                            alpha_ratio,
+                            bravais_type=config.bravais_type,
+                            c_ratio_min=c_ratio_min,
+                            c_ratio_max=c_ratio_max,
+                            scan_level=scan_level,
+                            optimize_metric=metric_param
+                        )
+                        ca_results[config.id] = {
+                            **scan_result,
+                            'lattice': config.lattice,
+                            'bravais_type': config.bravais_type,
+                            'pattern': config.pattern
+                        }
+                    except Exception as e:
+                        ca_results[config.id] = {
+                            'best_c_ratio': None,
+                            'best_s_star': None,
+                            'best_volume': None,
+                            'best_metric': None,
+                            'error': str(e)
+                        }
+                
+                progress_bar.empty()
+                status_text.empty()
+                st.session_state.ca_scan_results = ca_results
             
             if scan_disabled:
                 st.caption("No tetragonal, hexagonal, or orthorhombic configurations available for c/a scanning.")
@@ -523,30 +532,42 @@ def main():
             if st.session_state.ca_scan_results:
                 st.subheader(f"c/a Scan Results for CN = {target_cn}")
                 
-                # Sort by best s_star
+                # Sort by best metric
                 sorted_ca_results = sorted(
                     [(k, v) for k, v in st.session_state.ca_scan_results.items() 
-                     if v.get('best_s_star') is not None],
-                    key=lambda x: x[1]['best_s_star']
+                     if v.get('best_metric') is not None],
+                    key=lambda x: x[1]['best_metric']
                 )
                 
                 if sorted_ca_results:
                     # Best result
                     best_id, best_data = sorted_ca_results[0]
-                    st.success(f"**Best: {best_id}** — c/a = {best_data['best_c_ratio']:.4f}, s* = {best_data['best_s_star']:.4f}")
+                    opt_metric = best_data.get('optimize_metric', 's3_over_volume')
+                    if opt_metric == 's3_over_volume':
+                        st.success(f"**Best: {best_id}** — c/a = {best_data['best_c_ratio']:.4f}, "
+                                  f"s* = {best_data['best_s_star']:.4f}, "
+                                  f"V = {best_data['best_volume']:.2f}, "
+                                  f"s³/V = {best_data['best_metric']:.6f}")
+                    else:
+                        st.success(f"**Best: {best_id}** — c/a = {best_data['best_c_ratio']:.4f}, "
+                                  f"s* = {best_data['best_s_star']:.4f}")
                     
                     # Results table
                     ca_df_data = []
                     for config_id, data in sorted_ca_results:
                         bravais = data.get('bravais_type', '')
                         bravais_label = BRAVAIS_LABELS.get(bravais, bravais)
-                        ca_df_data.append({
+                        row = {
                             'Configuration': config_id,
                             'Optimal c/a': f"{data['best_c_ratio']:.4f}",
                             's*': f"{data['best_s_star']:.4f}",
+                            'Volume': f"{data['best_volume']:.2f}",
                             'Lattice': data.get('lattice', ''),
                             'Bravais': bravais_label
-                        })
+                        }
+                        if data.get('optimize_metric') == 's3_over_volume':
+                            row['s³/V'] = f"{data['best_metric']:.6f}"
+                        ca_df_data.append(row)
                     
                     ca_df = pd.DataFrame(ca_df_data)
                     st.dataframe(ca_df, use_container_width=True, hide_index=True)
@@ -562,37 +583,48 @@ def main():
                     if selected_config:
                         detail_data = st.session_state.ca_scan_results[selected_config]
                         scan_results = detail_data.get('scan_results', [])
+                        opt_metric = detail_data.get('optimize_metric', 's_over_volume')
                         
                         if scan_results:
-                            # Create scan plot
-                            valid_scans = [(c, s) for c, s in scan_results if s is not None]
+                            # Create scan plot - now with 4 values per tuple
+                            valid_scans = [(c, s, v, m) for c, s, v, m in scan_results if m is not None]
                             if valid_scans:
-                                c_vals, s_vals = zip(*valid_scans)
+                                c_vals = [x[0] for x in valid_scans]
+                                s_vals = [x[1] for x in valid_scans]
+                                v_vals = [x[2] for x in valid_scans]
+                                m_vals = [x[3] for x in valid_scans]
                                 
+                                # Plot metric vs c/a
                                 fig_scan = go.Figure()
+                                
+                                y_vals = m_vals if opt_metric == 's3_over_volume' else s_vals
+                                y_label = "s³/Volume" if opt_metric == 's3_over_volume' else "s*"
+                                
                                 fig_scan.add_trace(go.Scatter(
                                     x=c_vals,
-                                    y=s_vals,
+                                    y=y_vals,
                                     mode='markers+lines',
                                     marker=dict(size=8, color='#667eea'),
                                     line=dict(width=1, color='#667eea', dash='dot'),
-                                    name='Scan points'
+                                    name='Scan points',
+                                    hovertemplate='c/a: %{x:.3f}<br>' + y_label + ': %{y:.4f}<extra></extra>'
                                 ))
                                 
                                 # Mark the optimum
-                                if detail_data.get('best_c_ratio') and detail_data.get('best_s_star'):
+                                if detail_data.get('best_c_ratio') and detail_data.get('best_metric'):
+                                    best_y = detail_data['best_metric'] if opt_metric == 's_over_volume' else detail_data['best_s_star']
                                     fig_scan.add_trace(go.Scatter(
                                         x=[detail_data['best_c_ratio']],
-                                        y=[detail_data['best_s_star']],
+                                        y=[best_y],
                                         mode='markers',
                                         marker=dict(size=15, color='#22c55e', symbol='star'),
                                         name=f"Optimum (c/a={detail_data['best_c_ratio']:.3f})"
                                     ))
                                 
                                 fig_scan.update_layout(
-                                    title=f"s* vs c/a for {selected_config}",
+                                    title=f"{y_label} vs c/a for {selected_config}",
                                     xaxis_title="c/a ratio",
-                                    yaxis_title="s*",
+                                    yaxis_title=y_label,
                                     height=350,
                                     showlegend=True
                                 )
@@ -603,17 +635,19 @@ def main():
                             if scan_history:
                                 with st.expander("View scan history by level"):
                                     for level, level_results in scan_history.items():
-                                        valid_level = [(c, s) for c, s in level_results if s is not None]
+                                        valid_level = [(c, s, v, m) for c, s, v, m in level_results if m is not None]
                                         if valid_level:
                                             st.markdown(f"**{level.capitalize()}** ({len(valid_level)} points)")
-                                            level_df = pd.DataFrame(valid_level, columns=['c/a', 's*'])
-                                            level_df['s*'] = level_df['s*'].apply(lambda x: f"{x:.4f}")
+                                            level_df = pd.DataFrame(valid_level, columns=['c/a', 's*', 'Volume', 'Metric'])
                                             level_df['c/a'] = level_df['c/a'].apply(lambda x: f"{x:.4f}")
+                                            level_df['s*'] = level_df['s*'].apply(lambda x: f"{x:.4f}")
+                                            level_df['Volume'] = level_df['Volume'].apply(lambda x: f"{x:.2f}")
+                                            level_df['Metric'] = level_df['Metric'].apply(lambda x: f"{x:.6f}")
                                             st.dataframe(level_df, use_container_width=True, hide_index=True)
                 
                 # Show failures
                 ca_failures = [(k, v) for k, v in st.session_state.ca_scan_results.items() 
-                              if v.get('best_s_star') is None]
+                              if v.get('best_metric') is None]
                 if ca_failures:
                     with st.expander(f"⚠️ {len(ca_failures)} configurations could not achieve CN={target_cn}"):
                         for config_id, data in ca_failures:
