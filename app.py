@@ -253,32 +253,80 @@ def main():
             ]
             idx = len(st.session_state.metals)
             st.session_state.metals.append(defaults[idx % len(defaults)])
-        st.session_state.metals = st.session_state.metals[:num_metals]
+        
+        # Clean up tracking for removed metals
+        if len(st.session_state.metals) > num_metals:
+            st.session_state.metals = st.session_state.metals[:num_metals]
+            # Clean up tracking dict
+            if 'metal_last_params' in st.session_state:
+                st.session_state.metal_last_params = {
+                    k: v for k, v in st.session_state.metal_last_params.items() 
+                    if k < num_metals
+                }
         
         # Metal inputs
         st.subheader("Metal Cations")
+        
+        # Initialize tracking for auto-radius updates
+        if 'metal_last_params' not in st.session_state:
+            st.session_state.metal_last_params = {}
+        
         for i, metal in enumerate(st.session_state.metals):
             with st.expander(f"Metal {i+1}: {metal['symbol']}⁺{metal['charge']}", expanded=True):
                 mcols = st.columns(5)
                 with mcols[0]:
-                    metal['symbol'] = st.text_input("Symbol", value=metal['symbol'], key=f'm_sym_{i}')
+                    new_symbol = st.text_input("Symbol", value=metal['symbol'], key=f'm_sym_{i}')
                 with mcols[1]:
-                    metal['charge'] = st.number_input("Charge", min_value=1, max_value=7, 
-                                                      value=metal['charge'], key=f'm_chg_{i}')
+                    new_charge = st.number_input("Charge", min_value=1, max_value=7, 
+                                                  value=metal['charge'], key=f'm_chg_{i}')
                 with mcols[2]:
                     metal['ratio'] = st.number_input("Ratio", min_value=1, max_value=20,
                                                      value=metal['ratio'], key=f'm_rat_{i}')
                 with mcols[3]:
-                    avail_cns = get_available_cns(metal['symbol'], metal['charge'])
-                    metal['cn'] = st.number_input("CN", min_value=1, max_value=12,
-                                                  value=metal['cn'], key=f'm_cn_{i}')
+                    avail_cns = get_available_cns(new_symbol, new_charge)
+                    new_cn = st.number_input("CN", min_value=1, max_value=12,
+                                              value=metal['cn'], key=f'm_cn_{i}')
                     if avail_cns:
                         st.caption(f"Available: {', '.join(map(str, avail_cns))}")
+                
+                # Check if symbol, charge, or CN changed - if so, try to auto-update radius
+                last_params = st.session_state.metal_last_params.get(i, {})
+                params_changed = (
+                    last_params.get('symbol') != new_symbol or
+                    last_params.get('charge') != new_charge or
+                    last_params.get('cn') != new_cn
+                )
+                
+                # Update metal dict with new values
+                metal['symbol'] = new_symbol
+                metal['charge'] = new_charge
+                metal['cn'] = new_cn
+                
+                # Determine radius value to show
+                current_radius = metal.get('radius', 0.7)
+                if params_changed:
+                    # Try to get radius from database
+                    db_radius = get_ionic_radius(new_symbol, new_charge, new_cn)
+                    if db_radius is not None:
+                        current_radius = db_radius
+                    # Store new params
+                    st.session_state.metal_last_params[i] = {
+                        'symbol': new_symbol,
+                        'charge': new_charge,
+                        'cn': new_cn
+                    }
+                
                 with mcols[4]:
-                    db_radius = get_ionic_radius(metal['symbol'], metal['charge'], metal['cn'])
-                    metal['radius'] = st.number_input("Radius (Å)", min_value=0.1, max_value=2.0,
-                                                      value=db_radius or metal.get('radius', 0.7),
-                                                      step=0.01, key=f'm_rad_{i}')
+                    db_radius = get_ionic_radius(new_symbol, new_charge, new_cn)
+                    metal['radius'] = st.number_input(
+                        "Radius (Å)", 
+                        min_value=0.1, 
+                        max_value=2.5,
+                        value=current_radius,
+                        step=0.01, 
+                        key=f'm_rad_{i}',
+                        help=f"Database: {db_radius:.3f} Å" if db_radius else "No database value"
+                    )
         
         # Calculate button
         if st.button("🧮 Calculate Stoichiometry & CN", type="primary", use_container_width=True):
