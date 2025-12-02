@@ -1062,7 +1062,7 @@ def scan_ca_for_stoichiometry(
                 lattice_type=lattice_type,
                 alpha_ratio=alpha_ratios,
                 bravais_type=bravais_type,
-                c_ratio=c_ratio
+                lattice_params={'c_ratio': c_ratio}
             )
             
             if s_star is None:
