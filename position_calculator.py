@@ -149,8 +149,10 @@ def generate_metal_positions(
         offsets = sub.offsets if sub.offsets and len(sub.offsets) > 0 else [(0, 0, 0)]
         
         # Loop over all offsets AND all basis positions
-        for offset in offsets:
+        for offset_idx, offset in enumerate(offsets):
             offset_arr = np.array(offset, dtype=float)
+            # Get alpha for this specific offset
+            alpha = sub.get_alpha_for_offset(offset_idx)
             
             for basis_pos in basis:
                 # Fractional position
@@ -171,8 +173,8 @@ def generate_metal_positions(
                     all_cart.append(cart)
                     all_sublattice_id.append(sub_idx)
                     all_sublattice_names.append(sub.name)
-                    all_radius.append(sub.alpha_ratio * scale_s * p.a)
-                    all_alpha.append(sub.alpha_ratio)
+                    all_radius.append(alpha * scale_s * p.a)
+                    all_alpha.append(alpha)
     
     if not all_frac:
         return MetalAtomData(

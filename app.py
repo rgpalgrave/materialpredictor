@@ -346,11 +346,28 @@ def main():
             target_cn = int(round(st.session_state.results['anion_cn']))
             st.info(f"Target CN (from stoichiometry): **{target_cn}**")
             
-            # Alpha ratio input
+            # Compute per-metal alpha ratios from radii
+            # Alpha ratio: r = alpha * s * a, so alpha = r / (s * a)
+            # We normalize so the average alpha is around the user's base value
+            metals = st.session_state.metals
+            metal_radii = [m['radius'] for m in metals]
+            
+            # Alpha ratio input (base value)
             alpha_cols = st.columns(2)
             with alpha_cols[0]:
-                alpha_ratio = st.number_input("α ratio (r = α·s·a)", min_value=0.1, max_value=1.0,
-                                              value=0.5, step=0.05, key='alpha_ratio')
+                base_alpha = st.number_input("Base α ratio (r = α·s·a)", min_value=0.1, max_value=1.0,
+                                              value=0.5, step=0.05, key='alpha_ratio',
+                                              help="For multi-metal structures, individual α values are scaled by radius ratios")
+            
+            # Compute per-offset alpha ratios based on relative radii
+            if len(metal_radii) > 1:
+                # Normalize radii relative to the largest
+                max_radius = max(metal_radii)
+                alpha_ratios = tuple(base_alpha * (r / max_radius) for r in metal_radii)
+                st.caption(f"Per-metal α ratios: {', '.join(f'{a:.3f}' for a in alpha_ratios)}")
+            else:
+                alpha_ratios = base_alpha  # Single value for N=1
+            
             with alpha_cols[1]:
                 st.markdown("")
                 st.markdown("")
@@ -374,7 +391,7 @@ def main():
                                 config.offsets,
                                 target_cn,
                                 config.lattice,
-                                alpha_ratio,
+                                alpha_ratios,  # Now per-offset or single
                                 bravais_type=config.bravais_type
                             )
                             if s_star is not None:
@@ -385,7 +402,7 @@ def main():
                                     'pattern': config.pattern,
                                     'bravais_type': config.bravais_type,
                                     'offsets': config.offsets,
-                                    'alpha_ratio': alpha_ratio
+                                    'alpha_ratio': alpha_ratios  # Now per-offset or single
                                 }
                             else:
                                 results[config.id] = {'s_star': None, 'status': 'not_achievable'}
@@ -507,7 +524,7 @@ def main():
                             config.offsets,
                             target_cn,
                             config.lattice,
-                            alpha_ratio,
+                            alpha_ratios,  # Use per-offset alpha ratios
                             bravais_type=config.bravais_type,
                             c_ratio_min=c_ratio_min,
                             c_ratio_max=c_ratio_max,

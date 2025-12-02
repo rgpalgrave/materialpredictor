@@ -69,13 +69,26 @@ class Sublattice:
     """A sublattice with positions and sphere parameters."""
     name: str
     offsets: Tuple[Tuple[float, float, float], ...]  # Fractional coordinates
-    alpha_ratio: float = 0.5  # Sphere radius = alpha_ratio * scale * a
+    alpha_ratio: float | Tuple[float, ...] = 0.5  # Sphere radius = alpha_ratio * scale * a (single or per-offset)
     bravais_type: str = 'cubic_P'  # Bravais lattice type for centering
     
     def __post_init__(self):
         # Convert list to tuple if needed
         if isinstance(self.offsets, list):
             object.__setattr__(self, 'offsets', tuple(tuple(o) for o in self.offsets))
+        # Convert alpha_ratio list to tuple if needed
+        if isinstance(self.alpha_ratio, list):
+            object.__setattr__(self, 'alpha_ratio', tuple(self.alpha_ratio))
+    
+    def get_alpha_for_offset(self, offset_idx: int) -> float:
+        """Get alpha ratio for a specific offset index."""
+        if isinstance(self.alpha_ratio, (int, float)):
+            return float(self.alpha_ratio)
+        else:
+            # It's a tuple - return corresponding value or last value if index out of range
+            if offset_idx < len(self.alpha_ratio):
+                return float(self.alpha_ratio[offset_idx])
+            return float(self.alpha_ratio[-1])
     
     def get_all_positions(self) -> List[Tuple[float, float, float]]:
         """Get all atomic positions including Bravais centering."""
@@ -93,6 +106,25 @@ class Sublattice:
                         break
                 if not is_dup:
                     positions.append(pos)
+        return positions
+    
+    def get_all_positions_with_alpha(self) -> List[Tuple[Tuple[float, float, float], float]]:
+        """Get all atomic positions with their alpha ratios, including Bravais centering."""
+        basis = BRAVAIS_BASIS.get(self.bravais_type, [(0, 0, 0)])
+        positions = []
+        for offset_idx, offset in enumerate(self.offsets):
+            alpha = self.get_alpha_for_offset(offset_idx)
+            for b in basis:
+                # Add basis translation to offset, wrap to [0, 1)
+                pos = tuple((offset[i] + b[i]) % 1.0 for i in range(3))
+                # Avoid duplicates (within tolerance)
+                is_dup = False
+                for existing_pos, _ in positions:
+                    if all(abs((pos[i] - existing_pos[i] + 0.5) % 1.0 - 0.5) < 1e-6 for i in range(3)):
+                        is_dup = True
+                        break
+                if not is_dup:
+                    positions.append((pos, alpha))
         return positions
 
 
@@ -186,12 +218,12 @@ def build_centers_and_radii(sublattices: List[Sublattice], p: LatticeParams,
     radii = []
     
     for sub in sublattices:
-        # Get all positions including Bravais centering
-        all_positions = sub.get_all_positions()
-        for pos in all_positions:
+        # Get all positions including Bravais centering, with per-offset alpha
+        all_positions_with_alpha = sub.get_all_positions_with_alpha()
+        for pos, alpha in all_positions_with_alpha:
             cart = frac_to_cart(np.array(pos), lat_vecs)
             centers.append(cart)
-            radii.append(sub.alpha_ratio * scale_s * p.a)
+            radii.append(alpha * scale_s * p.a)
     
     return np.array(centers), np.array(radii)
 
@@ -367,7 +399,7 @@ def find_threshold_s_for_N(sublattices: List[Sublattice], p: LatticeParams,
 def compute_min_scale_for_cn(config_offsets: List[Tuple[float, float, float]],
                              target_cn: int,
                              lattice_type: str,
-                             alpha_ratio: float = 0.5,
+                             alpha_ratio: float | Tuple[float, ...] | List[float] = 0.5,
                              bravais_type: Optional[str] = None,
                              lattice_params: Optional[dict] = None) -> Optional[float]:
     """
@@ -377,7 +409,7 @@ def compute_min_scale_for_cn(config_offsets: List[Tuple[float, float, float]],
         config_offsets: List of fractional coordinate offsets
         target_cn: Target coordination number (intersection multiplicity)
         lattice_type: 'Cubic', 'Tetragonal', 'Hexagonal', etc.
-        alpha_ratio: r = alpha * s * a
+        alpha_ratio: r = alpha * s * a (single value for all, or tuple/list of per-offset values)
         bravais_type: Specific Bravais type (e.g., 'cubic_F', 'tetragonal_I')
         lattice_params: Optional dict with 'b_ratio', 'c_ratio', 'alpha', 'beta', 'gamma'
     
@@ -407,6 +439,10 @@ def compute_min_scale_for_cn(config_offsets: List[Tuple[float, float, float]],
     # Determine Bravais type if not specified
     if bravais_type is None:
         bravais_type = lattice_type.lower() + '_P'
+    
+    # Normalize alpha_ratio to tuple if it's a list
+    if isinstance(alpha_ratio, list):
+        alpha_ratio = tuple(alpha_ratio)
     
     # Create sublattice
     sub = Sublattice(
@@ -459,7 +495,7 @@ def scan_c_ratio_for_min_scale(
     config_offsets: List[Tuple[float, float, float]],
     target_cn: int,
     lattice_type: str,
-    alpha_ratio: float = 0.5,
+    alpha_ratio: float | Tuple[float, ...] | List[float] = 0.5,
     bravais_type: Optional[str] = None,
     c_ratio_min: float = 0.5,
     c_ratio_max: float = 2.0,
@@ -481,7 +517,7 @@ def scan_c_ratio_for_min_scale(
         config_offsets: List of fractional coordinate offsets
         target_cn: Target coordination number (intersection multiplicity)
         lattice_type: 'Tetragonal', 'Hexagonal', etc.
-        alpha_ratio: r = alpha * s * a
+        alpha_ratio: r = alpha * s * a (single value for all, or tuple/list of per-offset values)
         bravais_type: Specific Bravais type
         c_ratio_min: Minimum c/a ratio to scan
         c_ratio_max: Maximum c/a ratio to scan
@@ -664,7 +700,7 @@ def scan_c_ratio_for_min_scale(
 def batch_scan_c_ratio(
     configs: List[dict],
     target_cn: int,
-    alpha_ratio: float = 0.5,
+    alpha_ratio: float | Tuple[float, ...] | List[float] = 0.5,
     c_ratio_min: float = 0.5,
     c_ratio_max: float = 2.0,
     scan_level: str = 'fine',
@@ -678,7 +714,7 @@ def batch_scan_c_ratio(
     Args:
         configs: List of config dicts with 'id', 'lattice', 'offsets', 'bravais_type'
         target_cn: Target coordination number
-        alpha_ratio: Sphere radius ratio
+        alpha_ratio: Sphere radius ratio (single value or per-offset tuple/list)
         c_ratio_min: Minimum c/a ratio
         c_ratio_max: Maximum c/a ratio
         scan_level: Scan resolution level
