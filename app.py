@@ -28,7 +28,8 @@ from interstitial_engine import (
 from position_calculator import (
     calculate_complete_structure, generate_metal_positions, calculate_intersections,
     format_position_dict, format_xyz, format_metal_atoms_csv, format_intersections_csv,
-    get_unique_intersections, calculate_weighted_counts, analyze_all_coordination_environments
+    get_unique_intersections, calculate_weighted_counts, analyze_all_coordination_environments,
+    find_optimal_half_filling, HalfFillingResult
 )
 
 st.set_page_config(
@@ -1322,15 +1323,61 @@ def main():
             # 3D visualization
             st.subheader("3D Unit Cell")
             
-            # Half-filling option (for zinc blende, etc.)
-            viz_cols = st.columns([1, 1, 2])
+            # Half-filling options (for zinc blende, etc.)
+            viz_cols = st.columns([1, 1, 1, 1])
             with viz_cols[0]:
                 show_half_filling = st.checkbox(
                     "Half-filling mode",
                     value=False,
-                    help="Remove half the anion sites in an ordered fashion (for zinc blende, etc.)",
+                    help="Keep only half the anion sites, optimized for maximum coordination regularity",
                     key='uc_half_filling'
                 )
+            
+            with viz_cols[1]:
+                if show_half_filling:
+                    half_fill_fraction = st.select_slider(
+                        "Fraction to keep",
+                        options=[0.25, 0.33, 0.5, 0.67, 0.75],
+                        value=0.5,
+                        key='uc_half_fraction'
+                    )
+                else:
+                    half_fill_fraction = 0.5
+            
+            # Calculate optimized half-filling if enabled
+            half_filling_result = None
+            if show_half_filling:
+                with st.spinner("Optimizing site selection for maximum regularity..."):
+                    metals = st.session_state.get('metals', [{'symbol': 'M'}])
+                    half_filling_result = find_optimal_half_filling(
+                        structure=structure,
+                        metals=metals,
+                        max_coord_sites=12,
+                        target_fraction=half_fill_fraction
+                    )
+                    st.session_state['half_filling_result'] = half_filling_result
+                
+                if half_filling_result and half_filling_result.success:
+                    # Show improvement metrics
+                    improvement = half_filling_result.mean_regularity_after - half_filling_result.mean_regularity_before
+                    delta_str = f"+{improvement:.3f}" if improvement > 0 else f"{improvement:.3f}"
+                    
+                    hf_metric_cols = st.columns(4)
+                    with hf_metric_cols[0]:
+                        st.metric("Sites kept", f"{half_filling_result.kept_count}/{half_filling_result.original_count}")
+                    with hf_metric_cols[1]:
+                        st.metric("Regularity (before)", f"{half_filling_result.mean_regularity_before:.3f}")
+                    with hf_metric_cols[2]:
+                        st.metric("Regularity (after)", f"{half_filling_result.mean_regularity_after:.3f}", delta=delta_str)
+                    with hf_metric_cols[3]:
+                        # Show per-metal CNs
+                        cn_strs = [f"{m['symbol']}:{m['cn']}" for m in half_filling_result.per_metal_scores]
+                        st.metric("CNs", ", ".join(cn_strs))
+                    
+                    # Show per-metal details in expander
+                    with st.expander("Per-metal regularity details"):
+                        for m in half_filling_result.per_metal_scores:
+                            st.write(f"**{m['symbol']}**: CN = {m['cn']}, Regularity = {m['regularity']:.3f}")
             
             # Create 3D plot
             fig_3d = go.Figure()
@@ -1407,21 +1454,31 @@ def main():
                 frac = structure.intersections.fractional
                 cart = structure.intersections.cartesian
                 
-                # Apply half-filling filter if enabled
-                if show_half_filling:
-                    # Select every other site in an ordered fashion
-                    # Order by fractional coordinates (x, then y, then z)
-                    # This creates a systematic pattern like zinc blende
-                    order = np.lexsort((frac[:, 2], frac[:, 1], frac[:, 0]))
-                    # Take every other site
-                    half_mask = np.zeros(len(frac), dtype=bool)
-                    half_mask[order[::2]] = True
+                # Apply optimized half-filling filter if enabled
+                if show_half_filling and half_filling_result and half_filling_result.success:
+                    # Get the kept site fractional coordinates
+                    kept_fracs = half_filling_result.kept_site_fractions
                     
-                    frac = frac[half_mask]
-                    cart = cart[half_mask]
-                    mult = mult[half_mask]
+                    # Match intersection sites to kept sites (accounting for boundary equivalents)
+                    keep_mask = np.zeros(len(frac), dtype=bool)
                     
-                    st.caption(f"Half-filling: showing {len(cart)} of {len(structure.intersections.cartesian)} sites")
+                    for i in range(len(frac)):
+                        site_frac = frac[i]
+                        # Wrap to [0, 1) for comparison
+                        site_wrapped = site_frac - np.floor(site_frac)
+                        
+                        for kept_frac in kept_fracs:
+                            kept_wrapped = kept_frac - np.floor(kept_frac)
+                            # Check if this is the same site (considering PBC)
+                            diff = site_wrapped - kept_wrapped
+                            diff = diff - np.round(diff)
+                            if np.sum(diff**2) < 0.001:  # Tolerance
+                                keep_mask[i] = True
+                                break
+                    
+                    frac = frac[keep_mask]
+                    cart = cart[keep_mask]
+                    mult = mult[keep_mask]
                 
                 fig_3d.add_trace(go.Scatter3d(
                     x=cart[:, 0],

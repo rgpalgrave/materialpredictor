@@ -1624,3 +1624,371 @@ def analyze_all_coordination_environments(
             success=False,
             error=str(e)
         )
+
+
+# -----------------
+# Optimized Half-Filling
+# -----------------
+
+from itertools import combinations
+
+
+def calculate_regularity_for_sites(
+    metal_cart: np.ndarray,
+    coord_sites: List[CoordinationSite]
+) -> float:
+    """
+    Calculate regularity score for a given set of coordination sites.
+    
+    Args:
+        metal_cart: Cartesian position of metal
+        coord_sites: List of coordination sites
+    
+    Returns:
+        Overall regularity score (0-1)
+    """
+    if len(coord_sites) < 2:
+        return 0.0
+    
+    # Distance metrics
+    distances = np.array([s.distance for s in coord_sites])
+    mean_dist = np.mean(distances)
+    std_dist = np.std(distances)
+    cv_dist = std_dist / mean_dist if mean_dist > 0 else 0.0
+    
+    # Angular metrics
+    coord_positions = np.array([s.cartesian for s in coord_sites])
+    angles = calculate_angles(metal_cart, coord_positions)
+    
+    # Find ideal polyhedron
+    cn = len(coord_sites)
+    _, _, angle_deviation = find_closest_ideal_polyhedron(cn, angles)
+    
+    # Calculate regularity scores
+    distance_regularity = max(0.0, 1.0 - cv_dist * 2)
+    angular_regularity = max(0.0, 1.0 - angle_deviation / 30.0)
+    
+    return 0.5 * distance_regularity + 0.5 * angular_regularity
+
+
+def optimize_half_filling_for_metal(
+    metal_cart: np.ndarray,
+    all_coord_sites: List[CoordinationSite],
+    target_cn: int = None
+) -> Tuple[List[CoordinationSite], float]:
+    """
+    Find the optimal half of coordination sites for maximum regularity.
+    
+    Args:
+        metal_cart: Cartesian position of metal
+        all_coord_sites: Full list of coordination sites
+        target_cn: Target coordination number (default: half of total)
+    
+    Returns:
+        Tuple of (optimal sites, regularity score)
+    """
+    n_sites = len(all_coord_sites)
+    
+    if n_sites == 0:
+        return [], 0.0
+    
+    if target_cn is None:
+        target_cn = n_sites // 2
+    
+    target_cn = min(target_cn, n_sites)
+    
+    if target_cn == n_sites:
+        reg = calculate_regularity_for_sites(metal_cart, all_coord_sites)
+        return all_coord_sites, reg
+    
+    # For small numbers, try all combinations
+    if n_sites <= 14:
+        best_score = -1.0
+        best_subset = None
+        
+        for subset_indices in combinations(range(n_sites), target_cn):
+            subset = [all_coord_sites[i] for i in subset_indices]
+            score = calculate_regularity_for_sites(metal_cart, subset)
+            
+            if score > best_score:
+                best_score = score
+                best_subset = subset
+        
+        return best_subset if best_subset else [], best_score
+    
+    else:
+        # For larger numbers, use greedy removal
+        # Start with all sites sorted by distance
+        remaining = list(all_coord_sites)
+        
+        while len(remaining) > target_cn:
+            best_removal_score = -1.0
+            best_removal_idx = 0
+            
+            for i in range(len(remaining)):
+                # Try removing site i
+                test_subset = remaining[:i] + remaining[i+1:]
+                score = calculate_regularity_for_sites(metal_cart, test_subset)
+                
+                if score > best_removal_score:
+                    best_removal_score = score
+                    best_removal_idx = i
+            
+            remaining.pop(best_removal_idx)
+        
+        final_score = calculate_regularity_for_sites(metal_cart, remaining)
+        return remaining, final_score
+
+
+@dataclass
+class HalfFillingResult:
+    """Result of optimized half-filling analysis."""
+    kept_site_indices: List[int]          # Indices of sites to keep (in unique intersections)
+    kept_site_fractions: np.ndarray       # Fractional coords of kept sites
+    original_count: int                    # Original number of unique sites
+    kept_count: int                        # Number of sites kept
+    mean_regularity_before: float          # Mean regularity with all sites
+    mean_regularity_after: float           # Mean regularity after half-filling
+    per_metal_scores: List[Dict]           # Per-metal regularity scores
+    success: bool
+    error: Optional[str] = None
+
+
+def find_optimal_half_filling(
+    structure: CompleteStructureData,
+    metals: List[Dict],
+    max_coord_sites: int = 12,
+    target_fraction: float = 0.5
+) -> HalfFillingResult:
+    """
+    Find the optimal set of intersection sites to keep for half-filling.
+    
+    Optimizes for maximum average coordination regularity across all metal types.
+    
+    Args:
+        structure: Complete structure data
+        metals: List of metal dictionaries
+        max_coord_sites: Maximum coordination sites to consider per metal
+        target_fraction: Fraction of sites to keep (default 0.5)
+    
+    Returns:
+        HalfFillingResult with optimal site selection
+    """
+    try:
+        metal_atoms = structure.metal_atoms
+        intersections = structure.intersections
+        lat_vecs = structure.lattice_vectors
+        
+        if len(intersections.fractional) == 0:
+            return HalfFillingResult(
+                kept_site_indices=[],
+                kept_site_fractions=np.empty((0, 3)),
+                original_count=0,
+                kept_count=0,
+                mean_regularity_before=0.0,
+                mean_regularity_after=0.0,
+                per_metal_scores=[],
+                success=False,
+                error="No intersection sites found"
+            )
+        
+        # Get unique intersection sites (without boundary equivalents)
+        unique_frac, unique_mult = get_unique_intersections(intersections)
+        n_unique = len(unique_frac)
+        
+        if n_unique == 0:
+            return HalfFillingResult(
+                kept_site_indices=[],
+                kept_site_fractions=np.empty((0, 3)),
+                original_count=0,
+                kept_count=0,
+                mean_regularity_before=0.0,
+                mean_regularity_after=0.0,
+                per_metal_scores=[],
+                success=False,
+                error="No unique intersection sites"
+            )
+        
+        # Convert unique sites to Cartesian
+        unique_cart = unique_frac @ lat_vecs
+        
+        # Get unique metal sites
+        unique_metal_indices = get_unique_metal_sites(metal_atoms)
+        
+        # Calculate regularity with all sites for baseline
+        baseline_scores = []
+        for metal_idx in unique_metal_indices:
+            offset_idx = metal_atoms.offset_idx[metal_idx]
+            metal_cart = metal_atoms.cartesian[metal_idx]
+            
+            # Find coordination sites for this metal
+            coord_sites = find_nearest_intersections_pbc(
+                metal_cart, unique_frac, unique_cart, unique_mult,
+                lat_vecs, max_coord_sites
+            )
+            
+            if coord_sites:
+                score = calculate_regularity_for_sites(metal_cart, coord_sites)
+                baseline_scores.append(score)
+        
+        mean_baseline = np.mean(baseline_scores) if baseline_scores else 0.0
+        
+        # Target number of sites to keep
+        target_keep = max(1, int(n_unique * target_fraction))
+        
+        # If only a few unique sites, try all combinations
+        if n_unique <= 12:
+            best_score = -1.0
+            best_indices = list(range(n_unique))
+            
+            for kept_indices in combinations(range(n_unique), target_keep):
+                kept_indices = list(kept_indices)
+                kept_frac = unique_frac[kept_indices]
+                kept_cart = unique_cart[kept_indices]
+                kept_mult = unique_mult[kept_indices]
+                
+                # Calculate mean regularity for this selection
+                scores = []
+                for metal_idx in unique_metal_indices:
+                    metal_cart = metal_atoms.cartesian[metal_idx]
+                    
+                    coord_sites = find_nearest_intersections_pbc(
+                        metal_cart, kept_frac, kept_cart, kept_mult,
+                        lat_vecs, max_coord_sites
+                    )
+                    
+                    if coord_sites:
+                        score = calculate_regularity_for_sites(metal_cart, coord_sites)
+                        scores.append(score)
+                
+                mean_score = np.mean(scores) if scores else 0.0
+                
+                if mean_score > best_score:
+                    best_score = mean_score
+                    best_indices = kept_indices
+            
+            # Calculate per-metal scores for best selection
+            kept_frac = unique_frac[best_indices]
+            kept_cart = unique_cart[best_indices]
+            kept_mult = unique_mult[best_indices]
+            
+            per_metal = []
+            for metal_idx in unique_metal_indices:
+                offset_idx = metal_atoms.offset_idx[metal_idx]
+                symbol = metals[offset_idx]['symbol'] if offset_idx < len(metals) else f'M{offset_idx+1}'
+                metal_cart = metal_atoms.cartesian[metal_idx]
+                
+                coord_sites = find_nearest_intersections_pbc(
+                    metal_cart, kept_frac, kept_cart, kept_mult,
+                    lat_vecs, max_coord_sites
+                )
+                
+                cn = len(coord_sites)
+                score = calculate_regularity_for_sites(metal_cart, coord_sites) if coord_sites else 0.0
+                
+                per_metal.append({
+                    'symbol': symbol,
+                    'cn': cn,
+                    'regularity': score
+                })
+            
+            return HalfFillingResult(
+                kept_site_indices=list(best_indices),
+                kept_site_fractions=unique_frac[best_indices],
+                original_count=n_unique,
+                kept_count=len(best_indices),
+                mean_regularity_before=mean_baseline,
+                mean_regularity_after=best_score,
+                per_metal_scores=per_metal,
+                success=True,
+                error=None
+            )
+        
+        else:
+            # For many sites, use greedy removal approach
+            remaining_indices = list(range(n_unique))
+            
+            while len(remaining_indices) > target_keep:
+                best_removal_score = -1.0
+                best_removal_idx = 0
+                
+                for remove_pos in range(len(remaining_indices)):
+                    # Try removing this site
+                    test_indices = remaining_indices[:remove_pos] + remaining_indices[remove_pos+1:]
+                    test_frac = unique_frac[test_indices]
+                    test_cart = unique_cart[test_indices]
+                    test_mult = unique_mult[test_indices]
+                    
+                    # Calculate mean regularity
+                    scores = []
+                    for metal_idx in unique_metal_indices:
+                        metal_cart = metal_atoms.cartesian[metal_idx]
+                        
+                        coord_sites = find_nearest_intersections_pbc(
+                            metal_cart, test_frac, test_cart, test_mult,
+                            lat_vecs, max_coord_sites
+                        )
+                        
+                        if coord_sites:
+                            score = calculate_regularity_for_sites(metal_cart, coord_sites)
+                            scores.append(score)
+                    
+                    mean_score = np.mean(scores) if scores else 0.0
+                    
+                    if mean_score > best_removal_score:
+                        best_removal_score = mean_score
+                        best_removal_idx = remove_pos
+                
+                remaining_indices.pop(best_removal_idx)
+            
+            # Calculate final scores
+            kept_frac = unique_frac[remaining_indices]
+            kept_cart = unique_cart[remaining_indices]
+            kept_mult = unique_mult[remaining_indices]
+            
+            per_metal = []
+            final_scores = []
+            for metal_idx in unique_metal_indices:
+                offset_idx = metal_atoms.offset_idx[metal_idx]
+                symbol = metals[offset_idx]['symbol'] if offset_idx < len(metals) else f'M{offset_idx+1}'
+                metal_cart = metal_atoms.cartesian[metal_idx]
+                
+                coord_sites = find_nearest_intersections_pbc(
+                    metal_cart, kept_frac, kept_cart, kept_mult,
+                    lat_vecs, max_coord_sites
+                )
+                
+                cn = len(coord_sites)
+                score = calculate_regularity_for_sites(metal_cart, coord_sites) if coord_sites else 0.0
+                final_scores.append(score)
+                
+                per_metal.append({
+                    'symbol': symbol,
+                    'cn': cn,
+                    'regularity': score
+                })
+            
+            return HalfFillingResult(
+                kept_site_indices=remaining_indices,
+                kept_site_fractions=unique_frac[remaining_indices],
+                original_count=n_unique,
+                kept_count=len(remaining_indices),
+                mean_regularity_before=mean_baseline,
+                mean_regularity_after=np.mean(final_scores) if final_scores else 0.0,
+                per_metal_scores=per_metal,
+                success=True,
+                error=None
+            )
+    
+    except Exception as e:
+        return HalfFillingResult(
+            kept_site_indices=[],
+            kept_site_fractions=np.empty((0, 3)),
+            original_count=0,
+            kept_count=0,
+            mean_regularity_before=0.0,
+            mean_regularity_after=0.0,
+            per_metal_scores=[],
+            success=False,
+            error=str(e)
+        )
