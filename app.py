@@ -383,7 +383,9 @@ def main():
                                     'status': 'found',
                                     'lattice': config.lattice,
                                     'pattern': config.pattern,
-                                    'bravais_type': config.bravais_type
+                                    'bravais_type': config.bravais_type,
+                                    'offsets': config.offsets,
+                                    'alpha_ratio': alpha_ratio
                                 }
                             else:
                                 results[config.id] = {'s_star': None, 'status': 'not_achievable'}
@@ -673,8 +675,8 @@ def main():
     
     # Get available results from scale factor calculations
     available_configs = []
-    if 'sf_results' in st.session_state and st.session_state.sf_results:
-        for config_id, data in st.session_state.sf_results.items():
+    if 'scale_results' in st.session_state and st.session_state.scale_results:
+        for config_id, data in st.session_state.scale_results.items():
             if data.get('s_star') is not None:
                 available_configs.append({
                     'id': config_id,
@@ -708,11 +710,16 @@ def main():
             )
         
         with uc_cols[2]:
+            # Get target CN from results if available
+            default_cn = 4
+            if 'results' in st.session_state and st.session_state.results:
+                default_cn = int(round(st.session_state.results.get('anion_cn', 4)))
+            
             uc_target_n = st.number_input(
                 "Min. multiplicity",
                 min_value=2,
                 max_value=12,
-                value=target_cn if 'target_cn' in dir() and target_cn else 4,
+                value=default_cn,
                 step=1,
                 key='uc_target_n'
             )
@@ -729,7 +736,7 @@ def main():
             with st.spinner("Calculating positions..."):
                 # Build sublattice from selected config
                 config_data = None
-                for config_id, data in st.session_state.sf_results.items():
+                for config_id, data in st.session_state.scale_results.items():
                     if config_id == selected_config['id']:
                         config_data = data
                         break
@@ -738,11 +745,12 @@ def main():
                     # Create sublattice
                     offsets = config_data.get('offsets', [(0, 0, 0)])
                     bravais = config_data.get('bravais_type', 'cubic_P')
+                    stored_alpha = config_data.get('alpha_ratio', 0.5)
                     
                     sublattice = Sublattice(
                         name='M',
                         offsets=tuple(tuple(o) for o in offsets),
-                        alpha_ratio=alpha_ratio if 'alpha_ratio' in dir() else 0.5,
+                        alpha_ratio=stored_alpha,
                         bravais_type=bravais
                     )
                     
