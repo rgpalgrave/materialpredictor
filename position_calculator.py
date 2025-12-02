@@ -145,33 +145,34 @@ def generate_metal_positions(
         # Get basis positions for this Bravais lattice type
         basis = BRAVAIS_BASIS.get(sub.bravais_type, [(0, 0, 0)])
         
-        # Get the first offset (or default to origin)
-        if sub.offsets and len(sub.offsets) > 0:
-            offset = np.array(sub.offsets[0], dtype=float)
-        else:
-            offset = np.array([0.0, 0.0, 0.0])
+        # Get all offsets (default to origin if none specified)
+        offsets = sub.offsets if sub.offsets and len(sub.offsets) > 0 else [(0, 0, 0)]
         
-        for basis_pos in basis:
-            # Fractional position
-            frac = np.array(basis_pos, dtype=float) + offset
-            frac = wrap_to_unit_cell(frac)
+        # Loop over all offsets AND all basis positions
+        for offset in offsets:
+            offset_arr = np.array(offset, dtype=float)
             
-            # Generate boundary equivalents if requested
-            if include_boundary_equivalents:
-                positions = generate_boundary_equivalents(frac)
-            else:
-                positions = [frac]
-            
-            for pos in positions:
-                # Cartesian position
-                cart = frac_to_cart(pos, lat_vecs)
+            for basis_pos in basis:
+                # Fractional position
+                frac = np.array(basis_pos, dtype=float) + offset_arr
+                frac = wrap_to_unit_cell(frac)
                 
-                all_frac.append(pos)
-                all_cart.append(cart)
-                all_sublattice_id.append(sub_idx)
-                all_sublattice_names.append(sub.name)
-                all_radius.append(sub.alpha_ratio * scale_s * p.a)
-                all_alpha.append(sub.alpha_ratio)
+                # Generate boundary equivalents if requested
+                if include_boundary_equivalents:
+                    positions = generate_boundary_equivalents(frac)
+                else:
+                    positions = [frac]
+                
+                for pos in positions:
+                    # Cartesian position
+                    cart = frac_to_cart(pos, lat_vecs)
+                    
+                    all_frac.append(pos)
+                    all_cart.append(cart)
+                    all_sublattice_id.append(sub_idx)
+                    all_sublattice_names.append(sub.name)
+                    all_radius.append(sub.alpha_ratio * scale_s * p.a)
+                    all_alpha.append(sub.alpha_ratio)
     
     if not all_frac:
         return MetalAtomData(
