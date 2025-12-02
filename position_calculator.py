@@ -112,6 +112,7 @@ class MetalAtomData:
     sublattice_name: List[str]  # Names of sublattices
     radius: np.ndarray          # (N,) actual radius in Angstroms
     alpha_ratio: np.ndarray     # (N,) alpha ratio for each atom
+    offset_idx: np.ndarray      # (N,) which offset within sublattice (for multi-metal)
 
 
 def generate_metal_positions(
@@ -140,6 +141,7 @@ def generate_metal_positions(
     all_sublattice_names = []
     all_radius = []
     all_alpha = []
+    all_offset_idx = []
     
     for sub_idx, sub in enumerate(sublattices):
         # Get basis positions for this Bravais lattice type
@@ -175,6 +177,7 @@ def generate_metal_positions(
                     all_sublattice_names.append(sub.name)
                     all_radius.append(alpha * scale_s * p.a)
                     all_alpha.append(alpha)
+                    all_offset_idx.append(offset_idx)
     
     if not all_frac:
         return MetalAtomData(
@@ -183,7 +186,8 @@ def generate_metal_positions(
             sublattice_id=np.empty((0,), dtype=int),
             sublattice_name=[],
             radius=np.empty((0,)),
-            alpha_ratio=np.empty((0,))
+            alpha_ratio=np.empty((0,)),
+            offset_idx=np.empty((0,), dtype=int)
         )
     
     return MetalAtomData(
@@ -192,7 +196,8 @@ def generate_metal_positions(
         sublattice_id=np.array(all_sublattice_id, dtype=int),
         sublattice_name=all_sublattice_names,
         radius=np.array(all_radius),
-        alpha_ratio=np.array(all_alpha)
+        alpha_ratio=np.array(all_alpha),
+        offset_idx=np.array(all_offset_idx, dtype=int)
     )
 
 

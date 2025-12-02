@@ -1130,6 +1130,16 @@ def main():
             # 3D visualization
             st.subheader("3D Unit Cell")
             
+            # Half-filling option (for zinc blende, etc.)
+            viz_cols = st.columns([1, 1, 2])
+            with viz_cols[0]:
+                show_half_filling = st.checkbox(
+                    "Half-filling mode",
+                    value=False,
+                    help="Remove half the anion sites in an ordered fashion (for zinc blende, etc.)",
+                    key='uc_half_filling'
+                )
+            
             # Create 3D plot
             fig_3d = go.Figure()
             
@@ -1160,33 +1170,71 @@ def main():
                     hoverinfo='skip'
                 ))
             
-            # Plot metal atoms
+            # Color palette for different metals
+            metal_colors = ['blue', 'green', 'purple', 'orange', 'cyan', 'magenta', 'brown', 'pink']
+            
+            # Plot metal atoms - grouped by offset_idx (which corresponds to metal type)
             if len(structure.metal_atoms.cartesian) > 0:
-                fig_3d.add_trace(go.Scatter3d(
-                    x=structure.metal_atoms.cartesian[:, 0],
-                    y=structure.metal_atoms.cartesian[:, 1],
-                    z=structure.metal_atoms.cartesian[:, 2],
-                    mode='markers',
-                    marker=dict(
-                        size=10,
-                        color='blue',
-                        opacity=0.8
-                    ),
-                    name='Metal atoms',
-                    text=[f"Metal {i}<br>({structure.metal_atoms.fractional[i][0]:.3f}, {structure.metal_atoms.fractional[i][1]:.3f}, {structure.metal_atoms.fractional[i][2]:.3f})"
-                          for i in range(len(structure.metal_atoms.fractional))],
-                    hoverinfo='text'
-                ))
+                # Get unique offset indices
+                unique_offsets = np.unique(structure.metal_atoms.offset_idx)
+                metals = st.session_state.get('metals', [{'symbol': 'M'}])
+                
+                for offset_idx in unique_offsets:
+                    mask = structure.metal_atoms.offset_idx == offset_idx
+                    coords = structure.metal_atoms.cartesian[mask]
+                    frac_coords = structure.metal_atoms.fractional[mask]
+                    
+                    # Get metal symbol for this offset
+                    if offset_idx < len(metals):
+                        symbol = metals[offset_idx]['symbol']
+                    else:
+                        symbol = f"M{offset_idx+1}"
+                    
+                    color = metal_colors[offset_idx % len(metal_colors)]
+                    
+                    fig_3d.add_trace(go.Scatter3d(
+                        x=coords[:, 0],
+                        y=coords[:, 1],
+                        z=coords[:, 2],
+                        mode='markers',
+                        marker=dict(
+                            size=10,
+                            color=color,
+                            opacity=0.8
+                        ),
+                        name=f'{symbol} atoms',
+                        text=[f"{symbol}<br>({frac_coords[i][0]:.3f}, {frac_coords[i][1]:.3f}, {frac_coords[i][2]:.3f})"
+                              for i in range(len(frac_coords))],
+                        hoverinfo='text'
+                    ))
             
             # Plot intersections
             if len(structure.intersections.cartesian) > 0:
                 # Color by multiplicity
                 mult = structure.intersections.multiplicity
+                frac = structure.intersections.fractional
+                cart = structure.intersections.cartesian
+                
+                # Apply half-filling filter if enabled
+                if show_half_filling:
+                    # Select every other site in an ordered fashion
+                    # Order by fractional coordinates (x, then y, then z)
+                    # This creates a systematic pattern like zinc blende
+                    order = np.lexsort((frac[:, 2], frac[:, 1], frac[:, 0]))
+                    # Take every other site
+                    half_mask = np.zeros(len(frac), dtype=bool)
+                    half_mask[order[::2]] = True
+                    
+                    frac = frac[half_mask]
+                    cart = cart[half_mask]
+                    mult = mult[half_mask]
+                    
+                    st.caption(f"Half-filling: showing {len(cart)} of {len(structure.intersections.cartesian)} sites")
                 
                 fig_3d.add_trace(go.Scatter3d(
-                    x=structure.intersections.cartesian[:, 0],
-                    y=structure.intersections.cartesian[:, 1],
-                    z=structure.intersections.cartesian[:, 2],
+                    x=cart[:, 0],
+                    y=cart[:, 1],
+                    z=cart[:, 2],
                     mode='markers',
                     marker=dict(
                         size=8,
@@ -1196,9 +1244,9 @@ def main():
                         symbol='diamond',
                         opacity=0.9
                     ),
-                    name='Intersections',
-                    text=[f"Site {i}<br>N={mult[i]}<br>({structure.intersections.fractional[i][0]:.3f}, {structure.intersections.fractional[i][1]:.3f}, {structure.intersections.fractional[i][2]:.3f})"
-                          for i in range(len(structure.intersections.fractional))],
+                    name='Anion sites',
+                    text=[f"Site {i}<br>N={mult[i]}<br>({frac[i][0]:.3f}, {frac[i][1]:.3f}, {frac[i][2]:.3f})"
+                          for i in range(len(frac))],
                     hoverinfo='text'
                 ))
             
@@ -1231,6 +1279,17 @@ def main():
                         'Cart z': [f"{x:.4f}" for x in structure.metal_atoms.cartesian[:, 2]],
                         'Radius (Å)': [f"{x:.4f}" for x in structure.metal_atoms.radius]
                     })
+                    
+                    # Add metal symbol column
+                    metals = st.session_state.get('metals', [])
+                    symbols = []
+                    for idx in structure.metal_atoms.offset_idx:
+                        if idx < len(metals):
+                            symbols.append(metals[idx]['symbol'])
+                        else:
+                            symbols.append(f"M{idx+1}")
+                    metal_df.insert(1, 'Symbol', symbols)
+                    
                     st.dataframe(metal_df, use_container_width=True, hide_index=True)
                 else:
                     st.info("No metal atoms to display")
