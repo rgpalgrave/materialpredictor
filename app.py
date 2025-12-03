@@ -29,7 +29,7 @@ from position_calculator import (
     calculate_complete_structure, generate_metal_positions, calculate_intersections,
     format_position_dict, format_xyz, format_metal_atoms_csv, format_intersections_csv,
     get_unique_intersections, calculate_weighted_counts, analyze_all_coordination_environments,
-    find_optimal_half_filling, HalfFillingResult
+    find_optimal_half_filling, HalfFillingResult, calculate_stoichiometry_for_config
 )
 
 st.set_page_config(
@@ -182,6 +182,366 @@ def check_stoichiometry_match(
     return False, 'none'
 
 
+def run_full_analysis_chain(
+    metals: List[Dict],
+    anion_symbol: str,
+    anion_charge: int,
+    anion_radius: float,
+    progress_callback=None
+) -> Dict:
+    """
+    Run the complete analysis chain:
+    1. Calculate stoichiometry and CN
+    2. Find minimum scale factors for all configurations
+    3. Calculate stoichiometries for successful configs
+    4. Check for matches (exact, half-filling)
+    5. Calculate regularity for exact matches
+    6. Generate 3D previews for exact matches
+    
+    Args:
+        metals: List of metal dictionaries with symbol, charge, ratio, cn, radius
+        anion_symbol: Anion element symbol
+        anion_charge: Anion charge (positive integer)
+        anion_radius: Anion ionic radius
+        progress_callback: Optional callback(step, total, message) for progress updates
+    
+    Returns:
+        Dictionary with all results
+    """
+    results = {
+        'success': False,
+        'error': None,
+        'stoichiometry': None,
+        'scale_results': {},
+        'stoich_results': {},
+        'matching_configs': [],  # List of configs sorted by match quality
+        'regularity_results': {},  # Config ID -> regularity data
+        'preview_figures': {},  # Config ID -> Plotly figure
+    }
+    
+    def update_progress(step, total, message):
+        if progress_callback:
+            progress_callback(step, total, message)
+    
+    try:
+        num_metals = len(metals)
+        
+        # Step 1: Calculate stoichiometry
+        update_progress(1, 6, "Calculating stoichiometry...")
+        
+        metal_counts, anion_count = calculate_stoichiometry(metals, anion_charge)
+        total_metal_cn = sum(m['cn'] * c for m, c in zip(metals, metal_counts))
+        anion_cn = total_metal_cn / anion_count
+        target_cn = int(round(anion_cn))
+        
+        total_positive = sum(c * m['charge'] for m, c in zip(metals, metal_counts))
+        total_negative = anion_count * anion_charge
+        
+        results['stoichiometry'] = {
+            'metal_counts': metal_counts,
+            'anion_count': anion_count,
+            'anion_cn': anion_cn,
+            'target_cn': target_cn,
+            'charge_balanced': total_positive == total_negative,
+            'total_positive': total_positive,
+            'total_negative': total_negative,
+            'total_metal_cn': total_metal_cn,
+            'formula': build_formula_string(metals, metal_counts, anion_symbol, anion_count)
+        }
+        
+        # Step 2: Get configurations and calculate minimum scale factors
+        update_progress(2, 6, "Finding minimum scale factors...")
+        
+        configs = get_configs_for_n(num_metals)
+        arity0_configs = configs['arity0']
+        
+        # Use base alpha = 0.5, scaled by relative radii for multi-metal
+        base_alpha = 0.5
+        metal_radii = [m['radius'] for m in metals]
+        if len(metal_radii) > 1:
+            max_radius = max(metal_radii)
+            alpha_ratios = tuple(base_alpha * (r / max_radius) for r in metal_radii)
+        else:
+            alpha_ratios = base_alpha
+        
+        scale_results = {}
+        for config in arity0_configs:
+            if config.offsets is None:
+                continue
+            
+            try:
+                s_star = compute_min_scale_for_cn(
+                    config.offsets,
+                    target_cn,
+                    config.lattice,
+                    alpha_ratios,
+                    bravais_type=config.bravais_type
+                )
+                if s_star is not None:
+                    scale_results[config.id] = {
+                        's_star': s_star,
+                        'status': 'found',
+                        'lattice': config.lattice,
+                        'pattern': config.pattern,
+                        'bravais_type': config.bravais_type,
+                        'offsets': config.offsets,
+                        'alpha_ratio': alpha_ratios
+                    }
+            except Exception:
+                pass
+        
+        results['scale_results'] = scale_results
+        
+        if not scale_results:
+            results['error'] = "No configurations could achieve the target CN"
+            return results
+        
+        # Step 3: Calculate stoichiometries
+        update_progress(3, 6, "Calculating stoichiometries...")
+        
+        stoich_results = {}
+        for config_id, config_data in scale_results.items():
+            try:
+                stoich_result = calculate_stoichiometry_for_config(
+                    config_id=config_id,
+                    offsets=config_data['offsets'],
+                    bravais_type=config_data['bravais_type'],
+                    lattice_type=config_data['lattice'],
+                    metals=metals,
+                    anion_symbol=anion_symbol,
+                    scale_s=config_data['s_star'],
+                    target_cn=target_cn,
+                    base_alpha=base_alpha,
+                    cluster_eps_frac=0.05
+                )
+                stoich_results[config_id] = stoich_result
+            except Exception:
+                pass
+        
+        results['stoich_results'] = stoich_results
+        
+        # Step 4: Check matches and sort
+        update_progress(4, 6, "Checking stoichiometry matches...")
+        
+        expected_metal_counts = dict(zip([m['symbol'] for m in metals], metal_counts))
+        expected_anion_count = anion_count
+        
+        exact_matches = []
+        half_matches = []
+        non_matches = []
+        
+        for config_id, stoich_result in stoich_results.items():
+            if not stoich_result.success:
+                continue
+            
+            matches, match_type = check_stoichiometry_match(
+                stoich_result.metal_counts,
+                stoich_result.anion_count,
+                expected_metal_counts,
+                expected_anion_count
+            )
+            
+            config_data = scale_results[config_id]
+            entry = {
+                'config_id': config_id,
+                's_star': config_data['s_star'],
+                'lattice': config_data['lattice'],
+                'bravais_type': config_data['bravais_type'],
+                'pattern': config_data.get('pattern', ''),
+                'offsets': config_data['offsets'],
+                'formula': stoich_result.formula,
+                'match_type': match_type,
+                'stoich_result': stoich_result
+            }
+            
+            if match_type == 'exact':
+                exact_matches.append(entry)
+            elif match_type == 'half':
+                half_matches.append(entry)
+            else:
+                non_matches.append(entry)
+        
+        # Sort each group by s_star
+        exact_matches.sort(key=lambda x: x['s_star'])
+        half_matches.sort(key=lambda x: x['s_star'])
+        non_matches.sort(key=lambda x: x['s_star'])
+        
+        results['matching_configs'] = exact_matches + half_matches + non_matches
+        
+        # Step 5: Calculate regularity for exact matches
+        update_progress(5, 6, "Analyzing coordination regularity...")
+        
+        regularity_results = {}
+        for entry in exact_matches:
+            config_id = entry['config_id']
+            config_data = scale_results[config_id]
+            
+            try:
+                # Build structure
+                offsets = config_data['offsets']
+                sublattice = Sublattice(
+                    name='analysis',
+                    offsets=tuple(tuple(o) for o in offsets),
+                    alpha_ratio=alpha_ratios,
+                    bravais_type=config_data['bravais_type']
+                )
+                
+                lattice_type = config_data['lattice']
+                p_dict = {'a': 5.0, 'b_ratio': 1.0, 'c_ratio': 1.0,
+                          'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
+                if lattice_type == 'Hexagonal':
+                    p_dict['gamma'] = 120.0
+                    p_dict['c_ratio'] = 1.633
+                
+                p = LatticeParams(**p_dict)
+                
+                structure = calculate_complete_structure(
+                    sublattices=[sublattice],
+                    p=p,
+                    scale_s=config_data['s_star'],
+                    target_N=target_cn,
+                    k_samples=32,
+                    cluster_eps_frac=0.05,
+                    include_boundary_equivalents=True
+                )
+                
+                # Analyze coordination
+                coord_result = analyze_all_coordination_environments(
+                    structure=structure,
+                    metals=metals,
+                    max_sites=target_cn
+                )
+                
+                regularity_results[config_id] = {
+                    'structure': structure,
+                    'coord_result': coord_result,
+                    'mean_regularity': coord_result.summary.get('mean_overall_regularity', 0) if coord_result.success else 0
+                }
+            except Exception:
+                regularity_results[config_id] = {
+                    'structure': None,
+                    'coord_result': None,
+                    'mean_regularity': 0
+                }
+        
+        results['regularity_results'] = regularity_results
+        
+        # Step 6: Generate 3D previews for exact matches
+        update_progress(6, 6, "Generating 3D previews...")
+        
+        preview_figures = {}
+        for entry in exact_matches[:10]:  # Limit to first 10 for performance
+            config_id = entry['config_id']
+            reg_data = regularity_results.get(config_id, {})
+            structure = reg_data.get('structure')
+            
+            if structure is not None:
+                try:
+                    fig = generate_preview_figure(structure, metals, config_id)
+                    preview_figures[config_id] = fig
+                except Exception:
+                    pass
+        
+        results['preview_figures'] = preview_figures
+        results['success'] = True
+        
+    except Exception as e:
+        results['error'] = str(e)
+    
+    return results
+
+
+def build_formula_string(metals: List[Dict], metal_counts: List[int], 
+                         anion_symbol: str, anion_count: int) -> str:
+    """Build a chemical formula string."""
+    parts = []
+    for m, c in zip(metals, metal_counts):
+        parts.append(f"{m['symbol']}{c if c > 1 else ''}")
+    parts.append(f"{anion_symbol}{anion_count if anion_count > 1 else ''}")
+    return ''.join(parts)
+
+
+def generate_preview_figure(structure, metals: List[Dict], title: str = "") -> go.Figure:
+    """Generate a small 3D preview figure for a structure."""
+    fig = go.Figure()
+    
+    lat_vecs = structure.lattice_vectors
+    
+    # Draw unit cell edges
+    corners = np.array([
+        [0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0],
+        [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]
+    ])
+    cart_corners = corners @ lat_vecs
+    
+    edges = [
+        (0, 1), (1, 2), (2, 3), (3, 0),
+        (4, 5), (5, 6), (6, 7), (7, 4),
+        (0, 4), (1, 5), (2, 6), (3, 7)
+    ]
+    
+    for i, j in edges:
+        fig.add_trace(go.Scatter3d(
+            x=[cart_corners[i, 0], cart_corners[j, 0]],
+            y=[cart_corners[i, 1], cart_corners[j, 1]],
+            z=[cart_corners[i, 2], cart_corners[j, 2]],
+            mode='lines',
+            line=dict(color='gray', width=1),
+            showlegend=False,
+            hoverinfo='skip'
+        ))
+    
+    metal_colors = ['blue', 'green', 'purple', 'orange', 'cyan', 'magenta']
+    
+    # Plot metal atoms
+    if len(structure.metal_atoms.cartesian) > 0:
+        unique_offsets = np.unique(structure.metal_atoms.offset_idx)
+        
+        for offset_idx in unique_offsets:
+            mask = structure.metal_atoms.offset_idx == offset_idx
+            coords = structure.metal_atoms.cartesian[mask]
+            
+            symbol = metals[offset_idx]['symbol'] if offset_idx < len(metals) else f'M{offset_idx+1}'
+            color = metal_colors[offset_idx % len(metal_colors)]
+            
+            fig.add_trace(go.Scatter3d(
+                x=coords[:, 0], y=coords[:, 1], z=coords[:, 2],
+                mode='markers',
+                marker=dict(size=6, color=color, opacity=0.9),
+                name=symbol,
+                hoverinfo='name'
+            ))
+    
+    # Plot intersections
+    if len(structure.intersections.cartesian) > 0:
+        cart = structure.intersections.cartesian
+        mult = structure.intersections.multiplicity
+        
+        fig.add_trace(go.Scatter3d(
+            x=cart[:, 0], y=cart[:, 1], z=cart[:, 2],
+            mode='markers',
+            marker=dict(size=4, color='red', symbol='diamond', opacity=0.7),
+            name='Anions',
+            hoverinfo='name'
+        ))
+    
+    fig.update_layout(
+        scene=dict(
+            xaxis=dict(showticklabels=False, title=''),
+            yaxis=dict(showticklabels=False, title=''),
+            zaxis=dict(showticklabels=False, title=''),
+            aspectmode='data'
+        ),
+        height=250,
+        width=300,
+        margin=dict(l=0, r=0, t=25, b=0),
+        title=dict(text=title, font=dict(size=10)),
+        showlegend=False
+    )
+    
+    return fig
+
+
 def main():
     st.title("🔬 Crystal Coordination & Lattice Explorer")
     st.markdown("Calculate stoichiometry, anion CN, and find minimum scale factors for target coordination")
@@ -195,6 +555,10 @@ def main():
         st.session_state.results = None
     if 'scale_results' not in st.session_state:
         st.session_state.scale_results = {}
+    if 'chain_results' not in st.session_state:
+        st.session_state.chain_results = None
+    if 'stoichiometry_results' not in st.session_state:
+        st.session_state.stoichiometry_results = {}
     
     # Sidebar for examples
     with st.sidebar:
@@ -230,6 +594,8 @@ def main():
                 st.session_state.anion_charge = config['anion_charge']
                 st.session_state.results = None
                 st.session_state.scale_results = {}
+                st.session_state.chain_results = None
+                st.session_state.stoichiometry_results = {}
                 st.rerun()
     
     # Main content
@@ -344,34 +710,46 @@ def main():
                         help=f"Database: {db_radius:.3f} Å" if db_radius else "No database value"
                     )
         
-        # Calculate button
+        # Calculate button - runs the full analysis chain
         if st.button("🧮 Calculate Stoichiometry & CN", type="primary", use_container_width=True):
-            metal_counts, anion_count = calculate_stoichiometry(st.session_state.metals, anion_charge)
+            # Create a progress container
+            progress_container = st.container()
             
-            # Calculate anion CN
-            total_metal_cn = sum(m['cn'] * c for m, c in zip(st.session_state.metals, metal_counts))
-            anion_cn = total_metal_cn / anion_count
+            with progress_container:
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                
+                def update_progress(step, total, message):
+                    progress_bar.progress(step / total)
+                    status_text.text(message)
+                
+                # Run the full analysis chain
+                chain_results = run_full_analysis_chain(
+                    metals=st.session_state.metals,
+                    anion_symbol=anion_symbol,
+                    anion_charge=anion_charge,
+                    anion_radius=anion_radius,
+                    progress_callback=update_progress
+                )
+                
+                progress_bar.empty()
+                status_text.empty()
             
-            # Charge balance check
-            total_positive = sum(c * m['charge'] for m, c in zip(st.session_state.metals, metal_counts))
-            total_negative = anion_count * anion_charge
+            # Store results
+            st.session_state.chain_results = chain_results
             
-            st.session_state.results = {
-                'metal_counts': metal_counts,
-                'anion_count': anion_count,
-                'anion_cn': anion_cn,
-                'charge_balanced': total_positive == total_negative,
-                'total_positive': total_positive,
-                'total_negative': total_negative,
-                'total_metal_cn': total_metal_cn,
-            }
-            st.session_state.scale_results = {}
+            if chain_results['success'] and chain_results['stoichiometry']:
+                st.session_state.results = chain_results['stoichiometry']
+                st.session_state.scale_results = chain_results['scale_results']
+                st.session_state.stoichiometry_results = chain_results['stoich_results']
+            
+            st.rerun()
         
-        # Display results
+        # Display basic stoichiometry results
         if st.session_state.results:
             r = st.session_state.results
             st.markdown("---")
-            st.subheader("📊 Results")
+            st.subheader("📊 Stoichiometry Results")
             
             # Formula display
             formula_parts = []
@@ -392,26 +770,6 @@ def main():
                 st.metric("Total +", f"+{r['total_positive']}")
             with rcols[3]:
                 st.metric("Total −", f"−{r['total_negative']}")
-            
-            # Detailed tables
-            tcols = st.columns(2)
-            with tcols[0]:
-                st.markdown("**Stoichiometry**")
-                stoich_df = pd.DataFrame({
-                    'Species': [m['symbol'] for m in st.session_state.metals] + [anion_symbol],
-                    'Count': r['metal_counts'] + [r['anion_count']],
-                    'Charge': [m['charge'] for m in st.session_state.metals] + [-anion_charge],
-                })
-                st.dataframe(stoich_df, use_container_width=True, hide_index=True)
-            
-            with tcols[1]:
-                st.markdown("**Coordination Numbers**")
-                cn_df = pd.DataFrame({
-                    'Species': [m['symbol'] for m in st.session_state.metals] + [anion_symbol],
-                    'CN': [m['cn'] for m in st.session_state.metals] + [r['anion_cn']],
-                    'Radius (Å)': [m['radius'] for m in st.session_state.metals] + [anion_radius],
-                })
-                st.dataframe(cn_df, use_container_width=True, hide_index=True)
     
     with col2:
         st.header("🔷 Lattice Configurations")
@@ -457,7 +815,140 @@ def main():
                         <br><small>Params: {config.params}</small>
                     </div>
                     """, unsafe_allow_html=True)
+    
+    # ============================================
+    # UNIFIED RESULTS SECTION
+    # ============================================
+    if 'chain_results' in st.session_state and st.session_state.chain_results.get('success'):
+        chain = st.session_state.chain_results
         
+        st.markdown("---")
+        st.header("🎯 Matching Lattice Configurations")
+        
+        matching_configs = chain.get('matching_configs', [])
+        regularity_results = chain.get('regularity_results', {})
+        preview_figures = chain.get('preview_figures', {})
+        
+        # Count matches
+        exact_matches = [c for c in matching_configs if c['match_type'] == 'exact']
+        half_matches = [c for c in matching_configs if c['match_type'] == 'half']
+        non_matches = [c for c in matching_configs if c['match_type'] == 'none']
+        
+        # Summary metrics
+        summary_cols = st.columns(4)
+        with summary_cols[0]:
+            st.metric("Total Configurations", len(matching_configs))
+        with summary_cols[1]:
+            st.metric("Exact Matches ✓", len(exact_matches))
+        with summary_cols[2]:
+            st.metric("Half-Filling Matches ½", len(half_matches))
+        with summary_cols[3]:
+            target_cn = chain['stoichiometry'].get('target_cn', 0)
+            st.metric("Target CN", target_cn)
+        
+        # Display exact matches with regularity and 3D preview
+        if exact_matches:
+            st.subheader("✓ Exact Stoichiometry Matches")
+            st.markdown("These configurations produce the expected chemical formula with regular coordination environments.")
+            
+            for entry in exact_matches:
+                config_id = entry['config_id']
+                s_star = entry['s_star']
+                lattice = entry['lattice']
+                formula = entry['formula']
+                pattern = entry.get('pattern', '')
+                
+                # Get regularity data
+                reg_data = regularity_results.get(config_id, {})
+                mean_reg = reg_data.get('mean_regularity', 0)
+                coord_result = reg_data.get('coord_result')
+                
+                # Create expander for each match
+                with st.expander(f"**{config_id}** — {lattice} — s*={s_star:.4f} — Regularity: {mean_reg:.2f}", expanded=True):
+                    
+                    # Two columns: info + 3D preview
+                    info_col, preview_col = st.columns([2, 1])
+                    
+                    with info_col:
+                        # Key metrics
+                        met_cols = st.columns(4)
+                        with met_cols[0]:
+                            st.metric("Scale Factor (s*)", f"{s_star:.4f}")
+                        with met_cols[1]:
+                            st.metric("Lattice", lattice)
+                        with met_cols[2]:
+                            st.metric("Formula", formula)
+                        with met_cols[3]:
+                            st.metric("Regularity", f"{mean_reg:.3f}")
+                        
+                        if pattern:
+                            st.caption(f"Pattern: {pattern}")
+                        
+                        # Per-metal regularity details
+                        if coord_result and coord_result.success:
+                            st.markdown("**Coordination Environment Details:**")
+                            env_data = []
+                            for env in coord_result.environments:
+                                env_data.append({
+                                    'Metal': env.metal_symbol,
+                                    'CN': len(env.coordination_sites),
+                                    'Mean Dist (Å)': f"{env.mean_distance:.3f}",
+                                    'Dist CV': f"{env.cv_distance:.3f}",
+                                    'Ideal Polyhedron': env.ideal_polyhedron.replace('_', ' ').title(),
+                                    'Angle Dev (°)': f"{env.angle_deviation:.1f}",
+                                    'Regularity': f"{env.overall_regularity:.3f}"
+                                })
+                            env_df = pd.DataFrame(env_data)
+                            st.dataframe(env_df, use_container_width=True, hide_index=True)
+                    
+                    with preview_col:
+                        # 3D preview
+                        if config_id in preview_figures:
+                            st.plotly_chart(preview_figures[config_id], use_container_width=True)
+                        else:
+                            st.info("Preview not available")
+        
+        # Display half-filling matches (collapsed by default)
+        if half_matches:
+            st.subheader("½ Half-Filling Matches")
+            st.markdown("These configurations match when only half the anion sites are occupied (e.g., zinc blende, wurtzite).")
+            
+            # Summary table for half matches
+            half_data = []
+            for entry in half_matches:
+                half_data.append({
+                    'Configuration': entry['config_id'],
+                    's*': f"{entry['s_star']:.4f}",
+                    'Lattice': entry['lattice'],
+                    'Formula (full)': entry['formula'],
+                    'Pattern': entry.get('pattern', '')
+                })
+            
+            half_df = pd.DataFrame(half_data)
+            st.dataframe(half_df, use_container_width=True, hide_index=True)
+            
+            st.info("💡 Click on individual configurations in the Unit Cell Viewer below to explore half-filling optimization.")
+        
+        # Display non-matches (collapsed)
+        if non_matches:
+            with st.expander(f"Other Configurations ({len(non_matches)} configs - no stoichiometry match)"):
+                other_data = []
+                for entry in non_matches[:20]:  # Limit display
+                    other_data.append({
+                        'Configuration': entry['config_id'],
+                        's*': f"{entry['s_star']:.4f}",
+                        'Lattice': entry['lattice'],
+                        'Formula': entry['formula']
+                    })
+                other_df = pd.DataFrame(other_data)
+                st.dataframe(other_df, use_container_width=True, hide_index=True)
+                
+                if len(non_matches) > 20:
+                    st.caption(f"Showing first 20 of {len(non_matches)} configurations")
+    
+    # Keep the old detailed sections below for advanced users
+    # but hide them in expanders
+    with st.expander("🔧 Advanced: Manual Scale Factor & c/a Optimization", expanded=False):
         # Scale factor calculation section
         st.markdown("---")
         st.header("📐 Minimum Scale Factor Calculator")

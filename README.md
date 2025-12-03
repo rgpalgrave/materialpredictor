@@ -8,37 +8,50 @@ A Streamlit application for crystallographic analysis that calculates:
 
 ## Features
 
-### 1. Composition Calculator
+### 1. Streamlined Workflow (NEW)
+Click **"Calculate Stoichiometry & CN"** to run the complete analysis chain:
+1. Calculate stoichiometry and target coordination number
+2. Find minimum scale factors for all lattice configurations (with α = 0.5)
+3. Calculate stoichiometries for each successful configuration
+4. Match results: exact matches (✓), half-filling matches (½), or no match
+5. Analyze coordination polyhedron regularity for exact matches
+6. Generate 3D previews for exact matches
+
+Results are displayed in a unified section showing:
+- Summary metrics (total configs, exact matches, half-filling matches)
+- Detailed cards for each exact match with regularity scores and 3D preview
+- Tables for half-filling and other configurations
+
+### 2. Composition Calculator
 - Input multiple metal cations with their symbols, charges, ratios, and coordination numbers
 - Shannon ionic radii database (1976) with auto-lookup
 - Automatic charge balancing and stoichiometry calculation
 - Anion CN derived from metal-anion coordination consistency
 
-### 2. Lattice Configuration Catalogue
+### 3. Lattice Configuration Catalogue
 - Complete catalogue of metal sublattice configurations for N=1 through N=8
 - Covers all 6 Bravais lattice systems (Cubic, Tetragonal, Hexagonal, Orthorhombic, Rhombohedral, Monoclinic)
 - Both fixed (arity-0) and parametric (arity-1) configurations
 - Filterable by lattice type and arity
 
-### 3. Minimum Scale Factor Calculator
-- For each lattice configuration, finds the minimum sphere scale factor (s*) needed to achieve the target coordination number
-- Uses sphere intersection analysis with periodic boundary conditions
-- Binary search algorithm with coarse sweep refinement
-- Results sorted by s* to identify optimal configurations
+### 4. Advanced Manual Controls
+For users who want more control, an expandable "Advanced" section provides:
+- Manual scale factor calculation with custom α ratio
+- c/a ratio optimization for tetragonal/hexagonal/orthorhombic lattices
+- Stoichiometry-based c/a scanning
 
-### 4. c/a Ratio Optimization
-- Scan c/a ratios for tetragonal, hexagonal, and orthorhombic lattices
-- Optimize for s³/V (packing efficiency) or minimum s*
-- Interactive scan plots with detailed history
-
-### 5. Coordination Environment Analysis (NEW)
+### 5. Coordination Environment Analysis
 - Analyzes the regularity of coordination polyhedra around each metal type
-- Uses periodic boundary conditions to find the 12 nearest intersection sites
-- Calculates distance metrics: mean, std deviation, range, coefficient of variation
-- Calculates angular metrics: all inter-ligand angles, comparison to ideal polyhedra
+- Uses periodic boundary conditions to find nearest intersection sites
+- Calculates distance metrics: mean, std deviation, coefficient of variation
+- Calculates angular metrics: comparison to ideal polyhedra (tetrahedron, octahedron, cube, etc.)
 - Provides regularity scores (0-1) for distance uniformity and angular regularity
-- Compares to ideal polyhedra: tetrahedron (CN=4), octahedron (CN=6), cube (CN=8), cuboctahedron (CN=12)
-- 3D visualization of coordination environment with distance coloring
+
+### 6. Optimized Half-Filling
+- For structures that occupy only half the anion sites (zinc blende, wurtzite, etc.)
+- Optimizes which sites to keep for maximum coordination regularity
+- Adjustable fraction (0.25 to 0.75)
+- Shows before/after regularity comparison
 
 ## Local Development
 
