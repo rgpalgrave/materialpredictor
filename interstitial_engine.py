@@ -212,18 +212,24 @@ def pair_circle_samples(c1: np.ndarray, r1: float, c2: np.ndarray, r2: float,
 
 def build_centers_and_radii(sublattices: List[Sublattice], p: LatticeParams, 
                             scale_s: float) -> Tuple[np.ndarray, np.ndarray]:
-    """Build arrays of sphere centers and radii from sublattices."""
+    """
+    Build arrays of sphere centers and radii from sublattices.
+    
+    The alpha value is interpreted as the coordination radius in Å (typically r_metal + r_anion).
+    The actual sphere radius is: scale_s × coord_radius
+    """
     lat_vecs = lattice_vectors(p)
     centers = []
     radii = []
     
     for sub in sublattices:
-        # Get all positions including Bravais centering, with per-offset alpha
+        # Get all positions including Bravais centering, with per-offset coord_radius
         all_positions_with_alpha = sub.get_all_positions_with_alpha()
-        for pos, alpha in all_positions_with_alpha:
+        for pos, coord_radius in all_positions_with_alpha:
             cart = frac_to_cart(np.array(pos), lat_vecs)
             centers.append(cart)
-            radii.append(alpha * scale_s * p.a)
+            # coord_radius is in Å (r_metal + r_anion), scale_s is the common scale factor
+            radii.append(coord_radius * scale_s)
     
     return np.array(centers), np.array(radii)
 

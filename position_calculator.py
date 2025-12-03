@@ -767,7 +767,7 @@ def calculate_stoichiometry_for_config(
     anion_symbol: str,
     scale_s: float,
     target_cn: int,
-    base_alpha: float = 0.5,
+    anion_radius: float = 1.40,
     cluster_eps_frac: float = 0.05
 ) -> StoichiometryResult:
     """
@@ -782,20 +782,19 @@ def calculate_stoichiometry_for_config(
         anion_symbol: Anion symbol (e.g., 'O')
         scale_s: Scale factor to use (typically s*)
         target_cn: Target coordination number for filtering intersections
-        base_alpha: Base alpha ratio
+        anion_radius: Anion ionic radius in Å
         cluster_eps_frac: Clustering tolerance
     
     Returns:
         StoichiometryResult with formula and counts
     """
     try:
-        # Compute per-offset alpha ratios based on metal radii
+        # Compute coordination radii as (r_metal + r_anion) for each metal
         metal_radii = [m['radius'] for m in metals]
         if len(metal_radii) > 1:
-            max_radius = max(metal_radii)
-            alpha_ratios = tuple(base_alpha * (r / max_radius) for r in metal_radii)
+            coord_radii = tuple(r + anion_radius for r in metal_radii)
         else:
-            alpha_ratios = base_alpha
+            coord_radii = metal_radii[0] + anion_radius
         
         # Set up lattice parameters
         p_dict = {'a': 5.0, 'b_ratio': 1.0, 'c_ratio': 1.0,
@@ -815,7 +814,7 @@ def calculate_stoichiometry_for_config(
         sublattice = Sublattice(
             name='M',
             offsets=tuple(tuple(o) for o in offsets),
-            alpha_ratio=alpha_ratios,
+            alpha_ratio=coord_radii,  # Using (r_metal + r_anion) in Å
             bravais_type=bravais_type
         )
         
@@ -991,7 +990,7 @@ def scan_ca_for_stoichiometry(
     metals: List[Dict],
     target_mx_ratio: float,
     target_cn: int,
-    base_alpha: float = 0.5,
+    anion_radius: float = 1.40,
     c_ratio_min: float = 0.5,
     c_ratio_max: float = 2.0,
     n_points: int = 50,
@@ -1010,7 +1009,7 @@ def scan_ca_for_stoichiometry(
         metals: List of metal definitions
         target_mx_ratio: Target M/X ratio (total metals / anions)
         target_cn: Target coordination number
-        base_alpha: Base alpha ratio
+        anion_radius: Anion ionic radius in Å
         c_ratio_min/max: c/a scan range
         n_points: Number of scan points
         cluster_eps_frac: Clustering tolerance
@@ -1025,13 +1024,12 @@ def scan_ca_for_stoichiometry(
             LatticeParams, Sublattice, compute_min_scale_for_cn
         )
         
-        # Compute per-offset alpha ratios
+        # Compute coordination radii as (r_metal + r_anion)
         metal_radii = [m['radius'] for m in metals]
         if len(metal_radii) > 1:
-            max_radius = max(metal_radii)
-            alpha_ratios = tuple(base_alpha * (r / max_radius) for r in metal_radii)
+            coord_radii = tuple(r + anion_radius for r in metal_radii)
         else:
-            alpha_ratios = base_alpha
+            coord_radii = metal_radii[0] + anion_radius
         
         scan_data = []
         matching_ranges = []
@@ -1060,7 +1058,7 @@ def scan_ca_for_stoichiometry(
                 config_offsets=offsets,
                 target_cn=target_cn,
                 lattice_type=lattice_type,
-                alpha_ratio=alpha_ratios,
+                alpha_ratio=coord_radii,
                 bravais_type=bravais_type,
                 lattice_params={'c_ratio': c_ratio}
             )
@@ -1077,7 +1075,7 @@ def scan_ca_for_stoichiometry(
             sublattice = Sublattice(
                 name='M',
                 offsets=tuple(tuple(o) for o in offsets),
-                alpha_ratio=alpha_ratios,
+                alpha_ratio=coord_radii,
                 bravais_type=bravais_type
             )
             
@@ -1534,8 +1532,8 @@ def analyze_all_coordination_environments(
     
     Args:
         structure: Complete structure data with metal atoms and intersections
-        metals: List of metal dictionaries with 'symbol' keys
-        max_sites: Maximum coordination sites per metal
+        metals: List of metal dictionaries with 'symbol' and 'cn' keys
+        max_sites: Default maximum coordination sites (used if metal has no 'cn' key)
     
     Returns:
         CoordinationAnalysisResult with all environments and summary
@@ -1568,9 +1566,16 @@ def analyze_all_coordination_environments(
         for idx in unique_indices:
             # Get metal info
             offset_idx = metal_atoms.offset_idx[idx]
-            symbol = metals[offset_idx]['symbol'] if offset_idx < len(metals) else f'M{offset_idx+1}'
             
-            # Calculate coordination environment
+            if offset_idx < len(metals):
+                symbol = metals[offset_idx]['symbol']
+                # Use the metal's specific CN, not the anion CN
+                metal_cn = metals[offset_idx].get('cn', max_sites)
+            else:
+                symbol = f'M{offset_idx+1}'
+                metal_cn = max_sites
+            
+            # Calculate coordination environment using this metal's CN
             env = calculate_coordination_environment(
                 metal_idx=idx,
                 metal_symbol=symbol,
@@ -1580,7 +1585,7 @@ def analyze_all_coordination_environments(
                 intersection_cart=intersections.cartesian,
                 intersection_mult=intersections.multiplicity,
                 lat_vecs=lat_vecs,
-                max_sites=max_sites
+                max_sites=metal_cn  # Use metal's CN, not anion CN
             )
             environments.append(env)
         
@@ -1767,13 +1772,20 @@ def find_optimal_half_filling(
     
     Args:
         structure: Complete structure data
-        metals: List of metal dictionaries
-        max_coord_sites: Maximum coordination sites to consider per metal
+        metals: List of metal dictionaries with 'cn' keys for per-metal coordination
+        max_coord_sites: Default max coordination sites (used if metal has no 'cn' key)
         target_fraction: Fraction of sites to keep (default 0.5)
     
     Returns:
         HalfFillingResult with optimal site selection
     """
+    
+    def get_metal_cn(offset_idx: int) -> int:
+        """Get the CN for a metal by its offset index."""
+        if offset_idx < len(metals):
+            return metals[offset_idx].get('cn', max_coord_sites)
+        return max_coord_sites
+    
     try:
         metal_atoms = structure.metal_atoms
         intersections = structure.intersections
@@ -1820,11 +1832,12 @@ def find_optimal_half_filling(
         for metal_idx in unique_metal_indices:
             offset_idx = metal_atoms.offset_idx[metal_idx]
             metal_cart = metal_atoms.cartesian[metal_idx]
+            metal_cn = get_metal_cn(offset_idx)  # Use this metal's CN
             
             # Find coordination sites for this metal
             coord_sites = find_nearest_intersections_pbc(
                 metal_cart, unique_frac, unique_cart, unique_mult,
-                lat_vecs, max_coord_sites
+                lat_vecs, metal_cn
             )
             
             if coord_sites:
@@ -1850,11 +1863,13 @@ def find_optimal_half_filling(
                 # Calculate mean regularity for this selection
                 scores = []
                 for metal_idx in unique_metal_indices:
+                    offset_idx = metal_atoms.offset_idx[metal_idx]
                     metal_cart = metal_atoms.cartesian[metal_idx]
+                    metal_cn = get_metal_cn(offset_idx)  # Use this metal's CN
                     
                     coord_sites = find_nearest_intersections_pbc(
                         metal_cart, kept_frac, kept_cart, kept_mult,
-                        lat_vecs, max_coord_sites
+                        lat_vecs, metal_cn
                     )
                     
                     if coord_sites:
@@ -1877,10 +1892,11 @@ def find_optimal_half_filling(
                 offset_idx = metal_atoms.offset_idx[metal_idx]
                 symbol = metals[offset_idx]['symbol'] if offset_idx < len(metals) else f'M{offset_idx+1}'
                 metal_cart = metal_atoms.cartesian[metal_idx]
+                metal_cn = get_metal_cn(offset_idx)  # Use this metal's CN
                 
                 coord_sites = find_nearest_intersections_pbc(
                     metal_cart, kept_frac, kept_cart, kept_mult,
-                    lat_vecs, max_coord_sites
+                    lat_vecs, metal_cn
                 )
                 
                 cn = len(coord_sites)
@@ -1922,11 +1938,13 @@ def find_optimal_half_filling(
                     # Calculate mean regularity
                     scores = []
                     for metal_idx in unique_metal_indices:
+                        offset_idx = metal_atoms.offset_idx[metal_idx]
                         metal_cart = metal_atoms.cartesian[metal_idx]
+                        metal_cn = get_metal_cn(offset_idx)  # Use this metal's CN
                         
                         coord_sites = find_nearest_intersections_pbc(
                             metal_cart, test_frac, test_cart, test_mult,
-                            lat_vecs, max_coord_sites
+                            lat_vecs, metal_cn
                         )
                         
                         if coord_sites:
@@ -1952,10 +1970,11 @@ def find_optimal_half_filling(
                 offset_idx = metal_atoms.offset_idx[metal_idx]
                 symbol = metals[offset_idx]['symbol'] if offset_idx < len(metals) else f'M{offset_idx+1}'
                 metal_cart = metal_atoms.cartesian[metal_idx]
+                metal_cn = get_metal_cn(offset_idx)  # Use this metal's CN
                 
                 coord_sites = find_nearest_intersections_pbc(
                     metal_cart, kept_frac, kept_cart, kept_mult,
-                    lat_vecs, max_coord_sites
+                    lat_vecs, metal_cn
                 )
                 
                 cn = len(coord_sites)

@@ -255,14 +255,11 @@ def run_full_analysis_chain(
         configs = get_configs_for_n(num_metals)
         arity0_configs = configs['arity0']
         
-        # Use base alpha = 0.5, scaled by relative radii for multi-metal
-        base_alpha = 0.5
-        metal_radii = [m['radius'] for m in metals]
-        if len(metal_radii) > 1:
-            max_radius = max(metal_radii)
-            alpha_ratios = tuple(base_alpha * (r / max_radius) for r in metal_radii)
-        else:
-            alpha_ratios = base_alpha
+        # Compute coordination radii as (r_metal + r_anion) for each metal
+        # This replaces the old alpha_ratio approach
+        coord_radii = tuple(m['radius'] + anion_radius for m in metals)
+        if len(coord_radii) == 1:
+            coord_radii = coord_radii[0]  # Single value for N=1
         
         scale_results = {}
         for config in arity0_configs:
@@ -274,7 +271,7 @@ def run_full_analysis_chain(
                     config.offsets,
                     target_cn,
                     config.lattice,
-                    alpha_ratios,
+                    coord_radii,  # Now using (r_metal + r_anion) in Å
                     bravais_type=config.bravais_type
                 )
                 if s_star is not None:
@@ -285,7 +282,7 @@ def run_full_analysis_chain(
                         'pattern': config.pattern,
                         'bravais_type': config.bravais_type,
                         'offsets': config.offsets,
-                        'alpha_ratio': alpha_ratios
+                        'coord_radii': coord_radii  # Store coordination radii
                     }
             except Exception:
                 pass
@@ -311,7 +308,7 @@ def run_full_analysis_chain(
                     anion_symbol=anion_symbol,
                     scale_s=config_data['s_star'],
                     target_cn=target_cn,
-                    base_alpha=base_alpha,
+                    anion_radius=anion_radius,  # Pass anion radius for coordination calculation
                     cluster_eps_frac=0.05
                 )
                 stoich_results[config_id] = stoich_result
@@ -382,7 +379,7 @@ def run_full_analysis_chain(
                 sublattice = Sublattice(
                     name='analysis',
                     offsets=tuple(tuple(o) for o in offsets),
-                    alpha_ratio=alpha_ratios,
+                    alpha_ratio=coord_radii,  # Now using (r_metal + r_anion) in Å
                     bravais_type=config_data['bravais_type']
                 )
                 
@@ -963,21 +960,23 @@ def main():
             metals = st.session_state.metals
             metal_radii = [m['radius'] for m in metals]
             
-            # Alpha ratio input (base value)
+            # Get anion radius from session state or use default
+            anion_rad = st.session_state.get('anion_rad', 1.40)
+            
+            # Coordination radius input (scale factor for r_metal + r_anion)
             alpha_cols = st.columns(2)
             with alpha_cols[0]:
-                base_alpha = st.number_input("Base α ratio (r = α·s·a)", min_value=0.1, max_value=1.0,
-                                              value=0.5, step=0.05, key='alpha_ratio',
-                                              help="For multi-metal structures, individual α values are scaled by radius ratios")
+                # Compute coordination radii as (r_metal + r_anion)
+                coord_radii_list = [r + anion_rad for r in metal_radii]
+                st.markdown(f"**Coordination radii (r_M + r_X):**")
+                for m, cr in zip(metals, coord_radii_list):
+                    st.caption(f"  {m['symbol']}: {m['radius']:.3f} + {anion_rad:.3f} = {cr:.3f} Å")
             
-            # Compute per-offset alpha ratios based on relative radii
-            if len(metal_radii) > 1:
-                # Normalize radii relative to the largest
-                max_radius = max(metal_radii)
-                alpha_ratios = tuple(base_alpha * (r / max_radius) for r in metal_radii)
-                st.caption(f"Per-metal α ratios: {', '.join(f'{a:.3f}' for a in alpha_ratios)}")
+            # Create coord_radii tuple
+            if len(coord_radii_list) > 1:
+                coord_radii = tuple(coord_radii_list)
             else:
-                alpha_ratios = base_alpha  # Single value for N=1
+                coord_radii = coord_radii_list[0]
             
             with alpha_cols[1]:
                 st.markdown("")
@@ -1002,7 +1001,7 @@ def main():
                                 config.offsets,
                                 target_cn,
                                 config.lattice,
-                                alpha_ratios,  # Now per-offset or single
+                                coord_radii,  # Using (r_metal + r_anion) in Å
                                 bravais_type=config.bravais_type
                             )
                             if s_star is not None:
@@ -1013,7 +1012,7 @@ def main():
                                     'pattern': config.pattern,
                                     'bravais_type': config.bravais_type,
                                     'offsets': config.offsets,
-                                    'alpha_ratio': alpha_ratios  # Now per-offset or single
+                                    'coord_radii': coord_radii
                                 }
                             else:
                                 results[config.id] = {'s_star': None, 'status': 'not_achievable'}
@@ -1106,6 +1105,7 @@ def main():
                         stoich_results = {}
                         metals = st.session_state.metals
                         anion_symbol = st.session_state.get('anion_symbol', 'O')
+                        anion_rad = st.session_state.get('anion_rad', 1.40)
                         
                         for i, (config_id, config_data) in enumerate(successful_configs):
                             status_text.text(f"Calculating stoichiometry for {config_id}...")
@@ -1120,7 +1120,7 @@ def main():
                                 anion_symbol=anion_symbol,
                                 scale_s=config_data['s_star'],
                                 target_cn=target_cn,
-                                base_alpha=base_alpha,
+                                anion_radius=anion_rad,
                                 cluster_eps_frac=0.05
                             )
                             stoich_results[config_id] = result
@@ -1293,7 +1293,7 @@ def main():
                             config.offsets,
                             target_cn,
                             config.lattice,
-                            alpha_ratios,  # Use per-offset alpha ratios
+                            coord_radii,  # Use coordination radii (r_metal + r_anion)
                             bravais_type=config.bravais_type,
                             c_ratio_min=c_ratio_min,
                             c_ratio_max=c_ratio_max,
@@ -1516,7 +1516,7 @@ def main():
                             metals=metals,
                             target_mx_ratio=target_mx,
                             target_cn=target_cn,
-                            base_alpha=base_alpha,
+                            anion_radius=st.session_state.get('anion_rad', 1.40),
                             c_ratio_min=stoich_c_min,
                             c_ratio_max=stoich_c_max,
                             n_points=stoich_n_points,
@@ -1740,12 +1740,23 @@ def main():
                     # Create sublattice
                     offsets = config_data.get('offsets', [(0, 0, 0)])
                     bravais = config_data.get('bravais_type', 'cubic_P')
-                    stored_alpha = config_data.get('alpha_ratio', 0.5)
+                    
+                    # Get coordination radii (r_metal + r_anion) - with fallback for backward compatibility
+                    stored_coord_radii = config_data.get('coord_radii')
+                    if stored_coord_radii is None:
+                        # Fallback: compute from metal radii + anion radius
+                        metals = st.session_state.get('metals', [{'symbol': 'M', 'radius': 0.7}])
+                        anion_rad = st.session_state.get('anion_rad', 1.40)
+                        metal_radii = [m['radius'] for m in metals]
+                        if len(metal_radii) > 1:
+                            stored_coord_radii = tuple(r + anion_rad for r in metal_radii)
+                        else:
+                            stored_coord_radii = metal_radii[0] + anion_rad
                     
                     sublattice = Sublattice(
                         name='M',
                         offsets=tuple(tuple(o) for o in offsets),
-                        alpha_ratio=stored_alpha,
+                        alpha_ratio=stored_coord_radii,  # Now using coordination radii
                         bravais_type=bravais
                     )
                     
