@@ -474,7 +474,7 @@ def run_full_analysis_chain(
                 
                 lattice_type = config_data['lattice']
                 # Use 0.99 factor to ensure intersections occur
-                a_real = config_data['s_star'] * 0.999
+                a_real = config_data['s_star'] * 0.9999
                 
                 p_dict = {'a': a_real, 'b_ratio': 1.0, 'c_ratio': 1.0,
                           'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
@@ -544,7 +544,7 @@ def run_full_analysis_chain(
                 
                 lattice_type = config_data['lattice']
                 # Use 0.99 factor to ensure intersections occur
-                a_real = config_data['s_star'] * 0.999
+                a_real = config_data['s_star'] * 0.9999
                 
                 p_dict = {'a': a_real, 'b_ratio': 1.0, 'c_ratio': 1.0,
                           'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
@@ -1638,7 +1638,7 @@ def main():
                                 
                                 # s* is the lattice parameter 'a' in Å
                                 # Use 0.99 factor to ensure intersections occur
-                                a_real = opt_result['best_s_star'] * 0.999
+                                a_real = opt_result['best_s_star'] * 0.9999
                                 
                                 p_dict = {'a': a_real, 'b_ratio': 1.0, 
                                          'c_ratio': opt_result['best_c_ratio'],
