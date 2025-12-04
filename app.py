@@ -1368,7 +1368,8 @@ def main():
                                             }
                                     else:
                                         # Scan for best regularity
-                                        # For half-filling matches, optimize with only half the sites
+                                        # Pass target_mx_ratio to enable auto-detection of half-filling
+                                        # at c/a points where stoichiometry matches with half occupancy
                                         is_half = (match_type == 'half')
                                         best_result = scan_ca_for_best_regularity(
                                             config_id=config_id,
@@ -1381,7 +1382,8 @@ def main():
                                             c_ratio_min=ca_min,
                                             c_ratio_max=ca_max,
                                             n_points=ca_points,
-                                            is_half_filling=is_half
+                                            is_half_filling=is_half,
+                                            target_mx_ratio=expected_mx  # Enable auto-detection
                                         )
                                         # Convert dataclass to dict for session state
                                         st.session_state.ca_optimization_results[config_id] = {

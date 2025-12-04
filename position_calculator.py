@@ -1196,7 +1196,9 @@ def scan_ca_for_best_regularity(
     c_ratio_min: float = 0.5,
     c_ratio_max: float = 2.5,
     n_points: int = 50,
-    is_half_filling: bool = False
+    is_half_filling: bool = False,
+    target_mx_ratio: Optional[float] = None,
+    stoich_tolerance: float = 0.15
 ) -> RegularityScanResult:
     """
     Scan c/a ratios to find the one with best coordination regularity.
@@ -1212,7 +1214,11 @@ def scan_ca_for_best_regularity(
         c_ratio_min: Minimum c/a ratio to scan
         c_ratio_max: Maximum c/a ratio to scan
         n_points: Number of points in scan
-        is_half_filling: If True, optimize by keeping only half the intersection sites
+        is_half_filling: If True, always use half-filling (legacy behavior)
+        target_mx_ratio: If provided, auto-detect whether full or half-filling 
+                        is needed at each c/a point based on stoichiometry match.
+                        This overrides is_half_filling.
+        stoich_tolerance: Tolerance for M/X ratio matching (default 0.15 = 15%)
     
     Returns:
         RegularityScanResult with best c/a and regularity scores
@@ -1223,6 +1229,7 @@ def scan_ca_for_best_regularity(
     best_s_star = None
     best_regularity = -1.0
     best_per_metal = []
+    best_is_half = False
     scan_data = []
     
     c_ratios = np.linspace(c_ratio_min, c_ratio_max, n_points)
@@ -1269,8 +1276,36 @@ def scan_ca_for_best_regularity(
                     include_boundary_equivalents=True
                 )
                 
-                # For half-filling, optimize which sites to keep
-                if is_half_filling:
+                # Determine if we should use half-filling for this c/a point
+                use_half_filling = is_half_filling  # Default to explicit parameter
+                
+                if target_mx_ratio is not None:
+                    # Auto-detect based on stoichiometry
+                    weighted = calculate_weighted_counts(structure)
+                    metal_count = weighted['metal_count']
+                    anion_count = weighted['intersection_count']
+                    
+                    if anion_count > 0 and metal_count > 0:
+                        # Check full occupancy match
+                        mx_full = metal_count / anion_count
+                        error_full = abs(mx_full - target_mx_ratio) / target_mx_ratio
+                        
+                        # Check half occupancy match
+                        mx_half = metal_count / (anion_count / 2.0)
+                        error_half = abs(mx_half - target_mx_ratio) / target_mx_ratio
+                        
+                        # Decide which to use
+                        if error_full <= stoich_tolerance and error_full <= error_half:
+                            use_half_filling = False
+                        elif error_half <= stoich_tolerance:
+                            use_half_filling = True
+                        else:
+                            # Neither matches well - skip this c/a for stoichiometry-constrained search
+                            scan_data.append((c_ratio, s_star, None))
+                            continue
+                
+                # Evaluate regularity with chosen occupancy mode
+                if use_half_filling:
                     half_result = find_optimal_half_filling(
                         structure=structure,
                         metals=metals,
@@ -1287,6 +1322,7 @@ def scan_ca_for_best_regularity(
                             best_c_ratio = c_ratio
                             best_s_star = s_star
                             best_per_metal = half_result.per_metal_scores
+                            best_is_half = True
                     else:
                         scan_data.append((c_ratio, s_star, None))
                 else:
@@ -1305,6 +1341,7 @@ def scan_ca_for_best_regularity(
                             best_regularity = mean_reg
                             best_c_ratio = c_ratio
                             best_s_star = s_star
+                            best_is_half = False
                             # Store per-metal scores
                             best_per_metal = []
                             for env in coord_result.environments:
@@ -1329,7 +1366,7 @@ def scan_ca_for_best_regularity(
                 scan_data=scan_data,
                 success=True,
                 error=None,
-                is_half_filling=is_half_filling
+                is_half_filling=best_is_half
             )
         else:
             return RegularityScanResult(
@@ -1341,7 +1378,7 @@ def scan_ca_for_best_regularity(
                 scan_data=scan_data,
                 success=False,
                 error='No valid c/a found in range',
-                is_half_filling=is_half_filling
+                is_half_filling=False
             )
     except Exception as e:
         return RegularityScanResult(
@@ -1353,7 +1390,7 @@ def scan_ca_for_best_regularity(
             scan_data=[],
             success=False,
             error=str(e),
-            is_half_filling=is_half_filling
+            is_half_filling=False
         )
 
 
