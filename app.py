@@ -30,8 +30,323 @@ from position_calculator import (
     format_position_dict, format_xyz, format_metal_atoms_csv, format_intersections_csv,
     get_unique_intersections, calculate_weighted_counts, analyze_all_coordination_environments,
     find_optimal_half_filling, HalfFillingResult, calculate_stoichiometry_for_config,
-    scan_ca_for_best_regularity, RegularityScanResult, calculate_madelung_energy, MadelungResult
+    scan_ca_for_best_regularity, RegularityScanResult, calculate_madelung_energy, MadelungResult,
+    scan_ca_for_stoichiometry
 )
+
+
+def get_default_search_configs(num_metals: int) -> List[dict]:
+    """
+    Get default search configurations for initial structure search.
+    
+    Default lattice types searched:
+    - Cubic: P, F, I (c/a = 1.0)
+    - Hexagonal: H (HCP), P (both with c/a = 1.633)
+    - Tetragonal: P, I (with c/a = num_metals)
+    
+    For each Bravais type, all offset configurations for that number of metals are tested.
+    
+    Args:
+        num_metals: Number of metal sublattices (L)
+        
+    Returns:
+        List of config dicts with keys: id, lattice, bravais_type, offsets, pattern, c_ratio
+    """
+    from lattice_configs import get_configs_for_n
+    
+    # Define which Bravais types to search and their c/a values
+    default_bravais = {
+        # Cubic types (c/a = 1.0)
+        'cubic_P': {'lattice': 'Cubic', 'c_ratio': 1.0},
+        'cubic_F': {'lattice': 'Cubic', 'c_ratio': 1.0},
+        'cubic_I': {'lattice': 'Cubic', 'c_ratio': 1.0},
+        # Hexagonal types (c/a = 1.633 ideal for HCP)
+        'hexagonal_H': {'lattice': 'Hexagonal', 'c_ratio': 1.633},
+        'hexagonal_P': {'lattice': 'Hexagonal', 'c_ratio': 1.633},
+        # Tetragonal types (c/a = L, number of metal sublattices)
+        'tetragonal_P': {'lattice': 'Tetragonal', 'c_ratio': float(num_metals)},
+        'tetragonal_I': {'lattice': 'Tetragonal', 'c_ratio': float(num_metals)},
+    }
+    
+    # Get all configs for this number of metals
+    all_configs = get_configs_for_n(num_metals)
+    arity0_configs = all_configs.get('arity0', [])
+    
+    search_configs = []
+    
+    for config in arity0_configs:
+        if config.offsets is None:
+            continue
+            
+        bravais = config.bravais_type
+        if bravais not in default_bravais:
+            continue
+            
+        bravais_info = default_bravais[bravais]
+        
+        search_configs.append({
+            'id': config.id,
+            'lattice': bravais_info['lattice'],
+            'bravais_type': bravais,
+            'offsets': config.offsets,
+            'pattern': config.pattern,
+            'c_ratio': bravais_info['c_ratio'],
+        })
+    
+    return search_configs
+
+
+def get_scan_configs(num_metals: int, scan_type: str) -> List[dict]:
+    """
+    Get configurations for c/a ratio scanning.
+    
+    Args:
+        num_metals: Number of metal sublattices (L)
+        scan_type: One of 'tetragonal', 'hcp', 'hex_p'
+        
+    Returns:
+        List of config dicts for scanning
+    """
+    from lattice_configs import get_configs_for_n
+    
+    scan_bravais = {
+        'tetragonal': ['tetragonal_P', 'tetragonal_I'],
+        'hcp': ['hexagonal_H'],
+        'hex_p': ['hexagonal_P'],
+    }
+    
+    bravais_types = scan_bravais.get(scan_type, [])
+    
+    all_configs = get_configs_for_n(num_metals)
+    arity0_configs = all_configs.get('arity0', [])
+    
+    scan_configs = []
+    
+    for config in arity0_configs:
+        if config.offsets is None:
+            continue
+            
+        if config.bravais_type in bravais_types:
+            scan_configs.append({
+                'id': config.id,
+                'lattice': config.lattice,
+                'bravais_type': config.bravais_type,
+                'offsets': config.offsets,
+                'pattern': config.pattern,
+            })
+    
+    return scan_configs
+
+
+def run_ca_scan_for_stoichiometry(
+    config: dict,
+    metals: List[Dict],
+    anion_symbol: str,
+    anion_radius: float,
+    anion_charge: int,
+    target_cn: int,
+    expected_metal_counts: Dict[str, float],
+    expected_anion_count: float,
+    num_metals: int,
+    n_coarse: int = 50,
+    n_fine: int = 50
+) -> Optional[dict]:
+    """
+    Run two-phase c/a scan for a configuration.
+    
+    Phase 1: Coarse scan from 0.5*L to 2*L (50 points)
+    Phase 2: If match found, fine scan around optimal (50 points)
+    
+    Args:
+        config: Configuration dict with offsets, bravais_type, etc.
+        metals: List of metal definitions
+        anion_symbol: Anion symbol
+        anion_radius: Anion radius in Å
+        anion_charge: Anion charge (positive number)
+        target_cn: Target coordination number
+        expected_metal_counts: Expected metal counts from charge balance
+        expected_anion_count: Expected anion count from charge balance
+        num_metals: Number of metal sublattices (L)
+        n_coarse: Number of points in coarse scan
+        n_fine: Number of points in fine scan
+        
+    Returns:
+        Dict with scan results, or None if no match found
+    """
+    coord_radii = tuple(m['radius'] + anion_radius for m in metals)
+    if len(coord_radii) == 1:
+        coord_radii = coord_radii[0]
+    
+    # Phase 1: Coarse scan
+    c_min = 0.5 * num_metals
+    c_max = 2.0 * num_metals
+    
+    best_match = None
+    best_c_ratio = None
+    
+    for c_ratio in np.linspace(c_min, c_max, n_coarse):
+        try:
+            s_star = compute_min_scale_for_cn(
+                config['offsets'],
+                target_cn,
+                config['lattice'],
+                coord_radii,
+                bravais_type=config['bravais_type'],
+                lattice_params={'c_ratio': c_ratio}
+            )
+            
+            if s_star is None:
+                continue
+            
+            stoich_result = calculate_stoichiometry_for_config(
+                config_id=config['id'],
+                offsets=config['offsets'],
+                bravais_type=config['bravais_type'],
+                lattice_type=config['lattice'],
+                metals=metals,
+                anion_symbol=anion_symbol,
+                scale_s=s_star,
+                target_cn=target_cn,
+                anion_radius=anion_radius,
+                cluster_eps_frac=0.03,
+                c_ratio=c_ratio
+            )
+            
+            if not stoich_result.success:
+                continue
+            
+            # Check for match
+            matches, match_type = check_stoichiometry_match(
+                stoich_result.metal_counts,
+                stoich_result.anion_count,
+                expected_metal_counts,
+                expected_anion_count
+            )
+            
+            if matches:
+                best_match = {
+                    'c_ratio': c_ratio,
+                    's_star': s_star,
+                    'stoich_result': stoich_result,
+                    'match_type': match_type
+                }
+                best_c_ratio = c_ratio
+                break  # Found a match in coarse scan
+                
+        except Exception:
+            continue
+    
+    if best_match is None:
+        return None
+    
+    # Phase 2: Fine scan around the match
+    fine_range = 0.1 * num_metals  # ±10% of L around the match
+    fine_min = max(0.3, best_c_ratio - fine_range)
+    fine_max = best_c_ratio + fine_range
+    
+    best_regularity = 0
+    best_fine_result = best_match
+    
+    for c_ratio in np.linspace(fine_min, fine_max, n_fine):
+        try:
+            s_star = compute_min_scale_for_cn(
+                config['offsets'],
+                target_cn,
+                config['lattice'],
+                coord_radii,
+                bravais_type=config['bravais_type'],
+                lattice_params={'c_ratio': c_ratio}
+            )
+            
+            if s_star is None:
+                continue
+            
+            stoich_result = calculate_stoichiometry_for_config(
+                config_id=config['id'],
+                offsets=config['offsets'],
+                bravais_type=config['bravais_type'],
+                lattice_type=config['lattice'],
+                metals=metals,
+                anion_symbol=anion_symbol,
+                scale_s=s_star,
+                target_cn=target_cn,
+                anion_radius=anion_radius,
+                cluster_eps_frac=0.03,
+                c_ratio=c_ratio
+            )
+            
+            if not stoich_result.success:
+                continue
+            
+            # Check for match
+            matches, match_type = check_stoichiometry_match(
+                stoich_result.metal_counts,
+                stoich_result.anion_count,
+                expected_metal_counts,
+                expected_anion_count
+            )
+            
+            if not matches:
+                continue
+            
+            # Build structure and calculate regularity
+            sublattice = Sublattice(
+                name='scan',
+                offsets=tuple(tuple(o) for o in config['offsets']),
+                alpha_ratio=coord_radii,
+                bravais_type=config['bravais_type']
+            )
+            
+            a_real = s_star * 0.9999
+            p_dict = {'a': a_real, 'b_ratio': 1.0, 'c_ratio': c_ratio,
+                      'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
+            if config['lattice'] == 'Hexagonal':
+                p_dict['gamma'] = 120.0
+            
+            p = LatticeParams(**p_dict)
+            
+            structure = calculate_complete_structure(
+                sublattices=[sublattice],
+                p=p,
+                scale_s=1.0,
+                target_N=target_cn,
+                k_samples=32,
+                cluster_eps_frac=0.03,
+                include_boundary_equivalents=True
+            )
+            
+            # Calculate regularity
+            if match_type == 'half':
+                half_result = find_optimal_half_filling(
+                    structure=structure,
+                    metals=metals,
+                    max_coord_sites=target_cn,
+                    target_fraction=0.5
+                )
+                regularity = half_result.mean_regularity_after if half_result.success else 0
+            else:
+                coord_result = analyze_all_coordination_environments(
+                    structure=structure,
+                    metals=metals,
+                    max_sites=target_cn
+                )
+                regularity = coord_result.summary.get('mean_overall_regularity', 0) if coord_result.success else 0
+            
+            if regularity > best_regularity:
+                best_regularity = regularity
+                best_fine_result = {
+                    'c_ratio': c_ratio,
+                    's_star': s_star,
+                    'stoich_result': stoich_result,
+                    'match_type': match_type,
+                    'regularity': regularity,
+                    'structure': structure
+                }
+                
+        except Exception:
+            continue
+    
+    return best_fine_result
 
 
 def expand_for_unit_cell_display(frac_coords: np.ndarray, tol: float = 1e-4) -> np.ndarray:
@@ -321,40 +636,41 @@ def run_full_analysis_chain(
             'formula': build_formula_string(metals, metal_counts, anion_symbol, anion_count)
         }
         
-        # Step 2: Get configurations and calculate minimum scale factors
+        # Step 2: Get default configurations and calculate minimum scale factors
         update_progress(2, 6, "Finding minimum scale factors...")
         
-        configs = get_configs_for_n(num_metals)
-        arity0_configs = configs['arity0']
+        # Get default search configurations (cubic, hex, tet with appropriate c/a)
+        search_configs = get_default_search_configs(num_metals)
         
         # Compute coordination radii as (r_metal + r_anion) for each metal
-        # This replaces the old alpha_ratio approach
         coord_radii = tuple(m['radius'] + anion_radius for m in metals)
         if len(coord_radii) == 1:
             coord_radii = coord_radii[0]  # Single value for N=1
         
         scale_results = {}
-        for config in arity0_configs:
-            if config.offsets is None:
-                continue
-            
+        for config in search_configs:
             try:
+                # Pass c_ratio in lattice_params for non-cubic lattices
+                lattice_params = {'c_ratio': config['c_ratio']}
+                
                 s_star = compute_min_scale_for_cn(
-                    config.offsets,
+                    config['offsets'],
                     target_cn,
-                    config.lattice,
-                    coord_radii,  # Now using (r_metal + r_anion) in Å
-                    bravais_type=config.bravais_type
+                    config['lattice'],
+                    coord_radii,
+                    bravais_type=config['bravais_type'],
+                    lattice_params=lattice_params
                 )
                 if s_star is not None:
-                    scale_results[config.id] = {
+                    scale_results[config['id']] = {
                         's_star': s_star,
                         'status': 'found',
-                        'lattice': config.lattice,
-                        'pattern': config.pattern,
-                        'bravais_type': config.bravais_type,
-                        'offsets': config.offsets,
-                        'coord_radii': coord_radii  # Store coordination radii
+                        'lattice': config['lattice'],
+                        'pattern': config['pattern'],
+                        'bravais_type': config['bravais_type'],
+                        'offsets': config['offsets'],
+                        'coord_radii': coord_radii,
+                        'c_ratio': config['c_ratio']  # Store c_ratio used
                     }
             except Exception:
                 pass
@@ -380,8 +696,9 @@ def run_full_analysis_chain(
                     anion_symbol=anion_symbol,
                     scale_s=config_data['s_star'],
                     target_cn=target_cn,
-                    anion_radius=anion_radius,  # Pass anion radius for coordination calculation
-                    cluster_eps_frac=0.03
+                    anion_radius=anion_radius,
+                    cluster_eps_frac=0.03,
+                    c_ratio=config_data.get('c_ratio')  # Pass the c/a ratio used
                 )
                 stoich_results[config_id] = stoich_result
             except Exception:
@@ -536,14 +853,15 @@ def run_full_analysis_chain(
                 )
                 
                 lattice_type = config_data['lattice']
-                # Use 0.99 factor to ensure intersections occur
+                # Use 0.9999 factor to ensure intersections occur
                 a_real = config_data['s_star'] * 0.9999
                 
-                p_dict = {'a': a_real, 'b_ratio': 1.0, 'c_ratio': 1.0,
+                # Use stored c_ratio if available
+                c_ratio = config_data.get('c_ratio', 1.0)
+                p_dict = {'a': a_real, 'b_ratio': 1.0, 'c_ratio': c_ratio,
                           'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
                 if lattice_type == 'Hexagonal':
                     p_dict['gamma'] = 120.0
-                    p_dict['c_ratio'] = 1.633
                 
                 p = LatticeParams(**p_dict)
                 
@@ -606,14 +924,15 @@ def run_full_analysis_chain(
                 )
                 
                 lattice_type = config_data['lattice']
-                # Use 0.99 factor to ensure intersections occur
+                # Use 0.9999 factor to ensure intersections occur
                 a_real = config_data['s_star'] * 0.9999
                 
-                p_dict = {'a': a_real, 'b_ratio': 1.0, 'c_ratio': 1.0,
+                # Use stored c_ratio if available
+                c_ratio = config_data.get('c_ratio', 1.0)
+                p_dict = {'a': a_real, 'b_ratio': 1.0, 'c_ratio': c_ratio,
                           'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
                 if lattice_type == 'Hexagonal':
                     p_dict['gamma'] = 120.0
-                    p_dict['c_ratio'] = 1.633
                 
                 p = LatticeParams(**p_dict)
                 
@@ -1502,6 +1821,156 @@ def main():
                         st.dataframe(dup_data, use_container_width=True, hide_index=True)
         
         # ============================================
+        # C/A SCAN FOR LATTICE TYPES
+        # ============================================
+        st.markdown("---")
+        with st.expander("🔬 Scan c/a Ratio for Additional Lattice Types", expanded=True):
+            st.markdown("""
+            Scan c/a ratios to find structures in tetragonal or hexagonal lattices that weren't found in the default search.
+            The scan performs a two-phase search: first a coarse scan (50 points, c/a = 0.5L to 2L), then if a 
+            stoichiometry match is found, a refined scan around that point to optimize regularity.
+            """)
+            
+            num_metals = len(st.session_state.metals)
+            stoich_data = chain.get('stoichiometry', {})
+            expected_metal_counts = stoich_data.get('metal_counts', [])
+            expected_anion_count = stoich_data.get('anion_count', 1)
+            target_cn = stoich_data.get('target_cn', 6)
+            metals = st.session_state.metals
+            anion_rad = st.session_state.get('anion_rad', 1.40)
+            anion_sym = st.session_state.get('anion_symbol', 'O')
+            anion_chg = st.session_state.get('anion_charge', 2)
+            
+            # Initialize session state for scan results
+            if 'lattice_scan_results' not in st.session_state:
+                st.session_state.lattice_scan_results = {}
+            
+            scan_cols = st.columns(3)
+            
+            with scan_cols[0]:
+                st.markdown("**Tetragonal (P & I)**")
+                st.caption(f"Scan c/a: {0.5*num_metals:.1f} to {2*num_metals:.1f}")
+                if st.button("🔍 Scan Tetragonal", key="scan_tet", use_container_width=True):
+                    with st.spinner("Scanning tetragonal lattices..."):
+                        scan_configs = get_scan_configs(num_metals, 'tetragonal')
+                        exp_metals_dict = dict(zip([m['symbol'] for m in metals], expected_metal_counts))
+                        
+                        results = []
+                        for config in scan_configs:
+                            result = run_ca_scan_for_stoichiometry(
+                                config=config,
+                                metals=metals,
+                                anion_symbol=anion_sym,
+                                anion_radius=anion_rad,
+                                anion_charge=anion_chg,
+                                target_cn=target_cn,
+                                expected_metal_counts=exp_metals_dict,
+                                expected_anion_count=expected_anion_count,
+                                num_metals=num_metals
+                            )
+                            if result:
+                                result['config'] = config
+                                results.append(result)
+                        
+                        st.session_state.lattice_scan_results['tetragonal'] = results
+                        st.rerun()
+                
+                # Display results
+                tet_results = st.session_state.lattice_scan_results.get('tetragonal', [])
+                if tet_results:
+                    st.success(f"Found {len(tet_results)} matching structures")
+                    for r in tet_results:
+                        match_icon = "✓" if r['match_type'] == 'exact' else "½"
+                        reg = r.get('regularity', 0)
+                        st.markdown(f"{match_icon} **{r['config']['id']}**: c/a={r['c_ratio']:.3f}, a={r['s_star']:.3f}Å, reg={reg:.3f}")
+                elif 'tetragonal' in st.session_state.lattice_scan_results:
+                    st.info("No matching structures found")
+            
+            with scan_cols[1]:
+                st.markdown("**HCP (hexagonal_H)**")
+                st.caption(f"Scan c/a: {0.5*num_metals:.1f} to {2*num_metals:.1f}")
+                if st.button("🔍 Scan HCP", key="scan_hcp", use_container_width=True):
+                    with st.spinner("Scanning HCP lattices..."):
+                        scan_configs = get_scan_configs(num_metals, 'hcp')
+                        exp_metals_dict = dict(zip([m['symbol'] for m in metals], expected_metal_counts))
+                        
+                        results = []
+                        for config in scan_configs:
+                            result = run_ca_scan_for_stoichiometry(
+                                config=config,
+                                metals=metals,
+                                anion_symbol=anion_sym,
+                                anion_radius=anion_rad,
+                                anion_charge=anion_chg,
+                                target_cn=target_cn,
+                                expected_metal_counts=exp_metals_dict,
+                                expected_anion_count=expected_anion_count,
+                                num_metals=num_metals
+                            )
+                            if result:
+                                result['config'] = config
+                                results.append(result)
+                        
+                        st.session_state.lattice_scan_results['hcp'] = results
+                        st.rerun()
+                
+                # Display results
+                hcp_results = st.session_state.lattice_scan_results.get('hcp', [])
+                if hcp_results:
+                    st.success(f"Found {len(hcp_results)} matching structures")
+                    for r in hcp_results:
+                        match_icon = "✓" if r['match_type'] == 'exact' else "½"
+                        reg = r.get('regularity', 0)
+                        st.markdown(f"{match_icon} **{r['config']['id']}**: c/a={r['c_ratio']:.3f}, a={r['s_star']:.3f}Å, reg={reg:.3f}")
+                elif 'hcp' in st.session_state.lattice_scan_results:
+                    st.info("No matching structures found")
+            
+            with scan_cols[2]:
+                st.markdown("**Primitive Hexagonal (hexagonal_P)**")
+                st.caption(f"Scan c/a: {0.5*num_metals:.1f} to {2*num_metals:.1f}")
+                if st.button("🔍 Scan Hex-P", key="scan_hexP", use_container_width=True):
+                    with st.spinner("Scanning primitive hexagonal lattices..."):
+                        scan_configs = get_scan_configs(num_metals, 'hex_p')
+                        exp_metals_dict = dict(zip([m['symbol'] for m in metals], expected_metal_counts))
+                        
+                        results = []
+                        for config in scan_configs:
+                            result = run_ca_scan_for_stoichiometry(
+                                config=config,
+                                metals=metals,
+                                anion_symbol=anion_sym,
+                                anion_radius=anion_rad,
+                                anion_charge=anion_chg,
+                                target_cn=target_cn,
+                                expected_metal_counts=exp_metals_dict,
+                                expected_anion_count=expected_anion_count,
+                                num_metals=num_metals
+                            )
+                            if result:
+                                result['config'] = config
+                                results.append(result)
+                        
+                        st.session_state.lattice_scan_results['hex_p'] = results
+                        st.rerun()
+                
+                # Display results
+                hexP_results = st.session_state.lattice_scan_results.get('hex_p', [])
+                if hexP_results:
+                    st.success(f"Found {len(hexP_results)} matching structures")
+                    for r in hexP_results:
+                        match_icon = "✓" if r['match_type'] == 'exact' else "½"
+                        reg = r.get('regularity', 0)
+                        st.markdown(f"{match_icon} **{r['config']['id']}**: c/a={r['c_ratio']:.3f}, a={r['s_star']:.3f}Å, reg={reg:.3f}")
+                elif 'hex_p' in st.session_state.lattice_scan_results:
+                    st.info("No matching structures found")
+            
+            # Clear results button
+            if any(st.session_state.lattice_scan_results.values()):
+                if st.button("🗑️ Clear Scan Results", key="clear_scans"):
+                    st.session_state.lattice_scan_results = {}
+                    st.rerun()
+        
+        # ============================================
         # C/A OPTIMIZATION FOR NON-CUBIC LATTICES
         # ============================================
         # Get all non-cubic configs (tetragonal, hexagonal, orthorhombic)
@@ -1511,7 +1980,7 @@ def main():
         
         if non_cubic_configs:
             st.markdown("---")
-            with st.expander(f"📐 c/a Ratio Optimization ({len(non_cubic_configs)} non-cubic configurations)", expanded=True):
+            with st.expander(f"📐 Individual c/a Optimization ({len(non_cubic_configs)} configs)", expanded=False):
                 st.markdown("""
                 These configurations have variable c/a ratios. At c/a = 1, they may not produce the correct 
                 stoichiometry, but optimizing c/a can find structures that match your target formula or 

@@ -772,7 +772,8 @@ def calculate_stoichiometry_for_config(
     scale_s: float,  # Now interpreted as lattice parameter 'a' in Å
     target_cn: int,
     anion_radius: float = 1.40,
-    cluster_eps_frac: float = 0.03
+    cluster_eps_frac: float = 0.03,
+    c_ratio: Optional[float] = None  # Optional c/a ratio override
 ) -> StoichiometryResult:
     """
     Calculate stoichiometry for a single configuration.
@@ -788,6 +789,7 @@ def calculate_stoichiometry_for_config(
         target_cn: Target coordination number for filtering intersections
         anion_radius: Anion ionic radius in Å
         cluster_eps_frac: Clustering tolerance
+        c_ratio: Optional c/a ratio (if None, uses default for lattice type)
     
     Returns:
         StoichiometryResult with formula and counts
@@ -801,18 +803,22 @@ def calculate_stoichiometry_for_config(
             coord_radii = metal_radii[0] + anion_radius
         
         # Set up lattice parameters with real 'a' value
-        # Use 0.99 factor to ensure intersections occur (s* is the max where CN >= target)
+        # Use 0.9999 factor to ensure intersections occur (s* is the max where CN >= target)
         a_real = scale_s * 0.9999
         p_dict = {'a': a_real, 'b_ratio': 1.0, 'c_ratio': 1.0,
                   'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
         
         if lattice_type == 'Hexagonal':
             p_dict['gamma'] = 120.0
-            p_dict['c_ratio'] = 1.633
+            p_dict['c_ratio'] = 1.633  # Default for hexagonal
         elif lattice_type == 'Rhombohedral':
             p_dict['alpha'] = p_dict['beta'] = p_dict['gamma'] = 80.0
         elif lattice_type == 'Monoclinic':
             p_dict['beta'] = 100.0
+        
+        # Override c_ratio if provided
+        if c_ratio is not None:
+            p_dict['c_ratio'] = c_ratio
         
         p = LatticeParams(**p_dict)
         
