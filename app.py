@@ -2451,7 +2451,7 @@ def main():
                             s_physical = uc_scale_s  # Use current scale
                         
                         # Rebuild structure with physical lattice parameter and scale
-                        from interstitial_engine import Sublattice, LatticeParams
+                        # Note: Sublattice and LatticeParams already imported at module level
                         
                         # Get config data again
                         config_data = None
