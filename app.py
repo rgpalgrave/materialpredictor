@@ -30,7 +30,7 @@ from position_calculator import (
     format_position_dict, format_xyz, format_metal_atoms_csv, format_intersections_csv,
     get_unique_intersections, calculate_weighted_counts, analyze_all_coordination_environments,
     find_optimal_half_filling, HalfFillingResult, calculate_stoichiometry_for_config,
-    scan_ca_for_best_regularity, RegularityScanResult
+    scan_ca_for_best_regularity, RegularityScanResult, calculate_madelung_energy, MadelungResult
 )
 
 st.set_page_config(
@@ -418,16 +418,27 @@ def run_full_analysis_chain(
                     max_sites=target_cn
                 )
                 
+                # Calculate Madelung energy
+                madelung_result = calculate_madelung_energy(
+                    structure=structure,
+                    metals=metals,
+                    anion_charge=-anion_charge,  # Make negative for anion
+                    target_multiplicity=target_cn,
+                    supercell_size=5
+                )
+                
                 regularity_results[config_id] = {
                     'structure': structure,
                     'coord_result': coord_result,
-                    'mean_regularity': coord_result.summary.get('mean_overall_regularity', 0) if coord_result.success else 0
+                    'mean_regularity': coord_result.summary.get('mean_overall_regularity', 0) if coord_result.success else 0,
+                    'madelung_result': madelung_result
                 }
             except Exception:
                 regularity_results[config_id] = {
                     'structure': None,
                     'coord_result': None,
-                    'mean_regularity': 0
+                    'mean_regularity': 0,
+                    'madelung_result': None
                 }
         
         results['regularity_results'] = regularity_results
@@ -475,13 +486,23 @@ def run_full_analysis_chain(
                     target_fraction=0.5
                 )
                 
+                # Calculate Madelung energy (using full structure for now)
+                madelung_result = calculate_madelung_energy(
+                    structure=structure,
+                    metals=metals,
+                    anion_charge=-anion_charge,  # Make negative for anion
+                    target_multiplicity=target_cn,
+                    supercell_size=5
+                )
+                
                 half_filling_results[config_id] = {
                     'structure': structure,
                     'half_result': half_result,
                     'mean_regularity_before': half_result.mean_regularity_before if half_result.success else 0,
                     'mean_regularity_after': half_result.mean_regularity_after if half_result.success else 0,
                     'kept_indices': half_result.kept_site_indices if half_result.success else [],
-                    'per_metal_scores': half_result.per_metal_scores if half_result.success else []
+                    'per_metal_scores': half_result.per_metal_scores if half_result.success else [],
+                    'madelung_result': madelung_result
                 }
             except Exception:
                 half_filling_results[config_id] = {
@@ -490,7 +511,8 @@ def run_full_analysis_chain(
                     'mean_regularity_before': 0,
                     'mean_regularity_after': 0,
                     'kept_indices': [],
-                    'per_metal_scores': []
+                    'per_metal_scores': [],
+                    'madelung_result': None
                 }
         
         results['half_filling_results'] = half_filling_results
@@ -1052,16 +1074,22 @@ def main():
                 reg_data = regularity_results.get(config_id, {})
                 mean_reg = reg_data.get('mean_regularity', 0)
                 coord_result = reg_data.get('coord_result')
+                madelung_result = reg_data.get('madelung_result')
+                
+                # Get Madelung constant for expander title
+                madelung_str = ""
+                if madelung_result and madelung_result.success:
+                    madelung_str = f" — M={madelung_result.madelung_constant:.3f}"
                 
                 # Create expander for each match
-                with st.expander(f"**{config_id}** — {lattice} — s*={s_star:.4f} — Regularity: {mean_reg:.2f}", expanded=True):
+                with st.expander(f"**{config_id}** — {lattice} — s*={s_star:.4f} — Regularity: {mean_reg:.2f}{madelung_str}", expanded=True):
                     
                     # Two columns: info + 3D preview
                     info_col, preview_col = st.columns([2, 1])
                     
                     with info_col:
                         # Key metrics
-                        met_cols = st.columns(4)
+                        met_cols = st.columns(5)
                         with met_cols[0]:
                             st.metric("Scale Factor (s*)", f"{s_star:.4f}")
                         with met_cols[1]:
@@ -1070,6 +1098,12 @@ def main():
                             st.metric("Formula", formula)
                         with met_cols[3]:
                             st.metric("Regularity", f"{mean_reg:.3f}")
+                        with met_cols[4]:
+                            if madelung_result and madelung_result.success:
+                                st.metric("Madelung", f"{madelung_result.madelung_constant:.3f}",
+                                         help=f"Energy: {madelung_result.energy_per_formula:.2f} eV/f.u.")
+                            else:
+                                st.metric("Madelung", "—")
                         
                         if pattern:
                             st.caption(f"Pattern: {pattern}")
@@ -1121,19 +1155,25 @@ def main():
                 reg_before = hf_data.get('mean_regularity_before', 0)
                 reg_after = hf_data.get('mean_regularity_after', 0)
                 per_metal = hf_data.get('per_metal_scores', [])
+                madelung_result = hf_data.get('madelung_result')
                 
                 improvement = reg_after - reg_before
                 delta_str = f"+{improvement:.3f}" if improvement > 0 else f"{improvement:.3f}"
                 
+                # Get Madelung constant for expander title
+                madelung_str = ""
+                if madelung_result and madelung_result.success:
+                    madelung_str = f" — M={madelung_result.madelung_constant:.3f}"
+                
                 # Create expander for each half-filling match
-                with st.expander(f"**{config_id}** — {lattice} — s*={s_star:.4f} — Regularity: {reg_after:.2f} (after ½)", expanded=True):
+                with st.expander(f"**{config_id}** — {lattice} — s*={s_star:.4f} — Regularity: {reg_after:.2f} (after ½){madelung_str}", expanded=True):
                     
                     # Two columns: info + 3D preview
                     info_col, preview_col = st.columns([2, 1])
                     
                     with info_col:
-                        # Key metrics - 5 columns for half-filling
-                        met_cols = st.columns(5)
+                        # Key metrics - 6 columns for half-filling with Madelung
+                        met_cols = st.columns(6)
                         with met_cols[0]:
                             st.metric("Scale Factor (s*)", f"{s_star:.4f}")
                         with met_cols[1]:
@@ -1147,6 +1187,12 @@ def main():
                             st.metric("Reg. Before", f"{reg_before:.3f}")
                         with met_cols[4]:
                             st.metric("Reg. After", f"{reg_after:.3f}", delta=delta_str)
+                        with met_cols[5]:
+                            if madelung_result and madelung_result.success:
+                                st.metric("Madelung", f"{madelung_result.madelung_constant:.3f}",
+                                         help=f"Energy: {madelung_result.energy_per_formula:.2f} eV/f.u.")
+                            else:
+                                st.metric("Madelung", "—")
                         
                         if pattern:
                             st.caption(f"Pattern: {pattern}")
