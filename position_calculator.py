@@ -1483,6 +1483,48 @@ IDEAL_POLYHEDRA = {
     12: ('cuboctahedron', [60.0, 90.0, 120.0, 180.0]),
 }
 
+# Alternative geometries for certain coordination numbers
+# Keys are (CN, geometry_name) tuples
+ALTERNATIVE_GEOMETRIES = {
+    # CN=4 alternatives
+    (4, 'tetrahedron'): ('tetrahedron', [109.47]),  # Default
+    (4, 'square_planar'): ('square_planar', [90.0, 180.0]),
+    (4, 'seesaw'): ('seesaw', [90.0, 120.0, 180.0]),  # Distorted trigonal bipyramid minus one
+    
+    # CN=5 alternatives
+    (5, 'trigonal_bipyramid'): ('trigonal_bipyramid', [90.0, 120.0, 180.0]),  # Default
+    (5, 'square_pyramidal'): ('square_pyramidal', [90.0, 180.0]),
+    
+    # CN=6 alternatives
+    (6, 'octahedron'): ('octahedron', [90.0, 180.0]),  # Default
+    (6, 'trigonal_prismatic'): ('trigonal_prismatic', [81.79, 131.81]),  # Ideal trigonal prism angles
+    
+    # CN=8 alternatives  
+    (8, 'cube'): ('cube', [70.53, 109.47]),  # Default
+    (8, 'square_antiprism'): ('square_antiprism', [74.86, 99.64, 118.53]),
+}
+
+# Map of CN -> list of available geometry options
+CN_GEOMETRY_OPTIONS = {
+    4: ['tetrahedron', 'square_planar', 'seesaw'],
+    5: ['trigonal_bipyramid', 'square_pyramidal'],
+    6: ['octahedron', 'trigonal_prismatic'],
+    8: ['cube', 'square_antiprism'],
+}
+
+# Human-readable labels for geometry options
+GEOMETRY_LABELS = {
+    'tetrahedron': 'Tetrahedral',
+    'square_planar': 'Square Planar',
+    'seesaw': 'Seesaw',
+    'trigonal_bipyramid': 'Trigonal Bipyramidal',
+    'square_pyramidal': 'Square Pyramidal',
+    'octahedron': 'Octahedral',
+    'trigonal_prismatic': 'Trigonal Prismatic',
+    'cube': 'Cubic',
+    'square_antiprism': 'Square Antiprismatic',
+}
+
 
 def find_nearest_intersections_pbc(
     metal_pos_cart: np.ndarray,
@@ -1602,23 +1644,34 @@ def calculate_angles(metal_pos: np.ndarray, coord_positions: np.ndarray) -> np.n
     return np.array(angles)
 
 
-def find_closest_ideal_polyhedron(cn: int, observed_angles: np.ndarray) -> Tuple[str, List[float], float]:
+def find_closest_ideal_polyhedron(
+    cn: int, 
+    observed_angles: np.ndarray,
+    preferred_geometry: Optional[str] = None
+) -> Tuple[str, List[float], float]:
     """
     Find the closest ideal polyhedron for a given coordination number.
     
     Args:
         cn: Coordination number
         observed_angles: Observed angles in degrees
+        preferred_geometry: Optional geometry preference (e.g., 'square_planar' for CN=4)
+                          If provided and valid for the CN, uses that geometry.
+                          Otherwise falls back to default.
     
     Returns:
         Tuple of (polyhedron_name, ideal_angles, rms_deviation)
     """
-    if cn not in IDEAL_POLYHEDRA:
+    # Check if there's a preferred geometry for this CN
+    if preferred_geometry and (cn, preferred_geometry) in ALTERNATIVE_GEOMETRIES:
+        name, ideal_angles = ALTERNATIVE_GEOMETRIES[(cn, preferred_geometry)]
+    elif cn in IDEAL_POLYHEDRA:
+        name, ideal_angles = IDEAL_POLYHEDRA[cn]
+    else:
         # Find closest CN
         available_cns = list(IDEAL_POLYHEDRA.keys())
-        cn = min(available_cns, key=lambda x: abs(x - cn))
-    
-    name, ideal_angles = IDEAL_POLYHEDRA[cn]
+        closest_cn = min(available_cns, key=lambda x: abs(x - cn))
+        name, ideal_angles = IDEAL_POLYHEDRA[closest_cn]
     
     if len(observed_angles) == 0:
         return name, ideal_angles, 0.0
@@ -1643,7 +1696,8 @@ def calculate_coordination_environment(
     intersection_cart: np.ndarray,
     intersection_mult: np.ndarray,
     lat_vecs: np.ndarray,
-    max_sites: int = 12
+    max_sites: int = 12,
+    preferred_geometry: Optional[str] = None
 ) -> CoordinationEnvironment:
     """
     Calculate complete coordination environment for a single metal site.
@@ -1658,6 +1712,7 @@ def calculate_coordination_environment(
         intersection_mult: All intersection multiplicities
         lat_vecs: Lattice vectors
         max_sites: Maximum coordination sites to consider
+        preferred_geometry: Optional geometry preference (e.g., 'square_planar', 'trigonal_prismatic')
     
     Returns:
         CoordinationEnvironment with all metrics calculated
@@ -1714,7 +1769,9 @@ def calculate_coordination_environment(
     
     # Find ideal polyhedron and compare
     cn = len(coord_sites)
-    ideal_name, ideal_angles, angle_deviation = find_closest_ideal_polyhedron(cn, angles)
+    ideal_name, ideal_angles, angle_deviation = find_closest_ideal_polyhedron(
+        cn, angles, preferred_geometry=preferred_geometry
+    )
     
     # Calculate regularity scores
     # Distance regularity: 1 - CV (capped at 0)
@@ -1780,7 +1837,7 @@ def analyze_all_coordination_environments(
     
     Args:
         structure: Complete structure data with metal atoms and intersections
-        metals: List of metal dictionaries with 'symbol' and 'cn' keys
+        metals: List of metal dictionaries with 'symbol', 'cn', and optionally 'geometry' keys
         max_sites: Default maximum coordination sites (used if metal has no 'cn' key)
     
     Returns:
@@ -1819,11 +1876,14 @@ def analyze_all_coordination_environments(
                 symbol = metals[offset_idx]['symbol']
                 # Use the metal's specific CN, not the anion CN
                 metal_cn = metals[offset_idx].get('cn', max_sites)
+                # Get geometry preference if specified
+                preferred_geometry = metals[offset_idx].get('geometry', None)
             else:
                 symbol = f'M{offset_idx+1}'
                 metal_cn = max_sites
+                preferred_geometry = None
             
-            # Calculate coordination environment using this metal's CN
+            # Calculate coordination environment using this metal's CN and geometry preference
             env = calculate_coordination_environment(
                 metal_idx=idx,
                 metal_symbol=symbol,
@@ -1833,7 +1893,8 @@ def analyze_all_coordination_environments(
                 intersection_cart=intersections.cartesian,
                 intersection_mult=intersections.multiplicity,
                 lat_vecs=lat_vecs,
-                max_sites=metal_cn  # Use metal's CN, not anion CN
+                max_sites=metal_cn,  # Use metal's CN, not anion CN
+                preferred_geometry=preferred_geometry  # Pass geometry preference
             )
             environments.append(env)
         

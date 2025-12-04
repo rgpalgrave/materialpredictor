@@ -31,7 +31,7 @@ from position_calculator import (
     get_unique_intersections, calculate_weighted_counts, analyze_all_coordination_environments,
     find_optimal_half_filling, HalfFillingResult, calculate_stoichiometry_for_config,
     scan_ca_for_best_regularity, RegularityScanResult, calculate_madelung_energy, MadelungResult,
-    scan_ca_for_stoichiometry
+    scan_ca_for_stoichiometry, CN_GEOMETRY_OPTIONS, GEOMETRY_LABELS
 )
 
 
@@ -1406,6 +1406,33 @@ def main():
                         key=f'm_rad_{i}',
                         help=f"Database: {db_radius:.3f} Å" if db_radius else "No database value"
                     )
+                
+                # Geometry preference selector (only show if CN has alternatives)
+                if new_cn in CN_GEOMETRY_OPTIONS:
+                    geom_options = CN_GEOMETRY_OPTIONS[new_cn]
+                    geom_labels = [GEOMETRY_LABELS.get(g, g) for g in geom_options]
+                    
+                    # Get current geometry or default to first option
+                    current_geom = metal.get('geometry', geom_options[0])
+                    if current_geom not in geom_options:
+                        current_geom = geom_options[0]
+                    
+                    current_idx = geom_options.index(current_geom)
+                    
+                    selected_label = st.selectbox(
+                        "Preferred Geometry",
+                        options=geom_labels,
+                        index=current_idx,
+                        key=f'm_geom_{i}',
+                        help="Select the target coordination geometry for regularity optimization"
+                    )
+                    
+                    # Convert label back to geometry key
+                    selected_idx = geom_labels.index(selected_label)
+                    metal['geometry'] = geom_options[selected_idx]
+                else:
+                    # No alternative geometries for this CN
+                    metal['geometry'] = None
         
         # Calculate button - runs the full analysis chain
         if st.button("🧮 Calculate Stoichiometry & CN", type="primary", use_container_width=True):
