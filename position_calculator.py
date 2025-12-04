@@ -175,7 +175,8 @@ def generate_metal_positions(
                     all_cart.append(cart)
                     all_sublattice_id.append(sub_idx)
                     all_sublattice_names.append(sub.name)
-                    all_radius.append(alpha * scale_s * p.a)
+                    # alpha is coord_radius in Å, scale_s=1.0 when p.a is already physical
+                    all_radius.append(alpha * scale_s)
                     all_alpha.append(alpha)
                     all_offset_idx.append(offset_idx)
     
@@ -340,13 +341,16 @@ def calculate_intersections(
     lat_vecs = lattice_vectors(p)
     
     # Use existing engine to get raw intersection samples
+    # When p.a is already the physical lattice parameter and scale_s=1.0,
+    # we use legacy model: radius = coord_radius * scale_s = coord_radius * 1.0
     max_mult, sample_positions, sample_counts = max_multiplicity_for_scale(
         sublattices=sublattices,
         p=p,
         scale_s=scale_s,
         k_samples=k_samples,
         tol_inside=1e-3,
-        early_stop_at=None
+        early_stop_at=None,
+        use_new_model=False  # Use p.a directly, scale_s multiplies radius
     )
     
     if len(sample_positions) == 0:
