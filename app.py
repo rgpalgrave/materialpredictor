@@ -1875,16 +1875,12 @@ def main():
                         st.session_state.lattice_scan_results['tetragonal'] = results
                         st.rerun()
                 
-                # Display results
+                # Status indicator only in column
                 tet_results = st.session_state.lattice_scan_results.get('tetragonal', [])
                 if tet_results:
-                    st.success(f"Found {len(tet_results)} matching structures")
-                    for r in tet_results:
-                        match_icon = "✓" if r['match_type'] == 'exact' else "½"
-                        reg = r.get('regularity', 0)
-                        st.markdown(f"{match_icon} **{r['config']['id']}**: c/a={r['c_ratio']:.3f}, a={r['s_star']:.3f}Å, reg={reg:.3f}")
+                    st.success(f"✓ {len(tet_results)} found")
                 elif 'tetragonal' in st.session_state.lattice_scan_results:
-                    st.info("No matching structures found")
+                    st.info("No matches")
             
             with scan_cols[1]:
                 st.markdown("**HCP (hexagonal_H)**")
@@ -1914,16 +1910,12 @@ def main():
                         st.session_state.lattice_scan_results['hcp'] = results
                         st.rerun()
                 
-                # Display results
+                # Status indicator only in column
                 hcp_results = st.session_state.lattice_scan_results.get('hcp', [])
                 if hcp_results:
-                    st.success(f"Found {len(hcp_results)} matching structures")
-                    for r in hcp_results:
-                        match_icon = "✓" if r['match_type'] == 'exact' else "½"
-                        reg = r.get('regularity', 0)
-                        st.markdown(f"{match_icon} **{r['config']['id']}**: c/a={r['c_ratio']:.3f}, a={r['s_star']:.3f}Å, reg={reg:.3f}")
+                    st.success(f"✓ {len(hcp_results)} found")
                 elif 'hcp' in st.session_state.lattice_scan_results:
-                    st.info("No matching structures found")
+                    st.info("No matches")
             
             with scan_cols[2]:
                 st.markdown("**Primitive Hexagonal (hexagonal_P)**")
@@ -1953,22 +1945,100 @@ def main():
                         st.session_state.lattice_scan_results['hex_p'] = results
                         st.rerun()
                 
-                # Display results
+                # Status indicator only in column
                 hexP_results = st.session_state.lattice_scan_results.get('hex_p', [])
                 if hexP_results:
-                    st.success(f"Found {len(hexP_results)} matching structures")
-                    for r in hexP_results:
-                        match_icon = "✓" if r['match_type'] == 'exact' else "½"
-                        reg = r.get('regularity', 0)
-                        st.markdown(f"{match_icon} **{r['config']['id']}**: c/a={r['c_ratio']:.3f}, a={r['s_star']:.3f}Å, reg={reg:.3f}")
+                    st.success(f"✓ {len(hexP_results)} found")
                 elif 'hex_p' in st.session_state.lattice_scan_results:
-                    st.info("No matching structures found")
+                    st.info("No matches")
             
-            # Clear results button
+            # Clear scan results button (inside expander)
             if any(st.session_state.lattice_scan_results.values()):
                 if st.button("🗑️ Clear Scan Results", key="clear_scans"):
                     st.session_state.lattice_scan_results = {}
                     st.rerun()
+        
+        # ============================================
+        # DISPLAY SCAN RESULTS (OUTSIDE EXPANDER)
+        # ============================================
+        all_scan_results = []
+        for scan_type in ['tetragonal', 'hcp', 'hex_p']:
+            for r in st.session_state.get('lattice_scan_results', {}).get(scan_type, []):
+                r['scan_type'] = scan_type
+                all_scan_results.append(r)
+        
+        if all_scan_results:
+            st.markdown("---")
+            st.markdown("### 📊 c/a Scan Results")
+            
+            # Sort by regularity
+            all_scan_results.sort(key=lambda x: x.get('regularity', 0), reverse=True)
+            
+            # Get variables needed for display
+            stoich_data = chain.get('stoichiometry', {})
+            target_cn = stoich_data.get('target_cn', 6)
+            metals = st.session_state.metals
+            
+            for r in all_scan_results:
+                config = r['config']
+                match_icon = "✓ Exact" if r['match_type'] == 'exact' else "½ Half-fill"
+                reg = r.get('regularity', 0)
+                stoich = r.get('stoich_result')
+                formula = stoich.formula if stoich else "?"
+                
+                # Calculate c value
+                a_val = r['s_star']
+                c_val = a_val * r['c_ratio']
+                
+                scan_label = {'tetragonal': 'Tetragonal', 'hcp': 'HCP', 'hex_p': 'Hex-P'}[r['scan_type']]
+                
+                with st.expander(f"**{config['id']}** — {scan_label} — {formula} — c/a={r['c_ratio']:.3f} — Reg: {reg:.3f} — {match_icon}", expanded=True):
+                    col1, col2 = st.columns([1, 2])
+                    
+                    with col1:
+                        st.markdown("**Lattice Parameters:**")
+                        st.markdown(f"- a = {a_val:.4f} Å")
+                        st.markdown(f"- c = {c_val:.4f} Å")
+                        st.markdown(f"- c/a = {r['c_ratio']:.4f}")
+                        st.markdown(f"")
+                        st.markdown(f"**Match Type:** {match_icon}")
+                        st.markdown(f"**Regularity:** {reg:.4f}")
+                        st.markdown(f"**Pattern:** {config.get('pattern', '—')}")
+                    
+                    with col2:
+                        # Generate 3D preview if structure is available
+                        structure = r.get('structure')
+                        if structure is not None:
+                            try:
+                                if r['match_type'] == 'half':
+                                    # For half-filling, we need to recalculate kept indices
+                                    half_result = find_optimal_half_filling(
+                                        structure=structure,
+                                        metals=metals,
+                                        max_coord_sites=target_cn,
+                                        target_fraction=0.5
+                                    )
+                                    if half_result.success:
+                                        fig = generate_preview_figure_half_filling(
+                                            structure, metals,
+                                            half_result.kept_site_indices,
+                                            title=f"{config['id']} (c/a={r['c_ratio']:.2f})"
+                                        )
+                                    else:
+                                        fig = generate_preview_figure(
+                                            structure, metals,
+                                            title=f"{config['id']} (c/a={r['c_ratio']:.2f})"
+                                        )
+                                else:
+                                    fig = generate_preview_figure(
+                                        structure, metals,
+                                        title=f"{config['id']} (c/a={r['c_ratio']:.2f})"
+                                    )
+                                st.plotly_chart(fig, use_container_width=True)
+                            except Exception as e:
+                                st.warning(f"Could not generate preview: {e}")
+                        else:
+                            st.info("Structure not available for preview")
         
         # ============================================
         # C/A OPTIMIZATION FOR NON-CUBIC LATTICES
