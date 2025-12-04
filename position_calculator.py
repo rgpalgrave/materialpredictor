@@ -801,7 +801,8 @@ def calculate_stoichiometry_for_config(
             coord_radii = metal_radii[0] + anion_radius
         
         # Set up lattice parameters with real 'a' value
-        a_real = scale_s  # scale_s is now the lattice parameter in Å
+        # Use 0.99 factor to ensure intersections occur (s* is the max where CN >= target)
+        a_real = scale_s * 0.99
         p_dict = {'a': a_real, 'b_ratio': 1.0, 'c_ratio': 1.0,
                   'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
         
@@ -1070,7 +1071,9 @@ def scan_ca_for_stoichiometry(
                 continue
             
             # Set up lattice parameters with real 'a' value
-            a_real = s_star  # s_star is the lattice parameter in Å
+            # s_star is the MAX lattice param where CN >= target
+            # Use slightly smaller 'a' to ensure intersections occur
+            a_real = s_star * 0.99
             p_dict = {'a': a_real, 'b_ratio': 1.0, 'c_ratio': c_ratio,
                       'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
             
@@ -1258,7 +1261,8 @@ def scan_ca_for_best_regularity(
                     continue
                 
                 # Build structure with real lattice parameter
-                # s_star is now the lattice param 'a' in Å
+                # s_star is the MAX lattice param where CN >= target
+                # Use slightly smaller 'a' to ensure intersections occur
                 sublattice = Sublattice(
                     name='M',
                     offsets=tuple(tuple(o) for o in offsets),
@@ -1266,8 +1270,7 @@ def scan_ca_for_best_regularity(
                     bravais_type=bravais_type
                 )
                 
-                # Use s_star as lattice parameter, slightly larger to ensure intersections
-                a_real = s_star * 1.01
+                a_real = s_star * 0.99  # Slightly smaller to ensure sphere overlap
                 p_dict = {'a': a_real, 'b_ratio': 1.0, 'c_ratio': c_ratio,
                          'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
                 if lattice_type == 'Hexagonal':

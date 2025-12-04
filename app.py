@@ -372,13 +372,92 @@ def run_full_analysis_chain(
         half_matches.sort(key=lambda x: x['s_star'])
         non_matches.sort(key=lambda x: x['s_star'])
         
-        results['matching_configs'] = exact_matches + half_matches + non_matches
+        # Deduplicate equivalent structures (e.g., Cubic/Tetragonal/Ortho when a=b=c)
+        # Keep highest symmetry and track duplicates
+        def get_symmetry_rank(lattice_type):
+            """Higher rank = higher symmetry (prefer to show)."""
+            ranks = {
+                'Cubic': 6,
+                'Hexagonal': 5,
+                'Tetragonal': 4,
+                'Rhombohedral': 3,
+                'Orthorhombic': 2,
+                'Monoclinic': 1,
+                'Triclinic': 0
+            }
+            return ranks.get(lattice_type, 0)
         
-        # Step 5: Calculate regularity for exact matches
+        def get_effective_params(entry):
+            """Get effective lattice params (a, b, c, angles) for comparison."""
+            s_star = entry['s_star']
+            lattice = entry['lattice']
+            
+            # Default ratios
+            b_ratio = 1.0
+            c_ratio = 1.0
+            alpha, beta, gamma = 90.0, 90.0, 90.0
+            
+            if lattice == 'Hexagonal':
+                gamma = 120.0
+                c_ratio = 1.633  # Default HCP
+            elif lattice == 'Rhombohedral':
+                alpha = beta = gamma = 80.0
+            
+            a = s_star
+            b = s_star * b_ratio
+            c = s_star * c_ratio
+            
+            # Round for comparison (to 2 decimal places)
+            return (round(a, 2), round(b, 2), round(c, 2), 
+                    round(alpha, 1), round(beta, 1), round(gamma, 1))
+        
+        def deduplicate_matches(matches):
+            """Remove equivalent structures, keeping highest symmetry."""
+            if not matches:
+                return [], []
+            
+            # Group by effective parameters
+            param_groups = {}
+            for entry in matches:
+                params = get_effective_params(entry)
+                if params not in param_groups:
+                    param_groups[params] = []
+                param_groups[params].append(entry)
+            
+            primary = []
+            duplicates = []
+            
+            for params, group in param_groups.items():
+                # Sort by symmetry (highest first)
+                group.sort(key=lambda x: get_symmetry_rank(x['lattice']), reverse=True)
+                # Keep highest symmetry as primary
+                primary.append(group[0])
+                # Rest are duplicates
+                for dup in group[1:]:
+                    dup['duplicate_of'] = group[0]['config_id']
+                    duplicates.extend(group[1:])
+            
+            # Re-sort primary by s_star
+            primary.sort(key=lambda x: x['s_star'])
+            return primary, duplicates
+        
+        exact_primary, exact_duplicates = deduplicate_matches(exact_matches)
+        half_primary, half_duplicates = deduplicate_matches(half_matches)
+        
+        # Store both primary and duplicates
+        results['matching_configs'] = exact_primary + half_primary + non_matches
+        results['duplicate_configs'] = {
+            'exact': exact_duplicates,
+            'half': half_duplicates
+        }
+        results['exact_primary'] = exact_primary
+        results['half_primary'] = half_primary
+        
+        # Step 5: Calculate regularity for exact matches (primary only, not duplicates)
         update_progress(5, 6, "Analyzing coordination regularity...")
         
         regularity_results = {}
-        for entry in exact_matches:
+        for entry in exact_primary:
             config_id = entry['config_id']
             config_data = scale_results[config_id]
             
@@ -394,7 +473,8 @@ def run_full_analysis_chain(
                 )
                 
                 lattice_type = config_data['lattice']
-                a_real = config_data['s_star']  # s* is now the lattice parameter in Å
+                # Use 0.99 factor to ensure intersections occur
+                a_real = config_data['s_star'] * 0.99
                 
                 p_dict = {'a': a_real, 'b_ratio': 1.0, 'c_ratio': 1.0,
                           'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
@@ -446,9 +526,9 @@ def run_full_analysis_chain(
         
         results['regularity_results'] = regularity_results
         
-        # Step 5b: Calculate half-filling optimization for half-filling matches
+        # Step 5b: Calculate half-filling optimization for half-filling matches (primary only)
         half_filling_results = {}
-        for entry in half_matches:
+        for entry in half_primary:
             config_id = entry['config_id']
             config_data = scale_results[config_id]
             
@@ -463,7 +543,8 @@ def run_full_analysis_chain(
                 )
                 
                 lattice_type = config_data['lattice']
-                a_real = config_data['s_star']  # s* is the lattice parameter 'a' in Å
+                # Use 0.99 factor to ensure intersections occur
+                a_real = config_data['s_star'] * 0.99
                 
                 p_dict = {'a': a_real, 'b_ratio': 1.0, 'c_ratio': 1.0,
                           'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
@@ -522,11 +603,11 @@ def run_full_analysis_chain(
         
         results['half_filling_results'] = half_filling_results
         
-        # Step 6: Generate 3D previews for exact matches
+        # Step 6: Generate 3D previews for exact matches (primary only)
         update_progress(6, 6, "Generating 3D previews...")
         
         preview_figures = {}
-        for entry in exact_matches[:10]:  # Limit to first 10 for performance
+        for entry in exact_primary[:10]:  # Limit to first 10 for performance
             config_id = entry['config_id']
             reg_data = regularity_results.get(config_id, {})
             structure = reg_data.get('structure')
@@ -539,7 +620,7 @@ def run_full_analysis_chain(
                     pass
         
         # Generate previews for half-filling matches (showing kept sites only)
-        for entry in half_matches[:10]:
+        for entry in half_primary[:10]:
             config_id = entry['config_id']
             hf_data = half_filling_results.get(config_id, {})
             structure = hf_data.get('structure')
@@ -1046,19 +1127,27 @@ def main():
         regularity_results = chain.get('regularity_results', {})
         preview_figures = chain.get('preview_figures', {})
         
-        # Count matches
-        exact_matches = [c for c in matching_configs if c['match_type'] == 'exact']
-        half_matches = [c for c in matching_configs if c['match_type'] == 'half']
+        # Use deduplicated primary lists
+        exact_matches = chain.get('exact_primary', [c for c in matching_configs if c['match_type'] == 'exact'])
+        half_matches = chain.get('half_primary', [c for c in matching_configs if c['match_type'] == 'half'])
         non_matches = [c for c in matching_configs if c['match_type'] == 'none']
+        
+        # Get duplicate counts
+        duplicate_configs = chain.get('duplicate_configs', {'exact': [], 'half': []})
+        n_exact_dups = len(duplicate_configs.get('exact', []))
+        n_half_dups = len(duplicate_configs.get('half', []))
         
         # Summary metrics
         summary_cols = st.columns(4)
         with summary_cols[0]:
-            st.metric("Total Configurations", len(matching_configs))
+            total_unique = len(exact_matches) + len(half_matches) + len(non_matches)
+            st.metric("Unique Configurations", total_unique)
         with summary_cols[1]:
-            st.metric("Exact Matches ✓", len(exact_matches))
+            dup_note = f" (+{n_exact_dups} equiv.)" if n_exact_dups > 0 else ""
+            st.metric("Exact Matches ✓", f"{len(exact_matches)}{dup_note}")
         with summary_cols[2]:
-            st.metric("Half-Filling Matches ½", len(half_matches))
+            dup_note = f" (+{n_half_dups} equiv.)" if n_half_dups > 0 else ""
+            st.metric("Half-Filling Matches ½", f"{len(half_matches)}{dup_note}")
         with summary_cols[3]:
             target_cn = chain['stoichiometry'].get('target_cn', 0)
             st.metric("Target CN", target_cn)
@@ -1296,6 +1385,43 @@ def main():
                     st.caption(f"Showing first 20 of {len(non_matches)} configurations")
         
         # ============================================
+        # EQUIVALENT STRUCTURES (collapsed by default)
+        # ============================================
+        total_dups = n_exact_dups + n_half_dups
+        if total_dups > 0:
+            with st.expander(f"🔄 Equivalent Structures ({total_dups} hidden)", expanded=False):
+                st.markdown("""
+                These configurations have identical lattice parameters to higher-symmetry structures shown above.
+                For example, a Tetragonal structure with c/a = 1 is equivalent to its Cubic counterpart.
+                """)
+                
+                if n_exact_dups > 0:
+                    st.markdown("**Exact match equivalents:**")
+                    dup_data = []
+                    for dup in duplicate_configs['exact']:
+                        dup_data.append({
+                            'Config': dup['config_id'],
+                            'Lattice': dup['lattice'],
+                            'a (Å)': f"{dup['s_star']:.3f}",
+                            'Equivalent to': dup.get('duplicate_of', '—')
+                        })
+                    if dup_data:
+                        st.dataframe(dup_data, use_container_width=True, hide_index=True)
+                
+                if n_half_dups > 0:
+                    st.markdown("**Half-filling match equivalents:**")
+                    dup_data = []
+                    for dup in duplicate_configs['half']:
+                        dup_data.append({
+                            'Config': dup['config_id'],
+                            'Lattice': dup['lattice'],
+                            'a (Å)': f"{dup['s_star']:.3f}",
+                            'Equivalent to': dup.get('duplicate_of', '—')
+                        })
+                    if dup_data:
+                        st.dataframe(dup_data, use_container_width=True, hide_index=True)
+        
+        # ============================================
         # C/A OPTIMIZATION FOR NON-CUBIC LATTICES
         # ============================================
         # Get all non-cubic configs (tetragonal, hexagonal, orthorhombic)
@@ -1511,7 +1637,8 @@ def main():
                                 )
                                 
                                 # s* is the lattice parameter 'a' in Å
-                                a_real = opt_result['best_s_star']
+                                # Use 0.99 factor to ensure intersections occur
+                                a_real = opt_result['best_s_star'] * 0.99
                                 
                                 p_dict = {'a': a_real, 'b_ratio': 1.0, 
                                          'c_ratio': opt_result['best_c_ratio'],
