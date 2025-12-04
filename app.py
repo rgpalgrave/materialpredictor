@@ -1106,7 +1106,7 @@ def main():
             The optimization finds which sites to remove for maximum coordination regularity.
             """)
             
-            half_filling_results = chain_results.get('half_filling_results', {})
+            half_filling_results = chain.get('half_filling_results', {})
             
             for entry in half_matches:
                 config_id = entry['config_id']
