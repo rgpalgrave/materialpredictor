@@ -2011,3 +2011,291 @@ def find_optimal_half_filling(
             success=False,
             error=str(e)
         )
+
+
+# -----------------
+# Madelung Energy Calculation
+# -----------------
+
+@dataclass
+class MadelungResult:
+    """Result of Madelung energy calculation."""
+    energy_per_formula: float      # eV per formula unit
+    energy_per_atom: float         # eV per atom
+    madelung_constant: float       # Dimensionless Madelung constant (approximate)
+    nearest_neighbor_dist: float   # Å, shortest cation-anion distance
+    n_cations: int                 # Number of cations in unit cell
+    n_anions: int                  # Number of anions in unit cell
+    formula_units: float           # Formula units per unit cell
+    success: bool
+    error: Optional[str] = None
+
+
+def compute_physical_scale_factor(
+    lattice_param_a: float,
+    coord_radius: float,
+    structure_type: str = 'rocksalt'
+) -> float:
+    """
+    Compute the scale factor s that places anions at crystallographic positions.
+    
+    For ionic structures, anions should be at specific crystallographic sites
+    (octahedral holes for rocksalt, tetrahedral holes for zinc blende, etc.)
+    This function computes s such that sphere intersections occur at those sites.
+    
+    Args:
+        lattice_param_a: Lattice parameter 'a' in Ångströms
+        coord_radius: Coordination radius (r_cation + r_anion) in Ångströms
+        structure_type: Type of structure ('rocksalt', 'fluorite', 'zincblende', etc.)
+    
+    Returns:
+        Scale factor s (typically close to 1 for physical structures)
+    """
+    # For different structure types, anions are at different distances from cations
+    if structure_type in ['rocksalt', 'nacl']:
+        # Anions at octahedral sites: distance = a/2
+        anion_dist = lattice_param_a / 2
+    elif structure_type in ['fluorite', 'caf2']:
+        # Anions at tetrahedral sites: distance = a*sqrt(3)/4
+        anion_dist = lattice_param_a * np.sqrt(3) / 4
+    elif structure_type in ['zincblende', 'sphalerite', 'zns']:
+        # Anions at tetrahedral sites: distance = a*sqrt(3)/4
+        anion_dist = lattice_param_a * np.sqrt(3) / 4
+    elif structure_type in ['rutile', 'tio2']:
+        # More complex, use approximate value
+        anion_dist = lattice_param_a * 0.45
+    elif structure_type in ['perovskite', 'abo3']:
+        # Anions at face centers: distance = a/2
+        anion_dist = lattice_param_a / 2
+    else:
+        # Default: assume octahedral-like
+        anion_dist = lattice_param_a / 2
+    
+    # Scale factor such that spheres just reach the anion position
+    # Add small factor (1.02) to ensure intersection occurs
+    s = (anion_dist / coord_radius) * 1.02
+    
+    return s
+
+
+def calculate_madelung_energy(
+    structure: CompleteStructureData,
+    metals: List[Dict],
+    anion_charge: int,
+    target_multiplicity: Optional[int] = None,
+    supercell_size: int = 5,
+    convergence_check: bool = True
+) -> MadelungResult:
+    """
+    Calculate approximate Madelung energy using direct Coulomb summation.
+    
+    This is a simplified calculation using a finite supercell cutoff.
+    For more accurate results, Ewald summation would be needed.
+    
+    Args:
+        structure: Complete structure with metal atoms and anion positions
+        metals: List of metal dicts with 'charge' keys
+        anion_charge: Charge of anion (negative, e.g., -2 for O²⁻)
+        target_multiplicity: Only use intersection sites with this multiplicity
+                            (None = use all sites with multiplicity >= max/2)
+        supercell_size: Size of supercell for summation (e.g., 5 means 5×5×5)
+        convergence_check: If True, also compute with smaller supercell to estimate error
+    
+    Returns:
+        MadelungResult with energy and Madelung constant
+    """
+    try:
+        # Coulomb constant in convenient units: k = e²/(4πε₀) ≈ 14.3996 eV·Å
+        K_COULOMB = 14.3996  # eV·Å
+        
+        lat_vecs = structure.lattice_vectors
+        metal_atoms = structure.metal_atoms
+        intersections = structure.intersections
+        
+        if len(metal_atoms.fractional) == 0:
+            return MadelungResult(
+                energy_per_formula=0, energy_per_atom=0, madelung_constant=0,
+                nearest_neighbor_dist=0, n_cations=0, n_anions=0, formula_units=0,
+                success=False, error="No metal atoms in structure"
+            )
+        
+        if len(intersections.fractional) == 0:
+            return MadelungResult(
+                energy_per_formula=0, energy_per_atom=0, madelung_constant=0,
+                nearest_neighbor_dist=0, n_cations=0, n_anions=0, formula_units=0,
+                success=False, error="No anion sites in structure"
+            )
+        
+        # Filter intersections by multiplicity
+        mult = intersections.multiplicity
+        if target_multiplicity is not None:
+            mask = mult == target_multiplicity
+        else:
+            # Use sites with highest multiplicity (the "real" anion sites)
+            max_mult = np.max(mult)
+            mask = mult >= max_mult
+        
+        anion_frac_all = intersections.fractional[mask]
+        anion_cart_all = intersections.cartesian[mask]
+        
+        if len(anion_frac_all) == 0:
+            return MadelungResult(
+                energy_per_formula=0, energy_per_atom=0, madelung_constant=0,
+                nearest_neighbor_dist=0, n_cations=0, n_anions=0, formula_units=0,
+                success=False, error="No anion sites with target multiplicity"
+            )
+        
+        # Get unique sites only (not boundary equivalents)
+        def get_unique_sites(frac_coords, cart_coords, tol=0.02):
+            """Filter to unique sites within unit cell [0, 1)."""
+            unique_frac = []
+            unique_cart = []
+            for i, f in enumerate(frac_coords):
+                # Wrap to [0, 1)
+                f_wrapped = f - np.floor(f)
+                f_wrapped = np.where(np.abs(f_wrapped - 1.0) < tol, 0.0, f_wrapped)
+                
+                # Check not duplicate
+                is_dup = False
+                for uf in unique_frac:
+                    if np.allclose(f_wrapped, uf, atol=tol):
+                        is_dup = True
+                        break
+                if not is_dup:
+                    unique_frac.append(f_wrapped)
+                    unique_cart.append(frac_to_cart(f_wrapped, structure.lattice_vectors))
+            return np.array(unique_frac), np.array(unique_cart)
+        
+        # Get unique cations
+        cation_frac, cation_cart = get_unique_sites(
+            metal_atoms.fractional, metal_atoms.cartesian
+        )
+        
+        # Assign charges to cations
+        cation_charges = []
+        seen_offsets = set()
+        for i, f in enumerate(metal_atoms.fractional):
+            f_wrapped = f - np.floor(f)
+            f_wrapped = np.where(np.abs(f_wrapped - 1.0) < 0.02, 0.0, f_wrapped)
+            
+            # Check if this is a new unique site
+            is_new = True
+            for sf in seen_offsets:
+                if np.allclose(f_wrapped, np.array(sf), atol=0.02):
+                    is_new = False
+                    break
+            
+            if is_new:
+                seen_offsets.add(tuple(f_wrapped))
+                offset_idx = metal_atoms.offset_idx[i]
+                if offset_idx < len(metals):
+                    cation_charges.append(metals[offset_idx]['charge'])
+                else:
+                    cation_charges.append(2)
+        
+        cation_charges = np.array(cation_charges[:len(cation_frac)])
+        
+        # Get unique anions
+        anion_frac, anion_cart = get_unique_sites(anion_frac_all, anion_cart_all)
+        anion_charges_arr = np.full(len(anion_frac), anion_charge)
+        
+        n_cations = len(cation_frac)
+        n_anions = len(anion_frac)
+        
+        if n_cations == 0 or n_anions == 0:
+            return MadelungResult(
+                energy_per_formula=0, energy_per_atom=0, madelung_constant=0,
+                nearest_neighbor_dist=0, n_cations=n_cations, n_anions=n_anions, 
+                formula_units=0, success=False, 
+                error=f"No valid sites: {n_cations} cations, {n_anions} anions"
+            )
+        
+        # Combine all ions
+        all_frac = np.vstack([cation_frac, anion_frac])
+        all_cart = np.vstack([cation_cart, anion_cart])
+        all_charges = np.concatenate([cation_charges, anion_charges_arr])
+        n_ions = len(all_frac)
+        
+        # Generate supercell translation vectors
+        half = supercell_size // 2
+        translations = []
+        for i in range(-half, half + 1):
+            for j in range(-half, half + 1):
+                for k in range(-half, half + 1):
+                    translations.append([i, j, k])
+        translations = np.array(translations)
+        trans_cart = translations @ lat_vecs
+        
+        # Calculate energy using direct summation
+        total_energy = 0.0
+        min_cation_anion_dist = float('inf')
+        
+        for i in range(n_ions):
+            qi = all_charges[i]
+            ri = all_cart[i]
+            
+            for j in range(n_ions):
+                qj = all_charges[j]
+                
+                for t in trans_cart:
+                    if i == j and np.allclose(t, 0):
+                        continue
+                    
+                    rj = all_cart[j] + t
+                    r = np.linalg.norm(rj - ri)
+                    
+                    if r < 0.1:
+                        continue
+                    
+                    total_energy += qi * qj / r
+                    
+                    # Track minimum cation-anion distance (only in nearby cells)
+                    if (i < n_cations) != (j < n_cations):  # One cation, one anion
+                        if np.linalg.norm(t) < np.linalg.norm(lat_vecs[0]) * 1.5:
+                            min_cation_anion_dist = min(min_cation_anion_dist, r)
+        
+        # Each pair counted twice
+        total_energy = 0.5 * K_COULOMB * total_energy
+        
+        # Calculate formula units (based on charge balance)
+        total_cation_charge = np.sum(cation_charges)
+        total_anion_charge = abs(anion_charge) * n_anions
+        
+        # Formula units = how many times the formula repeats
+        from math import gcd
+        if total_cation_charge > 0 and total_anion_charge > 0:
+            g = gcd(int(total_cation_charge), int(total_anion_charge))
+            formula_units = g / abs(anion_charge) if abs(anion_charge) > 0 else 1
+        else:
+            formula_units = 1
+        
+        energy_per_formula = total_energy / max(formula_units, 1)
+        energy_per_atom = total_energy / n_ions
+        
+        # Madelung constant: A = -E * r₀ / (k * z+ * |z-|)
+        if min_cation_anion_dist < float('inf'):
+            avg_cation_charge = np.mean(cation_charges)
+            madelung_constant = -energy_per_formula * min_cation_anion_dist / (
+                K_COULOMB * avg_cation_charge * abs(anion_charge)
+            )
+        else:
+            madelung_constant = 0
+        
+        return MadelungResult(
+            energy_per_formula=energy_per_formula,
+            energy_per_atom=energy_per_atom,
+            madelung_constant=madelung_constant,
+            nearest_neighbor_dist=min_cation_anion_dist,
+            n_cations=n_cations,
+            n_anions=n_anions,
+            formula_units=formula_units,
+            success=True,
+            error=None
+        )
+    
+    except Exception as e:
+        return MadelungResult(
+            energy_per_formula=0, energy_per_atom=0, madelung_constant=0,
+            nearest_neighbor_dist=0, n_cations=0, n_anions=0, formula_units=0,
+            success=False, error=str(e)
+        )

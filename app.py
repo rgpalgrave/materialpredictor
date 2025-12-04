@@ -196,7 +196,8 @@ def run_full_analysis_chain(
     3. Calculate stoichiometries for successful configs
     4. Check for matches (exact, half-filling)
     5. Calculate regularity for exact matches
-    6. Generate 3D previews for exact matches
+    5b. Optimize half-filling and calculate regularity for half-filling matches
+    6. Generate 3D previews for all matches
     
     Args:
         metals: List of metal dictionaries with symbol, charge, ratio, cn, radius
@@ -206,7 +207,13 @@ def run_full_analysis_chain(
         progress_callback: Optional callback(step, total, message) for progress updates
     
     Returns:
-        Dictionary with all results
+        Dictionary with all results including:
+        - stoichiometry: Target formula and CN
+        - scale_results: Minimum s* for each config
+        - matching_configs: Sorted list of exact, half, and non-matching configs
+        - regularity_results: Coordination analysis for exact matches
+        - half_filling_results: Optimization results for half-filling matches
+        - preview_figures: 3D visualizations
     """
     results = {
         'success': False,
@@ -216,6 +223,7 @@ def run_full_analysis_chain(
         'stoich_results': {},
         'matching_configs': [],  # List of configs sorted by match quality
         'regularity_results': {},  # Config ID -> regularity data
+        'half_filling_results': {},  # Config ID -> half-filling optimization data
         'preview_figures': {},  # Config ID -> Plotly figure
     }
     
@@ -423,6 +431,69 @@ def run_full_analysis_chain(
         
         results['regularity_results'] = regularity_results
         
+        # Step 5b: Calculate half-filling optimization for half-filling matches
+        half_filling_results = {}
+        for entry in half_matches:
+            config_id = entry['config_id']
+            config_data = scale_results[config_id]
+            
+            try:
+                # Build structure
+                offsets = config_data['offsets']
+                sublattice = Sublattice(
+                    name='analysis',
+                    offsets=tuple(tuple(o) for o in offsets),
+                    alpha_ratio=coord_radii,
+                    bravais_type=config_data['bravais_type']
+                )
+                
+                lattice_type = config_data['lattice']
+                p_dict = {'a': 5.0, 'b_ratio': 1.0, 'c_ratio': 1.0,
+                          'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
+                if lattice_type == 'Hexagonal':
+                    p_dict['gamma'] = 120.0
+                    p_dict['c_ratio'] = 1.633
+                
+                p = LatticeParams(**p_dict)
+                
+                structure = calculate_complete_structure(
+                    sublattices=[sublattice],
+                    p=p,
+                    scale_s=config_data['s_star'],
+                    target_N=target_cn,
+                    k_samples=32,
+                    cluster_eps_frac=0.05,
+                    include_boundary_equivalents=True
+                )
+                
+                # Run half-filling optimization
+                half_result = find_optimal_half_filling(
+                    structure=structure,
+                    metals=metals,
+                    max_coord_sites=target_cn,  # This will use per-metal CN internally
+                    target_fraction=0.5
+                )
+                
+                half_filling_results[config_id] = {
+                    'structure': structure,
+                    'half_result': half_result,
+                    'mean_regularity_before': half_result.mean_regularity_before if half_result.success else 0,
+                    'mean_regularity_after': half_result.mean_regularity_after if half_result.success else 0,
+                    'kept_indices': half_result.kept_site_indices if half_result.success else [],
+                    'per_metal_scores': half_result.per_metal_scores if half_result.success else []
+                }
+            except Exception:
+                half_filling_results[config_id] = {
+                    'structure': None,
+                    'half_result': None,
+                    'mean_regularity_before': 0,
+                    'mean_regularity_after': 0,
+                    'kept_indices': [],
+                    'per_metal_scores': []
+                }
+        
+        results['half_filling_results'] = half_filling_results
+        
         # Step 6: Generate 3D previews for exact matches
         update_progress(6, 6, "Generating 3D previews...")
         
@@ -435,6 +506,22 @@ def run_full_analysis_chain(
             if structure is not None:
                 try:
                     fig = generate_preview_figure(structure, metals, config_id)
+                    preview_figures[config_id] = fig
+                except Exception:
+                    pass
+        
+        # Generate previews for half-filling matches (showing kept sites only)
+        for entry in half_matches[:10]:
+            config_id = entry['config_id']
+            hf_data = half_filling_results.get(config_id, {})
+            structure = hf_data.get('structure')
+            kept_indices = hf_data.get('kept_indices', [])
+            
+            if structure is not None and kept_indices:
+                try:
+                    fig = generate_preview_figure_half_filling(
+                        structure, metals, kept_indices, config_id
+                    )
                     preview_figures[config_id] = fig
                 except Exception:
                     pass
@@ -533,6 +620,111 @@ def generate_preview_figure(structure, metals: List[Dict], title: str = "") -> g
         width=300,
         margin=dict(l=0, r=0, t=25, b=0),
         title=dict(text=title, font=dict(size=10)),
+        showlegend=False
+    )
+    
+    return fig
+
+
+def generate_preview_figure_half_filling(structure, metals: List[Dict], 
+                                         kept_indices: List[int], title: str = "") -> go.Figure:
+    """Generate a small 3D preview figure showing only kept anion sites for half-filling."""
+    from position_calculator import get_unique_intersections
+    
+    fig = go.Figure()
+    
+    lat_vecs = structure.lattice_vectors
+    
+    # Draw unit cell edges
+    corners = np.array([
+        [0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0],
+        [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]
+    ])
+    cart_corners = corners @ lat_vecs
+    
+    edges = [
+        (0, 1), (1, 2), (2, 3), (3, 0),
+        (4, 5), (5, 6), (6, 7), (7, 4),
+        (0, 4), (1, 5), (2, 6), (3, 7)
+    ]
+    
+    for i, j in edges:
+        fig.add_trace(go.Scatter3d(
+            x=[cart_corners[i, 0], cart_corners[j, 0]],
+            y=[cart_corners[i, 1], cart_corners[j, 1]],
+            z=[cart_corners[i, 2], cart_corners[j, 2]],
+            mode='lines',
+            line=dict(color='gray', width=1),
+            showlegend=False,
+            hoverinfo='skip'
+        ))
+    
+    metal_colors = ['blue', 'green', 'purple', 'orange', 'cyan', 'magenta']
+    
+    # Plot metal atoms
+    if len(structure.metal_atoms.cartesian) > 0:
+        unique_offsets = np.unique(structure.metal_atoms.offset_idx)
+        
+        for offset_idx in unique_offsets:
+            mask = structure.metal_atoms.offset_idx == offset_idx
+            coords = structure.metal_atoms.cartesian[mask]
+            
+            symbol = metals[offset_idx]['symbol'] if offset_idx < len(metals) else f'M{offset_idx+1}'
+            color = metal_colors[offset_idx % len(metal_colors)]
+            
+            fig.add_trace(go.Scatter3d(
+                x=coords[:, 0], y=coords[:, 1], z=coords[:, 2],
+                mode='markers',
+                marker=dict(size=6, color=color, opacity=0.9),
+                name=symbol,
+                hoverinfo='name'
+            ))
+    
+    # Plot ONLY kept intersection sites
+    if len(structure.intersections.cartesian) > 0 and kept_indices:
+        # Get unique intersections first
+        unique_frac, unique_mult = get_unique_intersections(structure.intersections)
+        
+        if len(unique_frac) > 0 and len(kept_indices) > 0:
+            # Filter to kept indices
+            kept_frac = unique_frac[kept_indices]
+            kept_cart = kept_frac @ lat_vecs
+            
+            # Kept sites in red (solid)
+            fig.add_trace(go.Scatter3d(
+                x=kept_cart[:, 0], y=kept_cart[:, 1], z=kept_cart[:, 2],
+                mode='markers',
+                marker=dict(size=5, color='red', symbol='diamond', opacity=0.9),
+                name='Anions (kept)',
+                hoverinfo='name'
+            ))
+            
+            # Removed sites in gray (faded)
+            all_indices = set(range(len(unique_frac)))
+            removed_indices = list(all_indices - set(kept_indices))
+            if removed_indices:
+                removed_frac = unique_frac[removed_indices]
+                removed_cart = removed_frac @ lat_vecs
+                
+                fig.add_trace(go.Scatter3d(
+                    x=removed_cart[:, 0], y=removed_cart[:, 1], z=removed_cart[:, 2],
+                    mode='markers',
+                    marker=dict(size=3, color='gray', symbol='diamond', opacity=0.3),
+                    name='Anions (removed)',
+                    hoverinfo='name'
+                ))
+    
+    fig.update_layout(
+        scene=dict(
+            xaxis=dict(showticklabels=False, title=''),
+            yaxis=dict(showticklabels=False, title=''),
+            zaxis=dict(showticklabels=False, title=''),
+            aspectmode='data'
+        ),
+        height=250,
+        width=300,
+        margin=dict(l=0, r=0, t=25, b=0),
+        title=dict(text=f"{title} (½)", font=dict(size=10)),
         showlegend=False
     )
     
@@ -905,26 +1097,80 @@ def main():
                         else:
                             st.info("Preview not available")
         
-        # Display half-filling matches (collapsed by default)
+        # Display half-filling matches with full details
         if half_matches:
             st.subheader("½ Half-Filling Matches")
-            st.markdown("These configurations match when only half the anion sites are occupied (e.g., zinc blende, wurtzite).")
+            st.markdown("""
+            These configurations match when only **half** the anion sites are occupied 
+            (e.g., zinc blende from fluorite, wurtzite, anti-fluorite structures).
+            The optimization finds which sites to remove for maximum coordination regularity.
+            """)
             
-            # Summary table for half matches
-            half_data = []
+            half_filling_results = chain_results.get('half_filling_results', {})
+            
             for entry in half_matches:
-                half_data.append({
-                    'Configuration': entry['config_id'],
-                    's*': f"{entry['s_star']:.4f}",
-                    'Lattice': entry['lattice'],
-                    'Formula (full)': entry['formula'],
-                    'Pattern': entry.get('pattern', '')
-                })
-            
-            half_df = pd.DataFrame(half_data)
-            st.dataframe(half_df, use_container_width=True, hide_index=True)
-            
-            st.info("💡 Click on individual configurations in the Unit Cell Viewer below to explore half-filling optimization.")
+                config_id = entry['config_id']
+                s_star = entry['s_star']
+                lattice = entry['lattice']
+                formula = entry['formula']
+                pattern = entry.get('pattern', '')
+                
+                # Get half-filling optimization data
+                hf_data = half_filling_results.get(config_id, {})
+                reg_before = hf_data.get('mean_regularity_before', 0)
+                reg_after = hf_data.get('mean_regularity_after', 0)
+                per_metal = hf_data.get('per_metal_scores', [])
+                
+                improvement = reg_after - reg_before
+                delta_str = f"+{improvement:.3f}" if improvement > 0 else f"{improvement:.3f}"
+                
+                # Create expander for each half-filling match
+                with st.expander(f"**{config_id}** — {lattice} — s*={s_star:.4f} — Regularity: {reg_after:.2f} (after ½)", expanded=True):
+                    
+                    # Two columns: info + 3D preview
+                    info_col, preview_col = st.columns([2, 1])
+                    
+                    with info_col:
+                        # Key metrics - 5 columns for half-filling
+                        met_cols = st.columns(5)
+                        with met_cols[0]:
+                            st.metric("Scale Factor (s*)", f"{s_star:.4f}")
+                        with met_cols[1]:
+                            st.metric("Lattice", lattice)
+                        with met_cols[2]:
+                            # Show half-filled formula
+                            # Parse formula to halve anion count
+                            half_formula = formula.replace('₂', '₁').replace('₄', '₂').replace('₆', '₃').replace('₈', '₄')
+                            st.metric("Formula (½)", half_formula)
+                        with met_cols[3]:
+                            st.metric("Reg. Before", f"{reg_before:.3f}")
+                        with met_cols[4]:
+                            st.metric("Reg. After", f"{reg_after:.3f}", delta=delta_str)
+                        
+                        if pattern:
+                            st.caption(f"Pattern: {pattern}")
+                        
+                        # Per-metal coordination details
+                        if per_metal:
+                            st.markdown("**Per-Metal Coordination (after half-filling):**")
+                            metal_data = []
+                            for m in per_metal:
+                                metal_data.append({
+                                    'Metal': m['symbol'],
+                                    'CN': m['cn'],
+                                    'Regularity': f"{m['regularity']:.3f}"
+                                })
+                            metal_df = pd.DataFrame(metal_data)
+                            st.dataframe(metal_df, use_container_width=True, hide_index=True)
+                        
+                        st.info("💡 Half-filling optimization selects which anion sites to remove for maximum coordination regularity.")
+                    
+                    with preview_col:
+                        # 3D preview (shows kept sites in red, removed in gray)
+                        if config_id in preview_figures:
+                            st.plotly_chart(preview_figures[config_id], use_container_width=True)
+                        else:
+                            st.info("Preview not available")
         
         # Display non-matches (collapsed)
         if non_matches:
@@ -1887,6 +2133,155 @@ def main():
                     with st.expander("Per-metal regularity details"):
                         for m in half_filling_result.per_metal_scores:
                             st.write(f"**{m['symbol']}**: CN = {m['cn']}, Regularity = {m['regularity']:.3f}")
+            
+            # Madelung Energy Calculation
+            with st.expander("⚡ Madelung Energy Calculation", expanded=False):
+                st.markdown("""
+                Calculate approximate electrostatic (Madelung) energy using ionic charges.
+                For accurate results, enter the experimental lattice parameter.
+                """)
+                
+                mad_cols = st.columns([1, 1, 1])
+                with mad_cols[0]:
+                    # Default lattice param from current structure
+                    default_a = p.a if hasattr(p, 'a') else 5.0
+                    mad_lattice_a = st.number_input(
+                        "Lattice parameter a (Å)",
+                        min_value=2.0, max_value=20.0,
+                        value=default_a, step=0.01,
+                        help="Use experimental value for accurate Madelung constant",
+                        key='mad_lattice_a'
+                    )
+                
+                with mad_cols[1]:
+                    # Structure type for scale factor calculation
+                    struct_types = ['rocksalt', 'fluorite', 'zincblende', 'perovskite', 'rutile', 'custom']
+                    mad_struct_type = st.selectbox(
+                        "Structure type",
+                        struct_types,
+                        index=0,
+                        help="Determines expected anion positions",
+                        key='mad_struct_type'
+                    )
+                
+                with mad_cols[2]:
+                    mad_supercell = st.selectbox(
+                        "Supercell size",
+                        [5, 7, 9, 11],
+                        index=1,
+                        help="Larger = more accurate but slower",
+                        key='mad_supercell'
+                    )
+                
+                if st.button("⚡ Calculate Madelung Energy", key='calc_madelung'):
+                    with st.spinner("Computing electrostatic energy..."):
+                        from position_calculator import (
+                            calculate_madelung_energy, 
+                            compute_physical_scale_factor
+                        )
+                        
+                        # Get metal and anion info
+                        metals = st.session_state.get('metals', [{'symbol': 'M', 'charge': 2, 'radius': 0.7}])
+                        anion_charge = st.session_state.get('anion_charge', -2)
+                        anion_rad = st.session_state.get('anion_rad', 1.40)
+                        
+                        # Compute coordination radius
+                        metal_radii = [m['radius'] for m in metals]
+                        coord_radius = metal_radii[0] + anion_rad  # Use first metal for scale
+                        
+                        # Compute physical scale factor
+                        if mad_struct_type != 'custom':
+                            s_physical = compute_physical_scale_factor(
+                                mad_lattice_a, coord_radius, mad_struct_type
+                            )
+                        else:
+                            s_physical = uc_scale_s  # Use current scale
+                        
+                        # Rebuild structure with physical lattice parameter and scale
+                        from interstitial_engine import Sublattice, LatticeParams
+                        
+                        # Get config data again
+                        config_data = None
+                        for cid, data in st.session_state.scale_results.items():
+                            if cid == selected_config['id']:
+                                config_data = data
+                                break
+                        
+                        if config_data:
+                            offsets = config_data.get('offsets', [(0, 0, 0)])
+                            bravais = config_data.get('bravais_type', 'cubic_P')
+                            
+                            if len(metal_radii) > 1:
+                                coord_radii = tuple(r + anion_rad for r in metal_radii)
+                            else:
+                                coord_radii = coord_radius
+                            
+                            sublattice_mad = Sublattice(
+                                name='M',
+                                offsets=tuple(tuple(o) for o in offsets),
+                                alpha_ratio=coord_radii,
+                                bravais_type=bravais
+                            )
+                            
+                            # Create lattice params matching original but with user's a
+                            lattice_type = config_data.get('lattice', 'Cubic')
+                            p_mad = LatticeParams(
+                                a=mad_lattice_a,
+                                b_ratio=p.b_ratio,
+                                c_ratio=p.c_ratio,
+                                alpha=p.alpha,
+                                beta=p.beta,
+                                gamma=p.gamma
+                            )
+                            
+                            structure_mad = calculate_complete_structure(
+                                sublattices=[sublattice_mad],
+                                p=p_mad,
+                                scale_s=s_physical,
+                                target_N=expected_cn,
+                                k_samples=32,
+                                cluster_eps_frac=0.05,
+                                include_boundary_equivalents=True
+                            )
+                            
+                            # Calculate Madelung energy
+                            madelung_result = calculate_madelung_energy(
+                                structure=structure_mad,
+                                metals=metals,
+                                anion_charge=anion_charge,
+                                target_multiplicity=expected_cn,
+                                supercell_size=mad_supercell
+                            )
+                            
+                            if madelung_result.success:
+                                st.success("Madelung calculation complete!")
+                                
+                                mad_metric_cols = st.columns(4)
+                                with mad_metric_cols[0]:
+                                    st.metric("Madelung Constant", f"{madelung_result.madelung_constant:.4f}")
+                                with mad_metric_cols[1]:
+                                    st.metric("Energy/formula", f"{madelung_result.energy_per_formula:.2f} eV")
+                                with mad_metric_cols[2]:
+                                    st.metric("Nearest M-X", f"{madelung_result.nearest_neighbor_dist:.3f} Å")
+                                with mad_metric_cols[3]:
+                                    st.metric("Formula units", f"{madelung_result.formula_units:.0f}")
+                                
+                                # Additional info
+                                st.caption(f"Calculation used: {madelung_result.n_cations} cations, {madelung_result.n_anions} anions, s = {s_physical:.4f}")
+                                
+                                # Reference values
+                                st.info("""
+                                **Reference Madelung constants:**
+                                - Rocksalt (NaCl, MgO): 1.748
+                                - Fluorite (CaF₂): 2.519
+                                - Zinc blende (ZnS): 1.638
+                                - Wurtzite: 1.641
+                                - Cesium chloride: 1.763
+                                """)
+                            else:
+                                st.error(f"Calculation failed: {madelung_result.error}")
+                        else:
+                            st.error("Could not retrieve configuration data")
             
             # Create 3D plot
             fig_3d = go.Figure()

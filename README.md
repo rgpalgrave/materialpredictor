@@ -5,13 +5,28 @@ A Streamlit application for crystallographic analysis that calculates:
 - **Anion coordination number** from charge balance and metal CNs
 - **Minimum scale factors** to achieve target intersection multiplicities
 - **Coordination environment regularity** for assessing polyhedron geometry
+- **Madelung energy** for electrostatic stability analysis
+
+## Physical Model
+
+The app uses a sphere intersection model where each metal cation is surrounded by a coordination sphere of radius:
+
+```
+r = s × (r_cation + r_anion)
+```
+
+Where:
+- `r_cation` and `r_anion` are Shannon ionic radii in Ångströms
+- `s` is a scale factor (typically close to 1 for real structures)
+
+Anion positions are found at the intersection points where multiple spheres meet. The **multiplicity** of an intersection is the number of spheres that meet there, which corresponds to the coordination number of the anion.
 
 ## Features
 
-### 1. Streamlined Workflow (NEW)
+### 1. Streamlined Workflow
 Click **"Calculate Stoichiometry & CN"** to run the complete analysis chain:
 1. Calculate stoichiometry and target coordination number
-2. Find minimum scale factors for all lattice configurations (with α = 0.5)
+2. Find minimum scale factors for all lattice configurations
 3. Calculate stoichiometries for each successful configuration
 4. Match results: exact matches (✓), half-filling matches (½), or no match
 5. Analyze coordination polyhedron regularity for exact matches
@@ -34,24 +49,40 @@ Results are displayed in a unified section showing:
 - Both fixed (arity-0) and parametric (arity-1) configurations
 - Filterable by lattice type and arity
 
-### 4. Advanced Manual Controls
+### 4. Madelung Energy Calculation (NEW)
+- Calculate approximate electrostatic (Madelung) energy
+- Uses direct Coulomb summation over a supercell
+- Input experimental lattice parameters for accurate results
+- Returns Madelung constant, energy per formula unit, and nearest-neighbor distances
+- Reference values for common structure types (rocksalt: 1.748, fluorite: 2.519, etc.)
+
+### 5. Advanced Manual Controls
 For users who want more control, an expandable "Advanced" section provides:
-- Manual scale factor calculation with custom α ratio
+- Manual scale factor calculation
 - c/a ratio optimization for tetragonal/hexagonal/orthorhombic lattices
 - Stoichiometry-based c/a scanning
 
-### 5. Coordination Environment Analysis
+### 6. Coordination Environment Analysis
 - Analyzes the regularity of coordination polyhedra around each metal type
 - Uses periodic boundary conditions to find nearest intersection sites
 - Calculates distance metrics: mean, std deviation, coefficient of variation
 - Calculates angular metrics: comparison to ideal polyhedra (tetrahedron, octahedron, cube, etc.)
 - Provides regularity scores (0-1) for distance uniformity and angular regularity
+- Uses each metal's specific coordination number (not a single global value)
 
-### 6. Optimized Half-Filling
-- For structures that occupy only half the anion sites (zinc blende, wurtzite, etc.)
-- Optimizes which sites to keep for maximum coordination regularity
-- Adjustable fraction (0.25 to 0.75)
-- Shows before/after regularity comparison
+### 7. Integrated Half-Filling Analysis
+For structures where only half the anion sites are occupied (zinc blende from fluorite, wurtzite, anti-fluorite, etc.):
+- Automatically detected as "Half-Filling Matches" in the workflow
+- Optimization algorithm finds which sites to remove for maximum coordination regularity
+- Shows regularity scores before and after half-filling optimization
+- 3D preview distinguishes kept sites (red) from removed sites (gray)
+- Per-metal coordination details showing achieved CN and regularity
+- Typical regularity improvement: 10-30% from unoptimized half-filling
+
+**Example**: CaF₂ (fluorite) → CaF (half-filled)
+- Original: 8 tetrahedral F sites per Ca
+- Half-filled: 4 tetrahedral F sites, optimally selected
+- Regularity improves from ~0.57 to ~0.70
 
 ## Local Development
 
