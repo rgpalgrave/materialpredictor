@@ -1182,6 +1182,7 @@ class RegularityScanResult:
     scan_data: List[Tuple]  # (c_ratio, s_star, regularity)
     success: bool
     error: Optional[str]
+    is_half_filling: bool = False  # Whether half-filling optimization was applied
 
 
 def scan_ca_for_best_regularity(
@@ -1194,7 +1195,8 @@ def scan_ca_for_best_regularity(
     coord_radii,
     c_ratio_min: float = 0.5,
     c_ratio_max: float = 2.5,
-    n_points: int = 50
+    n_points: int = 50,
+    is_half_filling: bool = False
 ) -> RegularityScanResult:
     """
     Scan c/a ratios to find the one with best coordination regularity.
@@ -1210,6 +1212,7 @@ def scan_ca_for_best_regularity(
         c_ratio_min: Minimum c/a ratio to scan
         c_ratio_max: Maximum c/a ratio to scan
         n_points: Number of points in scan
+        is_half_filling: If True, optimize by keeping only half the intersection sites
     
     Returns:
         RegularityScanResult with best c/a and regularity scores
@@ -1266,31 +1269,52 @@ def scan_ca_for_best_regularity(
                     include_boundary_equivalents=True
                 )
                 
-                # Analyze coordination regularity
-                coord_result = analyze_all_coordination_environments(
-                    structure=structure,
-                    metals=metals,
-                    max_sites=target_cn
-                )
-                
-                if coord_result.success:
-                    mean_reg = coord_result.summary.get('mean_overall_regularity', 0)
-                    scan_data.append((c_ratio, s_star, mean_reg))
+                # For half-filling, optimize which sites to keep
+                if is_half_filling:
+                    half_result = find_optimal_half_filling(
+                        structure=structure,
+                        metals=metals,
+                        max_coord_sites=target_cn,
+                        target_fraction=0.5
+                    )
                     
-                    if mean_reg > best_regularity:
-                        best_regularity = mean_reg
-                        best_c_ratio = c_ratio
-                        best_s_star = s_star
-                        # Store per-metal scores
-                        best_per_metal = []
-                        for env in coord_result.environments:
-                            best_per_metal.append({
-                                'symbol': env.metal_symbol,
-                                'cn': len(env.coordination_sites),
-                                'regularity': env.overall_regularity
-                            })
+                    if half_result.success:
+                        mean_reg = half_result.mean_regularity_after
+                        scan_data.append((c_ratio, s_star, mean_reg))
+                        
+                        if mean_reg > best_regularity:
+                            best_regularity = mean_reg
+                            best_c_ratio = c_ratio
+                            best_s_star = s_star
+                            best_per_metal = half_result.per_metal_scores
+                    else:
+                        scan_data.append((c_ratio, s_star, None))
                 else:
-                    scan_data.append((c_ratio, s_star, None))
+                    # Standard regularity analysis with all sites
+                    coord_result = analyze_all_coordination_environments(
+                        structure=structure,
+                        metals=metals,
+                        max_sites=target_cn
+                    )
+                    
+                    if coord_result.success:
+                        mean_reg = coord_result.summary.get('mean_overall_regularity', 0)
+                        scan_data.append((c_ratio, s_star, mean_reg))
+                        
+                        if mean_reg > best_regularity:
+                            best_regularity = mean_reg
+                            best_c_ratio = c_ratio
+                            best_s_star = s_star
+                            # Store per-metal scores
+                            best_per_metal = []
+                            for env in coord_result.environments:
+                                best_per_metal.append({
+                                    'symbol': env.metal_symbol,
+                                    'cn': len(env.coordination_sites),
+                                    'regularity': env.overall_regularity
+                                })
+                    else:
+                        scan_data.append((c_ratio, s_star, None))
             except Exception:
                 scan_data.append((c_ratio, None, None))
                 continue
@@ -1304,7 +1328,8 @@ def scan_ca_for_best_regularity(
                 per_metal_scores=best_per_metal,
                 scan_data=scan_data,
                 success=True,
-                error=None
+                error=None,
+                is_half_filling=is_half_filling
             )
         else:
             return RegularityScanResult(
@@ -1315,7 +1340,8 @@ def scan_ca_for_best_regularity(
                 per_metal_scores=[],
                 scan_data=scan_data,
                 success=False,
-                error='No valid c/a found in range'
+                error='No valid c/a found in range',
+                is_half_filling=is_half_filling
             )
     except Exception as e:
         return RegularityScanResult(
@@ -1326,7 +1352,8 @@ def scan_ca_for_best_regularity(
             per_metal_scores=[],
             scan_data=[],
             success=False,
-            error=str(e)
+            error=str(e),
+            is_half_filling=is_half_filling
         )
 
 

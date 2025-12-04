@@ -1322,6 +1322,8 @@ def main():
                                             }
                                     else:
                                         # Scan for best regularity
+                                        # For half-filling matches, optimize with only half the sites
+                                        is_half = (match_type == 'half')
                                         best_result = scan_ca_for_best_regularity(
                                             config_id=config_id,
                                             offsets=offsets,
@@ -1332,7 +1334,8 @@ def main():
                                             coord_radii=coord_radii,
                                             c_ratio_min=ca_min,
                                             c_ratio_max=ca_max,
-                                            n_points=ca_points
+                                            n_points=ca_points,
+                                            is_half_filling=is_half
                                         )
                                         # Convert dataclass to dict for session state
                                         st.session_state.ca_optimization_results[config_id] = {
@@ -1343,7 +1346,8 @@ def main():
                                             'per_metal_scores': best_result.per_metal_scores,
                                             'optimize_type': 'regularity',
                                             'config_data': config_data,
-                                            'error': best_result.error
+                                            'error': best_result.error,
+                                            'is_half_filling': best_result.is_half_filling
                                         }
                                     
                                     st.rerun()
@@ -1422,18 +1426,41 @@ def main():
                                 metal_count = weighted['metal_count']
                                 anion_count = weighted['intersection_count']
                                 
+                                # Handle half-filling case
+                                is_half = opt_result.get('is_half_filling', False)
+                                kept_indices = []
+                                if is_half:
+                                    # Run half-filling optimization to get kept sites
+                                    half_result = find_optimal_half_filling(
+                                        structure=structure,
+                                        metals=metals,
+                                        max_coord_sites=target_cn,
+                                        target_fraction=0.5
+                                    )
+                                    if half_result.success:
+                                        kept_indices = half_result.kept_site_indices
+                                        anion_count = half_result.kept_count  # Use half-filled count
+                                
                                 st.markdown(f"**Structure at c/a = {opt_result['best_c_ratio']:.3f}:**")
                                 struct_cols = st.columns([1, 2])
                                 with struct_cols[0]:
                                     st.write(f"Metals/cell: {metal_count:.1f}")
-                                    st.write(f"Anions/cell: {anion_count:.1f}")
+                                    if is_half:
+                                        st.write(f"Anions/cell: {anion_count} (½ filled)")
+                                    else:
+                                        st.write(f"Anions/cell: {anion_count:.1f}")
                                     if anion_count > 0:
                                         st.write(f"M/X ratio: {metal_count/anion_count:.3f}")
                                 
                                 with struct_cols[1]:
                                     # Generate 3D preview
-                                    fig = generate_preview_figure(structure, metals, 
-                                                                 f"{config_id} (c/a={opt_result['best_c_ratio']:.2f})")
+                                    if is_half and kept_indices:
+                                        fig = generate_preview_figure_half_filling(
+                                            structure, metals, kept_indices,
+                                            f"{config_id} (c/a={opt_result['best_c_ratio']:.2f}, ½)")
+                                    else:
+                                        fig = generate_preview_figure(structure, metals, 
+                                                                     f"{config_id} (c/a={opt_result['best_c_ratio']:.2f})")
                                     fig.update_layout(height=350, width=400)
                                     st.plotly_chart(fig, use_container_width=True)
                             except Exception as e:
