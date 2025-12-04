@@ -33,6 +33,69 @@ from position_calculator import (
     scan_ca_for_best_regularity, RegularityScanResult, calculate_madelung_energy, MadelungResult
 )
 
+
+def expand_for_unit_cell_display(frac_coords: np.ndarray, tol: float = 1e-4) -> np.ndarray:
+    """
+    Expand fractional coordinates for unit cell visualization.
+    
+    Shows atoms on all faces of the unit cell box by adding periodic images
+    for positions near boundaries. This is for DISPLAY ONLY - does not affect
+    stoichiometry calculations.
+    
+    For each position, if a coordinate is near 0, show it also at 1 (far face).
+    If near 1, show it also at 0 (near face).
+    
+    Args:
+        frac_coords: (N, 3) array of fractional coordinates in [0, 1]
+        tol: Tolerance for boundary detection
+        
+    Returns:
+        Expanded array with boundary images for visualization
+    """
+    if len(frac_coords) == 0:
+        return frac_coords
+    
+    # First, wrap all coordinates to [0, 1)
+    wrapped = frac_coords % 1.0
+    
+    # Collect all expanded positions
+    expanded = []
+    
+    for pos in wrapped:
+        # Generate all boundary combinations for this position
+        # For each dimension, if near 0 add +1 image, if near 1 add -1 image
+        variants = [pos.copy()]
+        
+        for dim in range(3):
+            new_variants = []
+            for v in variants:
+                new_variants.append(v.copy())
+                # If close to 0, also show at 1
+                if v[dim] < tol:
+                    v_at_1 = v.copy()
+                    v_at_1[dim] = 1.0
+                    new_variants.append(v_at_1)
+                # If close to 1, also show at 0
+                elif v[dim] > 1.0 - tol:
+                    v_at_0 = v.copy()
+                    v_at_0[dim] = 0.0
+                    new_variants.append(v_at_0)
+            variants = new_variants
+        
+        expanded.extend(variants)
+    
+    # Remove duplicates
+    if len(expanded) == 0:
+        return np.empty((0, 3))
+    
+    expanded = np.array(expanded)
+    
+    # Round and remove duplicates
+    rounded = np.round(expanded, decimals=4)
+    unique_rows = np.unique(rounded, axis=0)
+    
+    return unique_rows
+
 st.set_page_config(
     page_title="Crystal Coordination Calculator",
     page_icon="🔬",
@@ -686,32 +749,39 @@ def generate_preview_figure(structure, metals: List[Dict], title: str = "") -> g
     
     metal_colors = ['blue', 'green', 'purple', 'orange', 'cyan', 'magenta']
     
-    # Plot metal atoms
+    # Plot metal atoms - expand for visualization
     if len(structure.metal_atoms.cartesian) > 0:
         unique_offsets = np.unique(structure.metal_atoms.offset_idx)
         
         for offset_idx in unique_offsets:
             mask = structure.metal_atoms.offset_idx == offset_idx
-            coords = structure.metal_atoms.cartesian[mask]
+            frac_coords = structure.metal_atoms.fractional[mask]
+            
+            # Expand for visualization (show on all unit cell faces)
+            expanded_frac = expand_for_unit_cell_display(frac_coords)
+            expanded_cart = expanded_frac @ lat_vecs
             
             symbol = metals[offset_idx]['symbol'] if offset_idx < len(metals) else f'M{offset_idx+1}'
             color = metal_colors[offset_idx % len(metal_colors)]
             
             fig.add_trace(go.Scatter3d(
-                x=coords[:, 0], y=coords[:, 1], z=coords[:, 2],
+                x=expanded_cart[:, 0], y=expanded_cart[:, 1], z=expanded_cart[:, 2],
                 mode='markers',
                 marker=dict(size=6, color=color, opacity=0.9),
                 name=symbol,
                 hoverinfo='name'
             ))
     
-    # Plot intersections
+    # Plot intersections - expand for visualization
     if len(structure.intersections.cartesian) > 0:
-        cart = structure.intersections.cartesian
-        mult = structure.intersections.multiplicity
+        frac = structure.intersections.fractional
+        
+        # Expand for visualization
+        expanded_frac = expand_for_unit_cell_display(frac)
+        expanded_cart = expanded_frac @ lat_vecs
         
         fig.add_trace(go.Scatter3d(
-            x=cart[:, 0], y=cart[:, 1], z=cart[:, 2],
+            x=expanded_cart[:, 0], y=expanded_cart[:, 1], z=expanded_cart[:, 2],
             mode='markers',
             marker=dict(size=4, color='red', symbol='diamond', opacity=0.7),
             name='Anions',
@@ -770,19 +840,23 @@ def generate_preview_figure_half_filling(structure, metals: List[Dict],
     
     metal_colors = ['blue', 'green', 'purple', 'orange', 'cyan', 'magenta']
     
-    # Plot metal atoms
+    # Plot metal atoms - expand for visualization
     if len(structure.metal_atoms.cartesian) > 0:
         unique_offsets = np.unique(structure.metal_atoms.offset_idx)
         
         for offset_idx in unique_offsets:
             mask = structure.metal_atoms.offset_idx == offset_idx
-            coords = structure.metal_atoms.cartesian[mask]
+            frac_coords = structure.metal_atoms.fractional[mask]
+            
+            # Expand for visualization
+            expanded_frac = expand_for_unit_cell_display(frac_coords)
+            expanded_cart = expanded_frac @ lat_vecs
             
             symbol = metals[offset_idx]['symbol'] if offset_idx < len(metals) else f'M{offset_idx+1}'
             color = metal_colors[offset_idx % len(metal_colors)]
             
             fig.add_trace(go.Scatter3d(
-                x=coords[:, 0], y=coords[:, 1], z=coords[:, 2],
+                x=expanded_cart[:, 0], y=expanded_cart[:, 1], z=expanded_cart[:, 2],
                 mode='markers',
                 marker=dict(size=6, color=color, opacity=0.9),
                 name=symbol,
@@ -797,11 +871,14 @@ def generate_preview_figure_half_filling(structure, metals: List[Dict],
         if len(unique_frac) > 0 and len(kept_indices) > 0:
             # Filter to kept indices
             kept_frac = unique_frac[kept_indices]
-            kept_cart = kept_frac @ lat_vecs
+            
+            # Expand for visualization
+            expanded_kept = expand_for_unit_cell_display(kept_frac)
+            expanded_kept_cart = expanded_kept @ lat_vecs
             
             # Kept sites in red (solid)
             fig.add_trace(go.Scatter3d(
-                x=kept_cart[:, 0], y=kept_cart[:, 1], z=kept_cart[:, 2],
+                x=expanded_kept_cart[:, 0], y=expanded_kept_cart[:, 1], z=expanded_kept_cart[:, 2],
                 mode='markers',
                 marker=dict(size=5, color='red', symbol='diamond', opacity=0.9),
                 name='Anions (kept)',
@@ -813,10 +890,13 @@ def generate_preview_figure_half_filling(structure, metals: List[Dict],
             removed_indices = list(all_indices - set(kept_indices))
             if removed_indices:
                 removed_frac = unique_frac[removed_indices]
-                removed_cart = removed_frac @ lat_vecs
+                
+                # Expand for visualization
+                expanded_removed = expand_for_unit_cell_display(removed_frac)
+                expanded_removed_cart = expanded_removed @ lat_vecs
                 
                 fig.add_trace(go.Scatter3d(
-                    x=removed_cart[:, 0], y=removed_cart[:, 1], z=removed_cart[:, 2],
+                    x=expanded_removed_cart[:, 0], y=expanded_removed_cart[:, 1], z=expanded_removed_cart[:, 2],
                     mode='markers',
                     marker=dict(size=3, color='gray', symbol='diamond', opacity=0.3),
                     name='Anions (removed)',
