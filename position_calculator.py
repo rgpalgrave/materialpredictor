@@ -765,7 +765,7 @@ def calculate_stoichiometry_for_config(
     lattice_type: str,
     metals: List[Dict],  # List of {'symbol': str, 'radius': float, ...}
     anion_symbol: str,
-    scale_s: float,
+    scale_s: float,  # Now interpreted as lattice parameter 'a' in Å
     target_cn: int,
     anion_radius: float = 1.40,
     cluster_eps_frac: float = 0.05
@@ -780,7 +780,7 @@ def calculate_stoichiometry_for_config(
         lattice_type: Lattice system (e.g., 'Cubic', 'Tetragonal')
         metals: List of metal definitions with 'symbol' and 'radius'
         anion_symbol: Anion symbol (e.g., 'O')
-        scale_s: Scale factor to use (typically s*)
+        scale_s: Lattice parameter 'a' in Å (what was previously s*)
         target_cn: Target coordination number for filtering intersections
         anion_radius: Anion ionic radius in Å
         cluster_eps_frac: Clustering tolerance
@@ -796,8 +796,9 @@ def calculate_stoichiometry_for_config(
         else:
             coord_radii = metal_radii[0] + anion_radius
         
-        # Set up lattice parameters
-        p_dict = {'a': 5.0, 'b_ratio': 1.0, 'c_ratio': 1.0,
+        # Set up lattice parameters with real 'a' value
+        a_real = scale_s  # scale_s is now the lattice parameter in Å
+        p_dict = {'a': a_real, 'b_ratio': 1.0, 'c_ratio': 1.0,
                   'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
         
         if lattice_type == 'Hexagonal':
@@ -814,15 +815,15 @@ def calculate_stoichiometry_for_config(
         sublattice = Sublattice(
             name='M',
             offsets=tuple(tuple(o) for o in offsets),
-            alpha_ratio=coord_radii,  # Using (r_metal + r_anion) in Å
+            alpha_ratio=coord_radii,  # Coordination radius in Å
             bravais_type=bravais_type
         )
         
-        # Calculate structure
+        # Calculate structure with scale = 1 since 'a' is already real
         structure = calculate_complete_structure(
             sublattices=[sublattice],
             p=p,
-            scale_s=scale_s,
+            scale_s=1.0,
             target_N=target_cn,
             k_samples=24,
             cluster_eps_frac=cluster_eps_frac,
@@ -1046,16 +1047,7 @@ def scan_ca_for_stoichiometry(
         c_ratios = np.linspace(c_ratio_min, c_ratio_max, n_points)
         
         for c_ratio in c_ratios:
-            # Set up lattice parameters
-            p_dict = {'a': 5.0, 'b_ratio': 1.0, 'c_ratio': c_ratio,
-                      'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
-            
-            if lattice_type == 'Hexagonal':
-                p_dict['gamma'] = 120.0
-            
-            p = LatticeParams(**p_dict)
-            
-            # Get s* for this c/a
+            # Get s* for this c/a - this is now the lattice parameter 'a' in Å
             s_star = compute_min_scale_for_cn(
                 config_offsets=offsets,
                 target_cn=target_cn,
@@ -1073,6 +1065,16 @@ def scan_ca_for_stoichiometry(
                     in_matching_range = False
                 continue
             
+            # Set up lattice parameters with real 'a' value
+            a_real = s_star  # s_star is the lattice parameter in Å
+            p_dict = {'a': a_real, 'b_ratio': 1.0, 'c_ratio': c_ratio,
+                      'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
+            
+            if lattice_type == 'Hexagonal':
+                p_dict['gamma'] = 120.0
+            
+            p = LatticeParams(**p_dict)
+            
             # Create sublattice and calculate structure
             sublattice = Sublattice(
                 name='M',
@@ -1084,7 +1086,7 @@ def scan_ca_for_stoichiometry(
             structure = calculate_complete_structure(
                 sublattices=[sublattice],
                 p=p,
-                scale_s=s_star,
+                scale_s=1.0,  # Scale = 1 since 'a' is already real
                 target_N=target_cn,
                 k_samples=24,
                 cluster_eps_frac=cluster_eps_frac,
@@ -1251,7 +1253,8 @@ def scan_ca_for_best_regularity(
                     scan_data.append((c_ratio, None, None))
                     continue
                 
-                # Build structure
+                # Build structure with real lattice parameter
+                # s_star is now the lattice param 'a' in Å
                 sublattice = Sublattice(
                     name='M',
                     offsets=tuple(tuple(o) for o in offsets),
@@ -1259,7 +1262,9 @@ def scan_ca_for_best_regularity(
                     bravais_type=bravais_type
                 )
                 
-                p_dict = {'a': 5.0, 'b_ratio': 1.0, 'c_ratio': c_ratio,
+                # Use s_star as lattice parameter, slightly larger to ensure intersections
+                a_real = s_star * 1.01
+                p_dict = {'a': a_real, 'b_ratio': 1.0, 'c_ratio': c_ratio,
                          'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
                 if lattice_type == 'Hexagonal':
                     p_dict['gamma'] = 120.0
@@ -1269,7 +1274,7 @@ def scan_ca_for_best_regularity(
                 structure = calculate_complete_structure(
                     sublattices=[sublattice],
                     p=p,
-                    scale_s=s_star * 1.01,  # Slightly above to ensure intersections
+                    scale_s=1.0,  # Scale = 1 since 'a' is already real
                     target_N=target_cn,
                     k_samples=24,
                     cluster_eps_frac=0.05,
@@ -2511,6 +2516,34 @@ def calculate_madelung_energy(
         else:
             madelung_constant = 0
         
+        # Sanity checks for unrealistic results
+        warning = None
+        
+        # Check for unrealistic Madelung constant (typical range: 1-5 for ionic crystals)
+        if abs(madelung_constant) > 10:
+            warning = f"Madelung constant {madelung_constant:.1f} is unrealistic (expected 1-5). Too many intersection sites?"
+        
+        # Check for anions too close together (indicates spurious intersections)
+        if n_anions > 1:
+            min_anion_anion_dist = float('inf')
+            for i in range(n_anions):
+                for j in range(i + 1, n_anions):
+                    d = np.linalg.norm(anion_cart[i] - anion_cart[j])
+                    if d > 0.1:
+                        min_anion_anion_dist = min(min_anion_anion_dist, d)
+            
+            # Anions should typically be > 2 Å apart
+            if min_anion_anion_dist < 1.5:
+                warning = f"Anions only {min_anion_anion_dist:.2f} Å apart - likely spurious intersections"
+        
+        # Check M/X ratio is reasonable (expect integer or simple fraction)
+        mx_ratio = n_cations / n_anions if n_anions > 0 else 0
+        # Common ratios: 1:1, 1:2, 2:1, 2:3, 3:2, 1:3, 3:1
+        common_ratios = [0.333, 0.5, 0.667, 1.0, 1.5, 2.0, 3.0]
+        is_common = any(abs(mx_ratio - r) < 0.1 for r in common_ratios)
+        if not is_common and warning is None:
+            warning = f"Unusual M/X ratio {mx_ratio:.2f} - may indicate spurious sites"
+        
         return MadelungResult(
             energy_per_formula=energy_per_formula,
             energy_per_atom=energy_per_atom,
@@ -2520,7 +2553,7 @@ def calculate_madelung_energy(
             n_anions=n_anions,
             formula_units=formula_units,
             success=True,
-            error=None
+            error=warning  # Use error field for warnings too
         )
     
     except Exception as e:

@@ -383,17 +383,20 @@ def run_full_analysis_chain(
             config_data = scale_results[config_id]
             
             try:
-                # Build structure
+                # Build structure with real lattice parameter
+                # In the new model, s_star IS the lattice parameter 'a' in Å
                 offsets = config_data['offsets']
                 sublattice = Sublattice(
                     name='analysis',
                     offsets=tuple(tuple(o) for o in offsets),
-                    alpha_ratio=coord_radii,  # Now using (r_metal + r_anion) in Å
+                    alpha_ratio=coord_radii,  # Coordination radius in Å (r_metal + r_anion)
                     bravais_type=config_data['bravais_type']
                 )
                 
                 lattice_type = config_data['lattice']
-                p_dict = {'a': 5.0, 'b_ratio': 1.0, 'c_ratio': 1.0,
+                a_real = config_data['s_star']  # s* is now the lattice parameter in Å
+                
+                p_dict = {'a': a_real, 'b_ratio': 1.0, 'c_ratio': 1.0,
                           'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
                 if lattice_type == 'Hexagonal':
                     p_dict['gamma'] = 120.0
@@ -404,7 +407,7 @@ def run_full_analysis_chain(
                 structure = calculate_complete_structure(
                     sublattices=[sublattice],
                     p=p,
-                    scale_s=config_data['s_star'],
+                    scale_s=1.0,  # Scale of 1.0 since lattice param already set correctly
                     target_N=target_cn,
                     k_samples=32,
                     cluster_eps_frac=0.05,
@@ -450,7 +453,7 @@ def run_full_analysis_chain(
             config_data = scale_results[config_id]
             
             try:
-                # Build structure
+                # Build structure with real lattice parameter (s* = a in Å)
                 offsets = config_data['offsets']
                 sublattice = Sublattice(
                     name='analysis',
@@ -460,7 +463,9 @@ def run_full_analysis_chain(
                 )
                 
                 lattice_type = config_data['lattice']
-                p_dict = {'a': 5.0, 'b_ratio': 1.0, 'c_ratio': 1.0,
+                a_real = config_data['s_star']  # s* is the lattice parameter 'a' in Å
+                
+                p_dict = {'a': a_real, 'b_ratio': 1.0, 'c_ratio': 1.0,
                           'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
                 if lattice_type == 'Hexagonal':
                     p_dict['gamma'] = 120.0
@@ -471,7 +476,7 @@ def run_full_analysis_chain(
                 structure = calculate_complete_structure(
                     sublattices=[sublattice],
                     p=p,
-                    scale_s=config_data['s_star'],
+                    scale_s=1.0,  # Scale = 1 since 'a' is already the real value
                     target_N=target_cn,
                     k_samples=32,
                     cluster_eps_frac=0.05,
@@ -1065,10 +1070,21 @@ def main():
             
             for entry in exact_matches:
                 config_id = entry['config_id']
-                s_star = entry['s_star']
+                s_star = entry['s_star']  # This is now the lattice parameter 'a' in Å
                 lattice = entry['lattice']
                 formula = entry['formula']
                 pattern = entry.get('pattern', '')
+                
+                # Calculate lattice parameters based on lattice type
+                # s_star is now 'a' in Å
+                a_param = s_star
+                c_ratio = 1.0
+                if lattice == 'Hexagonal':
+                    c_ratio = 1.633  # Ideal for HCP-like
+                elif lattice == 'Tetragonal':
+                    c_ratio = 1.0  # Could be varied
+                b_param = a_param  # b = a for most systems
+                c_param = a_param * c_ratio
                 
                 # Get regularity data
                 reg_data = regularity_results.get(config_id, {})
@@ -1079,19 +1095,32 @@ def main():
                 # Get Madelung constant for expander title
                 madelung_str = ""
                 if madelung_result and madelung_result.success:
-                    madelung_str = f" — M={madelung_result.madelung_constant:.3f}"
+                    if madelung_result.error:  # Has warning
+                        madelung_str = f" — M=⚠️"
+                    else:
+                        madelung_str = f" — M={madelung_result.madelung_constant:.3f}"
+                
+                # Format lattice params for title
+                if lattice == 'Cubic':
+                    lattice_str = f"a={a_param:.2f}Å"
+                else:
+                    lattice_str = f"a={a_param:.2f}Å, c={c_param:.2f}Å"
                 
                 # Create expander for each match
-                with st.expander(f"**{config_id}** — {lattice} — s*={s_star:.4f} — Regularity: {mean_reg:.2f}{madelung_str}", expanded=True):
+                with st.expander(f"**{config_id}** — {lattice} — {lattice_str} — Regularity: {mean_reg:.2f}{madelung_str}", expanded=True):
                     
                     # Two columns: info + 3D preview
                     info_col, preview_col = st.columns([2, 1])
                     
                     with info_col:
-                        # Key metrics
+                        # Key metrics - now showing lattice parameters
                         met_cols = st.columns(5)
                         with met_cols[0]:
-                            st.metric("Scale Factor (s*)", f"{s_star:.4f}")
+                            if lattice == 'Cubic':
+                                st.metric("a = b = c", f"{a_param:.3f} Å")
+                            else:
+                                st.metric("a (Å)", f"{a_param:.3f}",
+                                         help=f"b = {b_param:.3f} Å, c = {c_param:.3f} Å")
                         with met_cols[1]:
                             st.metric("Lattice", lattice)
                         with met_cols[2]:
@@ -1100,8 +1129,13 @@ def main():
                             st.metric("Regularity", f"{mean_reg:.3f}")
                         with met_cols[4]:
                             if madelung_result and madelung_result.success:
-                                st.metric("Madelung", f"{madelung_result.madelung_constant:.3f}",
-                                         help=f"Energy: {madelung_result.energy_per_formula:.2f} eV/f.u.")
+                                # Check for warnings (stored in error field)
+                                if madelung_result.error:
+                                    st.metric("Madelung", f"⚠️ {madelung_result.madelung_constant:.1f}",
+                                             help=f"⚠️ {madelung_result.error}")
+                                else:
+                                    st.metric("Madelung", f"{madelung_result.madelung_constant:.3f}",
+                                             help=f"Energy: {madelung_result.energy_per_formula:.2f} eV/f.u.")
                             else:
                                 st.metric("Madelung", "—")
                         
@@ -1145,10 +1179,17 @@ def main():
             
             for entry in half_matches:
                 config_id = entry['config_id']
-                s_star = entry['s_star']
+                s_star = entry['s_star']  # This is now the lattice parameter 'a' in Å
                 lattice = entry['lattice']
                 formula = entry['formula']
                 pattern = entry.get('pattern', '')
+                
+                # Calculate lattice parameters
+                a_param = s_star
+                c_ratio = 1.0
+                if lattice == 'Hexagonal':
+                    c_ratio = 1.633
+                c_param = a_param * c_ratio
                 
                 # Get half-filling optimization data
                 hf_data = half_filling_results.get(config_id, {})
@@ -1163,10 +1204,19 @@ def main():
                 # Get Madelung constant for expander title
                 madelung_str = ""
                 if madelung_result and madelung_result.success:
-                    madelung_str = f" — M={madelung_result.madelung_constant:.3f}"
+                    if madelung_result.error:  # Has warning
+                        madelung_str = f" — M=⚠️"
+                    else:
+                        madelung_str = f" — M={madelung_result.madelung_constant:.3f}"
+                
+                # Format lattice params for title
+                if lattice == 'Cubic':
+                    lattice_str = f"a={a_param:.2f}Å"
+                else:
+                    lattice_str = f"a={a_param:.2f}Å, c={c_param:.2f}Å"
                 
                 # Create expander for each half-filling match
-                with st.expander(f"**{config_id}** — {lattice} — s*={s_star:.4f} — Regularity: {reg_after:.2f} (after ½){madelung_str}", expanded=True):
+                with st.expander(f"**{config_id}** — {lattice} — {lattice_str} — Regularity: {reg_after:.2f} (after ½){madelung_str}", expanded=True):
                     
                     # Two columns: info + 3D preview
                     info_col, preview_col = st.columns([2, 1])
@@ -1175,7 +1225,11 @@ def main():
                         # Key metrics - 6 columns for half-filling with Madelung
                         met_cols = st.columns(6)
                         with met_cols[0]:
-                            st.metric("Scale Factor (s*)", f"{s_star:.4f}")
+                            if lattice == 'Cubic':
+                                st.metric("a = b = c", f"{a_param:.3f} Å")
+                            else:
+                                st.metric("a (Å)", f"{a_param:.3f}",
+                                         help=f"c = {c_param:.3f} Å")
                         with met_cols[1]:
                             st.metric("Lattice", lattice)
                         with met_cols[2]:
@@ -1189,8 +1243,13 @@ def main():
                             st.metric("Reg. After", f"{reg_after:.3f}", delta=delta_str)
                         with met_cols[5]:
                             if madelung_result and madelung_result.success:
-                                st.metric("Madelung", f"{madelung_result.madelung_constant:.3f}",
-                                         help=f"Energy: {madelung_result.energy_per_formula:.2f} eV/f.u.")
+                                # Check for warnings (stored in error field)
+                                if madelung_result.error:
+                                    st.metric("Madelung", f"⚠️ {madelung_result.madelung_constant:.1f}",
+                                             help=f"⚠️ {madelung_result.error}")
+                                else:
+                                    st.metric("Madelung", f"{madelung_result.madelung_constant:.3f}",
+                                             help=f"Energy: {madelung_result.energy_per_formula:.2f} eV/f.u.")
                             else:
                                 st.metric("Madelung", "—")
                         
@@ -1451,7 +1510,10 @@ def main():
                                     bravais_type=bravais
                                 )
                                 
-                                p_dict = {'a': 5.0, 'b_ratio': 1.0, 
+                                # s* is the lattice parameter 'a' in Å
+                                a_real = opt_result['best_s_star']
+                                
+                                p_dict = {'a': a_real, 'b_ratio': 1.0, 
                                          'c_ratio': opt_result['best_c_ratio'],
                                          'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
                                 if lattice == 'Hexagonal':
@@ -1462,7 +1524,7 @@ def main():
                                 structure = calculate_complete_structure(
                                     sublattices=[sublattice],
                                     p=p,
-                                    scale_s=opt_result['best_s_star'],
+                                    scale_s=1.0,  # Scale = 1 since 'a' is already the real value
                                     target_N=target_cn,
                                     k_samples=32,
                                     cluster_eps_frac=0.05,
@@ -2258,13 +2320,14 @@ def main():
                 st.rerun()
         
         with uc_cols[1]:
-            uc_scale_s = st.number_input(
-                "Scale factor s",
-                min_value=0.1,
-                max_value=2.0,
+            # In the new model, s* is the lattice parameter 'a' in Å
+            uc_lattice_a = st.number_input(
+                "Lattice param a (Å)",
+                min_value=2.0,
+                max_value=15.0,
                 value=float(selected_config['s_star']),
-                step=0.01,
-                key='uc_scale_s'
+                step=0.1,
+                key='uc_scale_s'  # Keep key for backward compat
             )
         
         with uc_cols[2]:
@@ -2330,13 +2393,16 @@ def main():
                     sublattice = Sublattice(
                         name='M',
                         offsets=tuple(tuple(o) for o in offsets),
-                        alpha_ratio=stored_coord_radii,  # Now using coordination radii
+                        alpha_ratio=stored_coord_radii,  # Coordination radii in Å
                         bravais_type=bravais
                     )
                     
+                    # Use user-specified lattice parameter 'a'
+                    a_real = uc_lattice_a  # This is the lattice param in Å
+                    
                     # Determine lattice type and set parameters
                     lattice_type = config_data.get('lattice', 'Cubic')
-                    p_dict = {'a': 5.0, 'b_ratio': 1.0, 'c_ratio': 1.0,
+                    p_dict = {'a': a_real, 'b_ratio': 1.0, 'c_ratio': 1.0,
                               'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
                     
                     if lattice_type == 'Hexagonal':
@@ -2351,11 +2417,11 @@ def main():
                     
                     p = LatticeParams(**p_dict)
                     
-                    # Calculate structure
+                    # Calculate structure with scale = 1 since 'a' is already real
                     structure = calculate_complete_structure(
                         sublattices=[sublattice],
                         p=p,
-                        scale_s=uc_scale_s,
+                        scale_s=1.0,
                         target_N=uc_target_n,
                         k_samples=32,
                         cluster_eps_frac=cluster_eps,

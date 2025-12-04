@@ -211,12 +211,18 @@ def pair_circle_samples(c1: np.ndarray, r1: float, c2: np.ndarray, r2: float,
 
 
 def build_centers_and_radii(sublattices: List[Sublattice], p: LatticeParams, 
-                            scale_s: float) -> Tuple[np.ndarray, np.ndarray]:
+                            scale_s: float = None) -> Tuple[np.ndarray, np.ndarray]:
     """
     Build arrays of sphere centers and radii from sublattices.
     
-    The alpha value is interpreted as the coordination radius in Å (typically r_metal + r_anion).
-    The actual sphere radius is: scale_s × coord_radius
+    NEW MODEL (when scale_s is None):
+        The lattice parameter 'a' in LatticeParams IS the scale factor.
+        Sphere radius = coord_radius (fixed at r_metal + r_anion).
+        This means s* directly gives the predicted lattice parameter in Å.
+    
+    LEGACY MODEL (when scale_s is provided):
+        Uses fixed a=5.0, sphere radius = scale_s × coord_radius.
+        For backward compatibility only.
     """
     lat_vecs = lattice_vectors(p)
     centers = []
@@ -228,8 +234,13 @@ def build_centers_and_radii(sublattices: List[Sublattice], p: LatticeParams,
         for pos, coord_radius in all_positions_with_alpha:
             cart = frac_to_cart(np.array(pos), lat_vecs)
             centers.append(cart)
-            # coord_radius is in Å (r_metal + r_anion), scale_s is the common scale factor
-            radii.append(coord_radius * scale_s)
+            
+            if scale_s is None:
+                # NEW MODEL: coord_radius is the actual sphere radius in Å
+                radii.append(coord_radius)
+            else:
+                # LEGACY MODEL: radius = scale_s × coord_radius
+                radii.append(coord_radius * scale_s)
     
     return np.array(centers), np.array(radii)
 
@@ -265,17 +276,39 @@ def periodic_candidate_pairs(centers: np.ndarray, shifts: np.ndarray,
 def max_multiplicity_for_scale(sublattices: List[Sublattice], p: LatticeParams,
                                scale_s: float, k_samples: int = 16,
                                tol_inside: float = 1e-3,
-                               early_stop_at: Optional[int] = None) -> Tuple[int, np.ndarray, np.ndarray]:
+                               early_stop_at: Optional[int] = None,
+                               use_new_model: bool = True) -> Tuple[int, np.ndarray, np.ndarray]:
     """
     Find maximum intersection multiplicity for a given scale factor.
+    
+    NEW MODEL (use_new_model=True):
+        scale_s IS the lattice parameter 'a' in Ångströms.
+        Sphere radii are fixed at coord_radius (ionic radii sum).
+        
+    LEGACY MODEL (use_new_model=False):
+        Uses p.a as lattice param, scale_s multiplies coord_radius.
     
     Returns:
         max_mult: Maximum multiplicity found
         positions: Array of sample positions with high multiplicity
         multiplicities: Multiplicity at each position
     """
-    lat_vecs = lattice_vectors(p)
-    centers, radii = build_centers_and_radii(sublattices, p, scale_s)
+    if use_new_model:
+        # NEW MODEL: scale_s is the lattice parameter
+        p_scaled = LatticeParams(
+            a=scale_s,
+            b_ratio=p.b_ratio,
+            c_ratio=p.c_ratio,
+            alpha=p.alpha,
+            beta=p.beta,
+            gamma=p.gamma
+        )
+        lat_vecs = lattice_vectors(p_scaled)
+        centers, radii = build_centers_and_radii(sublattices, p_scaled, scale_s=None)
+    else:
+        # LEGACY MODEL: fixed a, scale_s multiplies radius
+        lat_vecs = lattice_vectors(p)
+        centers, radii = build_centers_and_radii(sublattices, p, scale_s)
     
     if len(centers) == 0:
         return 0, np.empty((0, 3)), np.empty(0)
@@ -341,68 +374,138 @@ def max_multiplicity_for_scale(sublattices: List[Sublattice], p: LatticeParams,
 
 
 def find_threshold_s_for_N(sublattices: List[Sublattice], p: LatticeParams,
-                           target_N: int, s_min: float = 0.01, s_max: float = 3.0,
+                           target_N: int, s_min: float = 2.0, s_max: float = 15.0,
                            k_samples_coarse: int = 8, k_samples_fine: int = 16,
-                           tol_inside: float = 1e-3, max_iter: int = 25) -> Optional[float]:
+                           tol_inside: float = 1e-3, max_iter: int = 25,
+                           use_new_model: bool = True) -> Optional[float]:
     """
-    Find minimum scale factor s* such that max_multiplicity >= target_N.
+    Find the lattice parameter 'a' where spheres just touch to give target_N intersections.
     Uses coarse sweep followed by bisection.
     
-    Note: s_max default is 3.0 to accommodate physical ionic radii models where
-    coordination radius (r_cation + r_anion) can be ~2 Å with lattice param ~5 Å.
-    
-    Returns None if target cannot be achieved within s_max.
-    """
-    # Coarse sweep to find initial bounds
-    s_hi = None
-    for s in np.linspace(s_min, s_max, 20):
-        m, _, _ = max_multiplicity_for_scale(
-            sublattices, p, s,
-            k_samples=k_samples_coarse,
-            tol_inside=tol_inside,
-            early_stop_at=target_N
-        )
-        if m >= target_N:
-            s_hi = s
-            break
-    
-    if s_hi is None:
-        return None
-    
-    # Refine lower bound
-    s_lo = s_min
-    for s in np.linspace(s_min, s_hi, 15):
-        m, _, _ = max_multiplicity_for_scale(
-            sublattices, p, s,
-            k_samples=k_samples_coarse,
-            tol_inside=tol_inside,
-            early_stop_at=target_N
-        )
-        if m < target_N:
-            s_lo = s
-        else:
-            s_hi = s
-            break
-    
-    # Bisection
-    for _ in range(max_iter):
-        mid = 0.5 * (s_lo + s_hi)
-        if (s_hi - s_lo) < 1e-5:
-            break
+    NEW MODEL (use_new_model=True, default):
+        s* IS the lattice parameter 'a' in Ångströms.
+        Default range 2-15 Å covers typical ionic crystal lattice constants.
+        Sphere radii are fixed at coord_radius (r_cation + r_anion).
         
-        ks = k_samples_coarse if (s_hi - s_lo) > 0.02 else k_samples_fine
-        m, _, _ = max_multiplicity_for_scale(
-            sublattices, p, mid,
-            k_samples=ks,
-            tol_inside=tol_inside,
-            early_stop_at=target_N
-        )
-        if m >= target_N:
-            s_hi = mid
-        else:
-            s_lo = mid
+        Key insight: Larger 'a' → less sphere overlap → lower multiplicity.
+        We find the MAXIMUM 'a' where multiplicity >= target_N.
+        
+    LEGACY MODEL (use_new_model=False):
+        s* is a dimensionless multiplier for sphere radius.
+        Larger s → more overlap → find MINIMUM s for target.
     
-    return s_hi
+    Returns None if target cannot be achieved within range.
+    """
+    if use_new_model:
+        # NEW MODEL: Find MAXIMUM 'a' where multiplicity >= target_N
+        # Start from high 'a' and work down to find where CN is first achieved
+        s_lo = None
+        for s in np.linspace(s_max, s_min, 20):
+            m, _, _ = max_multiplicity_for_scale(
+                sublattices, p, s,
+                k_samples=k_samples_coarse,
+                tol_inside=tol_inside,
+                early_stop_at=target_N,
+                use_new_model=use_new_model
+            )
+            if m >= target_N:
+                s_lo = s
+                break
+        
+        if s_lo is None:
+            return None
+        
+        # Refine upper bound - find where multiplicity drops below target
+        s_hi = s_max
+        for s in np.linspace(s_lo, s_max, 15):
+            m, _, _ = max_multiplicity_for_scale(
+                sublattices, p, s,
+                k_samples=k_samples_coarse,
+                tol_inside=tol_inside,
+                early_stop_at=target_N,
+                use_new_model=use_new_model
+            )
+            if m >= target_N:
+                s_lo = s
+            else:
+                s_hi = s
+                break
+        
+        # Bisection to find the transition point
+        for _ in range(max_iter):
+            mid = 0.5 * (s_lo + s_hi)
+            if (s_hi - s_lo) < 1e-4:
+                break
+            
+            ks = k_samples_coarse if (s_hi - s_lo) > 0.1 else k_samples_fine
+            m, _, _ = max_multiplicity_for_scale(
+                sublattices, p, mid,
+                k_samples=ks,
+                tol_inside=tol_inside,
+                early_stop_at=target_N,
+                use_new_model=use_new_model
+            )
+            if m >= target_N:
+                s_lo = mid  # Can go larger
+            else:
+                s_hi = mid  # Too large, multiplicity dropped
+        
+        return s_lo  # Return max 'a' where target is still achieved
+    
+    else:
+        # LEGACY MODEL: Find MINIMUM s* where multiplicity >= target_N
+        s_hi = None
+        for s in np.linspace(s_min, s_max, 20):
+            m, _, _ = max_multiplicity_for_scale(
+                sublattices, p, s,
+                k_samples=k_samples_coarse,
+                tol_inside=tol_inside,
+                early_stop_at=target_N,
+                use_new_model=use_new_model
+            )
+            if m >= target_N:
+                s_hi = s
+                break
+        
+        if s_hi is None:
+            return None
+        
+        # Refine lower bound
+        s_lo = s_min
+        for s in np.linspace(s_min, s_hi, 15):
+            m, _, _ = max_multiplicity_for_scale(
+                sublattices, p, s,
+                k_samples=k_samples_coarse,
+                tol_inside=tol_inside,
+                early_stop_at=target_N,
+                use_new_model=use_new_model
+            )
+            if m < target_N:
+                s_lo = s
+            else:
+                s_hi = s
+                break
+        
+        # Bisection
+        for _ in range(max_iter):
+            mid = 0.5 * (s_lo + s_hi)
+            if (s_hi - s_lo) < 1e-4:
+                break
+            
+            ks = k_samples_coarse if (s_hi - s_lo) > 0.1 else k_samples_fine
+            m, _, _ = max_multiplicity_for_scale(
+                sublattices, p, mid,
+                k_samples=ks,
+                tol_inside=tol_inside,
+                early_stop_at=target_N,
+                use_new_model=use_new_model
+            )
+            if m >= target_N:
+                s_hi = mid
+            else:
+                s_lo = mid
+        
+        return s_hi
 
 
 def compute_min_scale_for_cn(config_offsets: List[Tuple[float, float, float]],
@@ -412,21 +515,28 @@ def compute_min_scale_for_cn(config_offsets: List[Tuple[float, float, float]],
                              bravais_type: Optional[str] = None,
                              lattice_params: Optional[dict] = None) -> Optional[float]:
     """
-    Compute minimum scale factor for a specific lattice configuration to achieve target CN.
+    Compute minimum lattice parameter 'a' for a configuration to achieve target CN.
+    
+    NEW MODEL:
+        Returns s* = lattice parameter 'a' in Ångströms where coord_radius-sized 
+        spheres create intersections of the target multiplicity.
+        The alpha_ratio parameter is now interpreted as the coordination radius
+        (r_cation + r_anion) in Ångströms, NOT as a fraction.
     
     Args:
         config_offsets: List of fractional coordinate offsets
         target_cn: Target coordination number (intersection multiplicity)
         lattice_type: 'Cubic', 'Tetragonal', 'Hexagonal', etc.
-        alpha_ratio: r = alpha * s * a (single value for all, or tuple/list of per-offset values)
+        alpha_ratio: Coordination radius in Å (r_metal + r_anion), single or per-offset
         bravais_type: Specific Bravais type (e.g., 'cubic_F', 'tetragonal_I')
         lattice_params: Optional dict with 'b_ratio', 'c_ratio', 'alpha', 'beta', 'gamma'
     
     Returns:
-        Minimum scale factor s*, or None if not achievable
+        Lattice parameter 'a' in Ångströms, or None if not achievable
     """
-    # Set up lattice parameters based on type
-    params = {'a': 5.0, 'b_ratio': 1.0, 'c_ratio': 1.0, 
+    # Set up lattice parameters - note 'a' is not used (it's what we're finding)
+    # We only need the ratios and angles
+    params = {'a': 1.0, 'b_ratio': 1.0, 'c_ratio': 1.0, 
               'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
     
     if lattice_type == 'Hexagonal':
@@ -439,7 +549,7 @@ def compute_min_scale_for_cn(config_offsets: List[Tuple[float, float, float]],
     elif lattice_type == 'Monoclinic':
         params['beta'] = 100.0
     
-    # Override with user params
+    # Override with user params (but 'a' doesn't matter for the search)
     if lattice_params:
         params.update(lattice_params)
     
@@ -453,7 +563,7 @@ def compute_min_scale_for_cn(config_offsets: List[Tuple[float, float, float]],
     if isinstance(alpha_ratio, list):
         alpha_ratio = tuple(alpha_ratio)
     
-    # Create sublattice
+    # Create sublattice - alpha_ratio is now coordination radius in Å
     sub = Sublattice(
         name='M',
         offsets=tuple(tuple(o) for o in config_offsets),
@@ -461,8 +571,8 @@ def compute_min_scale_for_cn(config_offsets: List[Tuple[float, float, float]],
         bravais_type=bravais_type
     )
     
-    # Find threshold
-    s_star = find_threshold_s_for_N([sub], p, target_cn)
+    # Find threshold - s_star is now the lattice parameter in Å
+    s_star = find_threshold_s_for_N([sub], p, target_cn, use_new_model=True)
     return s_star
 
 
@@ -545,8 +655,8 @@ def scan_c_ratio_for_min_scale(
             'scan_results': List of (c_ratio, s_star, volume, metric) tuples from all scans
             'scan_history': Dict with results from each scan level
     """
-    # Set up base lattice parameters
-    params = {'a': 5.0, 'b_ratio': 1.0, 'c_ratio': 1.0, 
+    # Set up base lattice parameters (ratios and angles only, 'a' will be determined by s*)
+    params = {'a': 1.0, 'b_ratio': 1.0, 'c_ratio': 1.0, 
               'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
     
     if lattice_type == 'Hexagonal':
@@ -565,9 +675,8 @@ def scan_c_ratio_for_min_scale(
     all_results = []
     scan_history = {}
     
-    def compute_volume(c_ratio: float, b_ratio: float = 1.0) -> float:
-        """Compute unit cell volume. For tetragonal/hex: a²c, for ortho: abc."""
-        a = params['a']
+    def compute_volume(a: float, c_ratio: float, b_ratio: float = 1.0) -> float:
+        """Compute unit cell volume using real 'a' value. a is now in Å."""
         b = a * b_ratio
         c = a * c_ratio
         
@@ -596,16 +705,19 @@ def scan_c_ratio_for_min_scale(
             bravais_type=bravais_type
         )
         
+        # s_star is now the lattice parameter 'a' in Å
         s_star = find_threshold_s_for_N([sub], p, target_cn)
-        volume = compute_volume(c_ratio, params.get('b_ratio', 1.0))
         
+        # Use s_star as the actual 'a' value for volume calculation
         if s_star is not None:
+            volume = compute_volume(s_star, c_ratio, params.get('b_ratio', 1.0))
             if optimize_metric == 's3_over_volume':
                 # s³/V is proportional to packing fraction
                 metric = (s_star ** 3) / volume
             else:
                 metric = s_star
         else:
+            volume = 0
             metric = None
         
         return s_star, volume, metric
