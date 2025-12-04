@@ -318,7 +318,7 @@ def run_full_analysis_chain(
                     scale_s=config_data['s_star'],
                     target_cn=target_cn,
                     anion_radius=anion_radius,  # Pass anion radius for coordination calculation
-                    cluster_eps_frac=0.05
+                    cluster_eps_frac=0.03
                 )
                 stoich_results[config_id] = stoich_result
             except Exception:
@@ -490,7 +490,7 @@ def run_full_analysis_chain(
                     scale_s=1.0,  # Scale of 1.0 since lattice param already set correctly
                     target_N=target_cn,
                     k_samples=32,
-                    cluster_eps_frac=0.05,
+                    cluster_eps_frac=0.03,
                     include_boundary_equivalents=True
                 )
                 
@@ -560,7 +560,7 @@ def run_full_analysis_chain(
                     scale_s=1.0,  # Scale = 1 since 'a' is already the real value
                     target_N=target_cn,
                     k_samples=32,
-                    cluster_eps_frac=0.05,
+                    cluster_eps_frac=0.03,
                     include_boundary_equivalents=True
                 )
                 
@@ -1654,7 +1654,7 @@ def main():
                                     scale_s=1.0,  # Scale = 1 since 'a' is already the real value
                                     target_N=target_cn,
                                     k_samples=32,
-                                    cluster_eps_frac=0.05,
+                                    cluster_eps_frac=0.03,
                                     include_boundary_equivalents=True
                                 )
                                 
@@ -1884,7 +1884,7 @@ def main():
                                 scale_s=config_data['s_star'],
                                 target_cn=target_cn,
                                 anion_radius=anion_rad,
-                                cluster_eps_frac=0.05
+                                cluster_eps_frac=0.03
                             )
                             stoich_results[config_id] = result
                         
@@ -2761,7 +2761,7 @@ def main():
                                 scale_s=s_physical,
                                 target_N=expected_cn,
                                 k_samples=32,
-                                cluster_eps_frac=0.05,
+                                cluster_eps_frac=0.03,
                                 include_boundary_equivalents=True
                             )
                             

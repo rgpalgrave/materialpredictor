@@ -485,7 +485,7 @@ def calculate_complete_structure(
     scale_s: float,
     target_N: Optional[int] = None,
     k_samples: int = 24,
-    cluster_eps_frac: float = 0.05,
+    cluster_eps_frac: float = 0.03,
     include_boundary_equivalents: bool = True
 ) -> CompleteStructureData:
     """
@@ -772,7 +772,7 @@ def calculate_stoichiometry_for_config(
     scale_s: float,  # Now interpreted as lattice parameter 'a' in Å
     target_cn: int,
     anion_radius: float = 1.40,
-    cluster_eps_frac: float = 0.05
+    cluster_eps_frac: float = 0.03
 ) -> StoichiometryResult:
     """
     Calculate stoichiometry for a single configuration.
@@ -1001,7 +1001,7 @@ def scan_ca_for_stoichiometry(
     c_ratio_min: float = 0.5,
     c_ratio_max: float = 2.0,
     n_points: int = 50,
-    cluster_eps_frac: float = 0.05,
+    cluster_eps_frac: float = 0.03,
     tolerance: float = 0.1,
     check_half_filling: bool = True
 ) -> StoichiometryScanResult:
@@ -1284,7 +1284,7 @@ def scan_ca_for_best_regularity(
                     scale_s=1.0,  # Scale = 1 since 'a' is already real
                     target_N=target_cn,
                     k_samples=24,
-                    cluster_eps_frac=0.05,
+                    cluster_eps_frac=0.03,
                     include_boundary_equivalents=True
                 )
                 
