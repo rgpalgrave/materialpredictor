@@ -341,12 +341,15 @@ def max_multiplicity_for_scale(sublattices: List[Sublattice], p: LatticeParams,
 
 
 def find_threshold_s_for_N(sublattices: List[Sublattice], p: LatticeParams,
-                           target_N: int, s_min: float = 0.01, s_max: float = 1.5,
+                           target_N: int, s_min: float = 0.01, s_max: float = 3.0,
                            k_samples_coarse: int = 8, k_samples_fine: int = 16,
                            tol_inside: float = 1e-3, max_iter: int = 25) -> Optional[float]:
     """
     Find minimum scale factor s* such that max_multiplicity >= target_N.
     Uses coarse sweep followed by bisection.
+    
+    Note: s_max default is 3.0 to accommodate physical ionic radii models where
+    coordination radius (r_cation + r_anion) can be ~2 Å with lattice param ~5 Å.
     
     Returns None if target cannot be achieved within s_max.
     """

@@ -976,6 +976,7 @@ class StoichiometryScanResult:
     best_s_star: Optional[float]
     best_mx_ratio: Optional[float]  # Achieved M/X ratio
     best_mx_error: Optional[float]  # |achieved - target|
+    is_half_filling_match: bool  # Whether best match uses half the anion sites
     matching_ranges: List[Tuple[float, float]]  # c/a ranges where stoichiometry matches
     scan_data: List[Tuple[float, float, float, float]]  # (c/a, s*, M/X, error)
     success: bool
@@ -1040,6 +1041,7 @@ def scan_ca_for_stoichiometry(
         best_s_star = None
         best_mx_ratio = None
         best_mx_error = float('inf')
+        best_is_half_filling = False
         
         c_ratios = np.linspace(c_ratio_min, c_ratio_max, n_points)
         
@@ -1104,6 +1106,7 @@ def scan_ca_for_stoichiometry(
             # Calculate M/X ratio (also check half-filling)
             mx_ratio = metal_count / anion_count
             mx_error = abs(mx_ratio - target_mx_ratio) / target_mx_ratio if target_mx_ratio > 0 else float('inf')
+            is_half_filling = False
             
             # Check half-filling case
             if check_half_filling:
@@ -1113,6 +1116,7 @@ def scan_ca_for_stoichiometry(
                 if mx_error_half < mx_error:
                     mx_ratio = mx_ratio_half
                     mx_error = mx_error_half
+                    is_half_filling = True
             
             scan_data.append((c_ratio, s_star, mx_ratio, mx_error))
             
@@ -1122,6 +1126,7 @@ def scan_ca_for_stoichiometry(
                 best_c_ratio = c_ratio
                 best_s_star = s_star
                 best_mx_ratio = mx_ratio
+                best_is_half_filling = is_half_filling
             
             # Track matching ranges
             is_match = mx_error <= tolerance
@@ -1143,6 +1148,7 @@ def scan_ca_for_stoichiometry(
             best_s_star=best_s_star,
             best_mx_ratio=best_mx_ratio,
             best_mx_error=best_mx_error if best_mx_error != float('inf') else None,
+            is_half_filling_match=best_is_half_filling,
             matching_ranges=matching_ranges,
             scan_data=scan_data,
             success=best_c_ratio is not None,
@@ -1157,7 +1163,167 @@ def scan_ca_for_stoichiometry(
             best_s_star=None,
             best_mx_ratio=None,
             best_mx_error=None,
+            is_half_filling_match=False,
             matching_ranges=[],
+            scan_data=[],
+            success=False,
+            error=str(e)
+        )
+
+
+@dataclass
+class RegularityScanResult:
+    """Result of scanning c/a ratios for best coordination regularity."""
+    config_id: str
+    best_c_ratio: Optional[float]
+    best_s_star: Optional[float]
+    best_regularity: float
+    per_metal_scores: List[Dict]
+    scan_data: List[Tuple]  # (c_ratio, s_star, regularity)
+    success: bool
+    error: Optional[str]
+
+
+def scan_ca_for_best_regularity(
+    config_id: str,
+    offsets: List,
+    bravais_type: str,
+    lattice_type: str,
+    metals: List[Dict],
+    target_cn: int,
+    coord_radii,
+    c_ratio_min: float = 0.5,
+    c_ratio_max: float = 2.5,
+    n_points: int = 50
+) -> RegularityScanResult:
+    """
+    Scan c/a ratios to find the one with best coordination regularity.
+    
+    Args:
+        config_id: Configuration identifier
+        offsets: Metal site offsets
+        bravais_type: Bravais lattice type
+        lattice_type: Lattice system (Tetragonal, Hexagonal, etc.)
+        metals: List of metal dictionaries with symbol, cn, radius
+        target_cn: Target coordination number
+        coord_radii: Coordination radius (r_metal + r_anion) - scalar or tuple
+        c_ratio_min: Minimum c/a ratio to scan
+        c_ratio_max: Maximum c/a ratio to scan
+        n_points: Number of points in scan
+    
+    Returns:
+        RegularityScanResult with best c/a and regularity scores
+    """
+    from interstitial_engine import compute_min_scale_for_cn
+    
+    best_c_ratio = None
+    best_s_star = None
+    best_regularity = -1.0
+    best_per_metal = []
+    scan_data = []
+    
+    c_ratios = np.linspace(c_ratio_min, c_ratio_max, n_points)
+    
+    try:
+        for c_ratio in c_ratios:
+            try:
+                # Get s* for this c/a
+                s_star = compute_min_scale_for_cn(
+                    config_offsets=offsets,
+                    target_cn=target_cn,
+                    lattice_type=lattice_type,
+                    alpha_ratio=coord_radii,
+                    bravais_type=bravais_type,
+                    lattice_params={'c_ratio': c_ratio}
+                )
+                
+                if s_star is None:
+                    scan_data.append((c_ratio, None, None))
+                    continue
+                
+                # Build structure
+                sublattice = Sublattice(
+                    name='M',
+                    offsets=tuple(tuple(o) for o in offsets),
+                    alpha_ratio=coord_radii,
+                    bravais_type=bravais_type
+                )
+                
+                p_dict = {'a': 5.0, 'b_ratio': 1.0, 'c_ratio': c_ratio,
+                         'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
+                if lattice_type == 'Hexagonal':
+                    p_dict['gamma'] = 120.0
+                
+                p = LatticeParams(**p_dict)
+                
+                structure = calculate_complete_structure(
+                    sublattices=[sublattice],
+                    p=p,
+                    scale_s=s_star * 1.01,  # Slightly above to ensure intersections
+                    target_N=target_cn,
+                    k_samples=24,
+                    cluster_eps_frac=0.05,
+                    include_boundary_equivalents=True
+                )
+                
+                # Analyze coordination regularity
+                coord_result = analyze_all_coordination_environments(
+                    structure=structure,
+                    metals=metals,
+                    max_sites=target_cn
+                )
+                
+                if coord_result.success:
+                    mean_reg = coord_result.summary.get('mean_overall_regularity', 0)
+                    scan_data.append((c_ratio, s_star, mean_reg))
+                    
+                    if mean_reg > best_regularity:
+                        best_regularity = mean_reg
+                        best_c_ratio = c_ratio
+                        best_s_star = s_star
+                        # Store per-metal scores
+                        best_per_metal = []
+                        for env in coord_result.environments:
+                            best_per_metal.append({
+                                'symbol': env.metal_symbol,
+                                'cn': len(env.coordination_sites),
+                                'regularity': env.overall_regularity
+                            })
+                else:
+                    scan_data.append((c_ratio, s_star, None))
+            except Exception:
+                scan_data.append((c_ratio, None, None))
+                continue
+        
+        if best_c_ratio is not None:
+            return RegularityScanResult(
+                config_id=config_id,
+                best_c_ratio=best_c_ratio,
+                best_s_star=best_s_star,
+                best_regularity=best_regularity,
+                per_metal_scores=best_per_metal,
+                scan_data=scan_data,
+                success=True,
+                error=None
+            )
+        else:
+            return RegularityScanResult(
+                config_id=config_id,
+                best_c_ratio=None,
+                best_s_star=None,
+                best_regularity=0.0,
+                per_metal_scores=[],
+                scan_data=scan_data,
+                success=False,
+                error='No valid c/a found in range'
+            )
+    except Exception as e:
+        return RegularityScanResult(
+            config_id=config_id,
+            best_c_ratio=None,
+            best_s_star=None,
+            best_regularity=0.0,
+            per_metal_scores=[],
             scan_data=[],
             success=False,
             error=str(e)

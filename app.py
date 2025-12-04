@@ -29,7 +29,8 @@ from position_calculator import (
     calculate_complete_structure, generate_metal_positions, calculate_intersections,
     format_position_dict, format_xyz, format_metal_atoms_csv, format_intersections_csv,
     get_unique_intersections, calculate_weighted_counts, analyze_all_coordination_environments,
-    find_optimal_half_filling, HalfFillingResult, calculate_stoichiometry_for_config
+    find_optimal_half_filling, HalfFillingResult, calculate_stoichiometry_for_config,
+    scan_ca_for_best_regularity, RegularityScanResult
 )
 
 st.set_page_config(
@@ -1188,6 +1189,258 @@ def main():
                 
                 if len(non_matches) > 20:
                     st.caption(f"Showing first 20 of {len(non_matches)} configurations")
+        
+        # ============================================
+        # C/A OPTIMIZATION FOR NON-CUBIC LATTICES
+        # ============================================
+        # Get all non-cubic configs (tetragonal, hexagonal, orthorhombic)
+        non_cubic_lattices = {'Tetragonal', 'Hexagonal', 'Orthorhombic'}
+        all_configs = matching_configs
+        non_cubic_configs = [c for c in all_configs if c['lattice'] in non_cubic_lattices]
+        
+        if non_cubic_configs:
+            st.markdown("---")
+            with st.expander(f"📐 c/a Ratio Optimization ({len(non_cubic_configs)} non-cubic configurations)", expanded=True):
+                st.markdown("""
+                These configurations have variable c/a ratios. At c/a = 1, they may not produce the correct 
+                stoichiometry, but optimizing c/a can find structures that match your target formula or 
+                maximize coordination regularity.
+                """)
+                
+                # Get stoichiometry info for matching
+                stoich_data = chain.get('stoichiometry', {})
+                expected_metal_counts = stoich_data.get('metal_counts', [])
+                expected_anion_count = stoich_data.get('anion_count', 1)
+                target_cn = stoich_data.get('target_cn', 6)
+                metals = st.session_state.metals
+                anion_rad = st.session_state.get('anion_rad', 1.40)
+                
+                # Calculate expected M/X ratio
+                total_metals = sum(expected_metal_counts)
+                expected_mx = total_metals / expected_anion_count if expected_anion_count > 0 else 1
+                
+                # Global c/a scan parameters
+                st.markdown("#### Scan Parameters")
+                scan_param_cols = st.columns(4)
+                with scan_param_cols[0]:
+                    ca_min = st.number_input("c/a min", min_value=0.3, max_value=1.5, 
+                                            value=0.5, step=0.1, key='global_ca_min')
+                with scan_param_cols[1]:
+                    ca_max = st.number_input("c/a max", min_value=0.5, max_value=3.0,
+                                            value=2.5, step=0.1, key='global_ca_max')
+                with scan_param_cols[2]:
+                    ca_points = st.selectbox("Scan points", [20, 50, 100, 200], 
+                                            index=1, key='global_ca_points')
+                with scan_param_cols[3]:
+                    optimize_target = st.selectbox("Optimize for", 
+                                                  ["Stoichiometry Match", "Best Regularity"],
+                                                  key='global_optimize_target')
+                
+                # Initialize session state for c/a results
+                if 'ca_optimization_results' not in st.session_state:
+                    st.session_state.ca_optimization_results = {}
+                
+                st.markdown("#### Non-Cubic Configurations")
+                
+                for entry in non_cubic_configs:
+                    config_id = entry['config_id']
+                    s_star_cubic = entry['s_star']
+                    lattice = entry['lattice']
+                    formula_cubic = entry['formula']
+                    pattern = entry.get('pattern', '')
+                    match_type = entry.get('match_type', 'none')
+                    
+                    # Get stored optimization result if available
+                    opt_result = st.session_state.ca_optimization_results.get(config_id, None)
+                    
+                    # Status indicator
+                    if match_type == 'exact':
+                        status = "✓ (exact at c/a=1)"
+                    elif match_type == 'half':
+                        status = "½ (half at c/a=1)"
+                    elif opt_result and opt_result.get('success'):
+                        status = f"🎯 c/a={opt_result['best_c_ratio']:.3f}"
+                    else:
+                        status = "⚙️ not optimized"
+                    
+                    with st.expander(f"**{config_id}** — {lattice} — {status}", expanded=False):
+                        # Config info
+                        info_cols = st.columns([2, 1, 1])
+                        with info_cols[0]:
+                            st.markdown(f"**Pattern:** {pattern}")
+                            st.markdown(f"**At c/a = 1:** s* = {s_star_cubic:.4f}, Formula = {formula_cubic}")
+                        with info_cols[1]:
+                            if st.button(f"🔍 Optimize", key=f"opt_{config_id}", type="primary"):
+                                with st.spinner(f"Scanning c/a for {config_id}..."):
+                                    # Get config data
+                                    scale_results = chain.get('scale_results', {})
+                                    config_data = scale_results.get(config_id, {})
+                                    offsets = config_data.get('offsets', [(0, 0, 0)])
+                                    bravais = config_data.get('bravais_type', 'cubic_P')
+                                    
+                                    # Compute coordination radii
+                                    metal_radii = [m['radius'] for m in metals]
+                                    if len(metal_radii) > 1:
+                                        coord_radii = tuple(r + anion_rad for r in metal_radii)
+                                    else:
+                                        coord_radii = metal_radii[0] + anion_rad
+                                    
+                                    if optimize_target == "Stoichiometry Match":
+                                        # Scan for stoichiometry match
+                                        from position_calculator import scan_ca_for_stoichiometry
+                                        result = scan_ca_for_stoichiometry(
+                                            config_id=config_id,
+                                            offsets=offsets,
+                                            bravais_type=bravais,
+                                            lattice_type=lattice,
+                                            metals=metals,
+                                            target_mx_ratio=expected_mx,
+                                            target_cn=target_cn,
+                                            anion_radius=anion_rad,
+                                            c_ratio_min=ca_min,
+                                            c_ratio_max=ca_max,
+                                            n_points=ca_points,
+                                            tolerance=0.1,
+                                            check_half_filling=True
+                                        )
+                                        
+                                        if result.success and result.best_c_ratio is not None:
+                                            st.session_state.ca_optimization_results[config_id] = {
+                                                'success': True,
+                                                'best_c_ratio': result.best_c_ratio,
+                                                'best_s_star': result.best_s_star,
+                                                'best_mx_ratio': result.best_mx_ratio,
+                                                'best_mx_error': result.best_mx_error,
+                                                'is_half_filling': result.is_half_filling_match,
+                                                'optimize_type': 'stoichiometry',
+                                                'config_data': config_data
+                                            }
+                                        else:
+                                            st.session_state.ca_optimization_results[config_id] = {
+                                                'success': False,
+                                                'error': 'No matching c/a found in range'
+                                            }
+                                    else:
+                                        # Scan for best regularity
+                                        best_result = scan_ca_for_best_regularity(
+                                            config_id=config_id,
+                                            offsets=offsets,
+                                            bravais_type=bravais,
+                                            lattice_type=lattice,
+                                            metals=metals,
+                                            target_cn=target_cn,
+                                            coord_radii=coord_radii,
+                                            c_ratio_min=ca_min,
+                                            c_ratio_max=ca_max,
+                                            n_points=ca_points
+                                        )
+                                        # Convert dataclass to dict for session state
+                                        st.session_state.ca_optimization_results[config_id] = {
+                                            'success': best_result.success,
+                                            'best_c_ratio': best_result.best_c_ratio,
+                                            'best_s_star': best_result.best_s_star,
+                                            'best_regularity': best_result.best_regularity,
+                                            'per_metal_scores': best_result.per_metal_scores,
+                                            'optimize_type': 'regularity',
+                                            'config_data': config_data,
+                                            'error': best_result.error
+                                        }
+                                    
+                                    st.rerun()
+                        
+                        with info_cols[2]:
+                            if opt_result and opt_result.get('success'):
+                                if st.button(f"🗑️ Clear", key=f"clear_{config_id}"):
+                                    del st.session_state.ca_optimization_results[config_id]
+                                    st.rerun()
+                        
+                        # Show optimization results if available
+                        if opt_result and opt_result.get('success'):
+                            st.markdown("---")
+                            st.markdown("**Optimization Result:**")
+                            
+                            res_cols = st.columns(4)
+                            with res_cols[0]:
+                                st.metric("Best c/a", f"{opt_result['best_c_ratio']:.4f}")
+                            with res_cols[1]:
+                                st.metric("s* at best c/a", f"{opt_result['best_s_star']:.4f}")
+                            with res_cols[2]:
+                                if opt_result.get('optimize_type') == 'stoichiometry':
+                                    mx = opt_result.get('best_mx_ratio', 0)
+                                    st.metric("M/X ratio", f"{mx:.3f}")
+                                else:
+                                    reg = opt_result.get('best_regularity', 0)
+                                    st.metric("Regularity", f"{reg:.3f}")
+                            with res_cols[3]:
+                                if opt_result.get('is_half_filling'):
+                                    st.metric("Match Type", "½ Half-filling")
+                                elif opt_result.get('optimize_type') == 'stoichiometry':
+                                    err = opt_result.get('best_mx_error', 0)
+                                    st.metric("M/X Error", f"{err:.3f}")
+                                else:
+                                    st.metric("Match Type", "Regularity Opt.")
+                            
+                            # Generate and show 3D preview
+                            try:
+                                config_data = opt_result.get('config_data', {})
+                                offsets = config_data.get('offsets', [(0, 0, 0)])
+                                bravais = config_data.get('bravais_type', 'cubic_P')
+                                
+                                metal_radii = [m['radius'] for m in metals]
+                                if len(metal_radii) > 1:
+                                    coord_radii = tuple(r + anion_rad for r in metal_radii)
+                                else:
+                                    coord_radii = metal_radii[0] + anion_rad
+                                
+                                sublattice = Sublattice(
+                                    name='M',
+                                    offsets=tuple(tuple(o) for o in offsets),
+                                    alpha_ratio=coord_radii,
+                                    bravais_type=bravais
+                                )
+                                
+                                p_dict = {'a': 5.0, 'b_ratio': 1.0, 
+                                         'c_ratio': opt_result['best_c_ratio'],
+                                         'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
+                                if lattice == 'Hexagonal':
+                                    p_dict['gamma'] = 120.0
+                                
+                                p = LatticeParams(**p_dict)
+                                
+                                structure = calculate_complete_structure(
+                                    sublattices=[sublattice],
+                                    p=p,
+                                    scale_s=opt_result['best_s_star'],
+                                    target_N=target_cn,
+                                    k_samples=32,
+                                    cluster_eps_frac=0.05,
+                                    include_boundary_equivalents=True
+                                )
+                                
+                                # Check stoichiometry
+                                weighted = calculate_weighted_counts(structure)
+                                metal_count = weighted['metal_count']
+                                anion_count = weighted['intersection_count']
+                                
+                                st.markdown(f"**Structure at c/a = {opt_result['best_c_ratio']:.3f}:**")
+                                struct_cols = st.columns([1, 2])
+                                with struct_cols[0]:
+                                    st.write(f"Metals/cell: {metal_count:.1f}")
+                                    st.write(f"Anions/cell: {anion_count:.1f}")
+                                    if anion_count > 0:
+                                        st.write(f"M/X ratio: {metal_count/anion_count:.3f}")
+                                
+                                with struct_cols[1]:
+                                    # Generate 3D preview
+                                    fig = generate_preview_figure(structure, metals, 
+                                                                 f"{config_id} (c/a={opt_result['best_c_ratio']:.2f})")
+                                    fig.update_layout(height=350, width=400)
+                                    st.plotly_chart(fig, use_container_width=True)
+                            except Exception as e:
+                                st.error(f"Could not generate preview: {e}")
+                        
+                        elif opt_result and not opt_result.get('success'):
+                            st.warning(f"Optimization failed: {opt_result.get('error', 'Unknown error')}")
     
     # Keep the old detailed sections below for advanced users
     # but hide them in expanders
