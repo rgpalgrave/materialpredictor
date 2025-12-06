@@ -35,23 +35,51 @@ from position_calculator import (
 )
 
 
-def get_default_search_configs(num_metals: int) -> List[dict]:
+def get_default_search_configs(num_metals: int, use_predictor: bool = True) -> List[dict]:
     """
     Get default search configurations for initial structure search.
     
-    Default lattice types searched:
+    When the AFLOW-based predictor is available, uses statistically-informed
+    predictions based on 1802 structures from the AFLOW Prototype Encyclopedia.
+    
+    Prediction strategy varies by N (number of metal positions):
+    - HIGH predictability (N=1,5,7): Uses exact offset patterns directly
+    - MODERATE predictability (N=2,3): Uses lattice types + best offsets  
+    - LOW predictability (N=4,6,8+): Uses lattice type priors only
+    
+    Falls back to standard search if predictor unavailable:
     - Cubic: P, F, I (c/a = 1.0)
     - Hexagonal: H (HCP), P (both with c/a = 1.633)
     - Tetragonal: P, I (with c/a = num_metals)
     
-    For each Bravais type, all offset configurations for that number of metals are tested.
-    
     Args:
         num_metals: Number of metal sublattices (L)
+        use_predictor: Whether to use AFLOW predictor if available (default: True)
         
     Returns:
         List of config dicts with keys: id, lattice, bravais_type, offsets, pattern, c_ratio
     """
+    # Try to use the AFLOW-based predictor
+    if use_predictor:
+        try:
+            from predictor_integration import get_predictor
+            predictor = get_predictor()
+            
+            if predictor.is_available():
+                configs = predictor.get_search_configs_from_predictor(
+                    num_metals,
+                    top_k_lattices=6,
+                    top_k_offsets=12,
+                    include_fallback=True
+                )
+                if configs:
+                    return configs
+        except ImportError:
+            pass  # Predictor not available, use fallback
+        except Exception as e:
+            print(f"Warning: Predictor error, using fallback: {e}")
+    
+    # Fallback: original algorithm
     from lattice_configs import get_configs_for_n
     
     # Define which Bravais types to search and their c/a values

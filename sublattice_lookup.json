@@ -1,0 +1,5993 @@
+{
+  "1": {
+    "total_structures": 56,
+    "unique_patterns": 9,
+    "predictability": "high",
+    "recommendation": "Use full_offsets directly - patterns are predictable",
+    "lattice_type": [
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "count": 16,
+        "probability": 0.2857,
+        "cumulative": 0.2857
+      },
+      {
+        "system": "Triclinic",
+        "centering": "P",
+        "count": 9,
+        "probability": 0.1607,
+        "cumulative": 0.4464
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "count": 9,
+        "probability": 0.1607,
+        "cumulative": 0.6071
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "count": 7,
+        "probability": 0.125,
+        "cumulative": 0.7321
+      },
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "count": 6,
+        "probability": 0.1071,
+        "cumulative": 0.8393
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "count": 5,
+        "probability": 0.0893,
+        "cumulative": 0.9286
+      },
+      {
+        "system": "Cubic",
+        "centering": "P",
+        "count": 2,
+        "probability": 0.0357,
+        "cumulative": 0.9643
+      },
+      {
+        "system": "Cubic",
+        "centering": "I",
+        "count": 1,
+        "probability": 0.0179,
+        "cumulative": 0.9821
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "I",
+        "count": 1,
+        "probability": 0.0179,
+        "cumulative": 1.0
+      }
+    ],
+    "z_pattern": [
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "z_values": [
+          "0"
+        ],
+        "count": 16,
+        "probability": 0.2857,
+        "cumulative": 0.2857
+      },
+      {
+        "system": "Triclinic",
+        "centering": "P",
+        "z_values": [
+          "0"
+        ],
+        "count": 9,
+        "probability": 0.1607,
+        "cumulative": 0.4464
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "z_values": [
+          "0"
+        ],
+        "count": 9,
+        "probability": 0.1607,
+        "cumulative": 0.6071
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "z_values": [
+          "0"
+        ],
+        "count": 7,
+        "probability": 0.125,
+        "cumulative": 0.7321
+      },
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "z_values": [
+          "0"
+        ],
+        "count": 6,
+        "probability": 0.1071,
+        "cumulative": 0.8393
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "z_values": [
+          "0"
+        ],
+        "count": 5,
+        "probability": 0.0893,
+        "cumulative": 0.9286
+      },
+      {
+        "system": "Cubic",
+        "centering": "P",
+        "z_values": [
+          "0"
+        ],
+        "count": 2,
+        "probability": 0.0357,
+        "cumulative": 0.9643
+      },
+      {
+        "system": "Cubic",
+        "centering": "I",
+        "z_values": [
+          "0"
+        ],
+        "count": 1,
+        "probability": 0.0179,
+        "cumulative": 0.9821
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "I",
+        "z_values": [
+          "0"
+        ],
+        "count": 1,
+        "probability": 0.0179,
+        "cumulative": 1.0
+      }
+    ],
+    "full_offsets": [
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)"
+        ],
+        "count": 16,
+        "probability": 0.2857,
+        "cumulative": 0.2857
+      },
+      {
+        "system": "Triclinic",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)"
+        ],
+        "count": 9,
+        "probability": 0.1607,
+        "cumulative": 0.4464
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "offsets": [
+          "(0,0,0)"
+        ],
+        "count": 9,
+        "probability": 0.1607,
+        "cumulative": 0.6071
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "offsets": [
+          "(0,0,0)"
+        ],
+        "count": 7,
+        "probability": 0.125,
+        "cumulative": 0.7321
+      },
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "offsets": [
+          "(0,0,0)"
+        ],
+        "count": 6,
+        "probability": 0.1071,
+        "cumulative": 0.8393
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)"
+        ],
+        "count": 5,
+        "probability": 0.0893,
+        "cumulative": 0.9286
+      },
+      {
+        "system": "Cubic",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)"
+        ],
+        "count": 2,
+        "probability": 0.0357,
+        "cumulative": 0.9643
+      },
+      {
+        "system": "Cubic",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)"
+        ],
+        "count": 1,
+        "probability": 0.0179,
+        "cumulative": 0.9821
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)"
+        ],
+        "count": 1,
+        "probability": 0.0179,
+        "cumulative": 1.0
+      }
+    ]
+  },
+  "2": {
+    "total_structures": 303,
+    "unique_patterns": 201,
+    "predictability": "moderate",
+    "recommendation": "Use lattice_type + z_pattern; full_offsets for refinement",
+    "lattice_type": [
+      {
+        "system": "Triclinic",
+        "centering": "P",
+        "count": 99,
+        "probability": 0.3267,
+        "cumulative": 0.3267
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "count": 58,
+        "probability": 0.1914,
+        "cumulative": 0.5182
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "count": 47,
+        "probability": 0.1551,
+        "cumulative": 0.6733
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "P",
+        "count": 33,
+        "probability": 0.1089,
+        "cumulative": 0.7822
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "count": 25,
+        "probability": 0.0825,
+        "cumulative": 0.8647
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "C",
+        "count": 15,
+        "probability": 0.0495,
+        "cumulative": 0.9142
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "P",
+        "count": 13,
+        "probability": 0.0429,
+        "cumulative": 0.9571
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "P",
+        "count": 5,
+        "probability": 0.0165,
+        "cumulative": 0.9736
+      },
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "count": 2,
+        "probability": 0.0066,
+        "cumulative": 0.9802
+      },
+      {
+        "system": "Cubic",
+        "centering": "P",
+        "count": 2,
+        "probability": 0.0066,
+        "cumulative": 0.9868
+      }
+    ],
+    "z_pattern": [
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "z_values": [
+          "0",
+          "1/2"
+        ],
+        "count": 37,
+        "probability": 0.1221,
+        "cumulative": 0.1221
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "z_values": [
+          "0",
+          "1/2"
+        ],
+        "count": 35,
+        "probability": 0.1155,
+        "cumulative": 0.2376
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "z_values": [
+          "0"
+        ],
+        "count": 15,
+        "probability": 0.0495,
+        "cumulative": 0.2871
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "C",
+        "z_values": [
+          "0",
+          "1/2"
+        ],
+        "count": 14,
+        "probability": 0.0462,
+        "cumulative": 0.3333
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "P",
+        "z_values": [
+          "0",
+          "1/2"
+        ],
+        "count": 12,
+        "probability": 0.0396,
+        "cumulative": 0.3729
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "z_values": [
+          "0",
+          "1/2"
+        ],
+        "count": 11,
+        "probability": 0.0363,
+        "cumulative": 0.4092
+      },
+      {
+        "system": "Triclinic",
+        "centering": "P",
+        "z_values": [
+          "0",
+          "1/2"
+        ],
+        "count": 11,
+        "probability": 0.0363,
+        "cumulative": 0.4455
+      },
+      {
+        "system": "Triclinic",
+        "centering": "P",
+        "z_values": [
+          "0",
+          "1/3"
+        ],
+        "count": 10,
+        "probability": 0.033,
+        "cumulative": 0.4785
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "P",
+        "z_values": [
+          "0"
+        ],
+        "count": 9,
+        "probability": 0.0297,
+        "cumulative": 0.5083
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "P",
+        "z_values": [
+          "0"
+        ],
+        "count": 8,
+        "probability": 0.0264,
+        "cumulative": 0.5347
+      }
+    ],
+    "full_offsets": [
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)"
+        ],
+        "count": 16,
+        "probability": 0.0528,
+        "cumulative": 0.0528
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(1/3,2/3,1/2)"
+        ],
+        "count": 15,
+        "probability": 0.0495,
+        "cumulative": 0.1023
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)"
+        ],
+        "count": 13,
+        "probability": 0.0429,
+        "cumulative": 0.1452
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)"
+        ],
+        "count": 11,
+        "probability": 0.0363,
+        "cumulative": 0.1815
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)"
+        ],
+        "count": 10,
+        "probability": 0.033,
+        "cumulative": 0.2145
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(1/2,1/2,0)"
+        ],
+        "count": 9,
+        "probability": 0.0297,
+        "cumulative": 0.2442
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,1/2)"
+        ],
+        "count": 7,
+        "probability": 0.0231,
+        "cumulative": 0.2673
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(2/3,1/3,1/2)"
+        ],
+        "count": 6,
+        "probability": 0.0198,
+        "cumulative": 0.2871
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "offsets": [
+          "(0,0,0)",
+          "(2/3,0,0)"
+        ],
+        "count": 4,
+        "probability": 0.0132,
+        "cumulative": 0.3003
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,1/2)"
+        ],
+        "count": 4,
+        "probability": 0.0132,
+        "cumulative": 0.3135
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(1/2,1/2,1/2)"
+        ],
+        "count": 3,
+        "probability": 0.0099,
+        "cumulative": 0.3234
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/3,0)"
+        ],
+        "count": 3,
+        "probability": 0.0099,
+        "cumulative": 0.3333
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/3,1/2)"
+        ],
+        "count": 3,
+        "probability": 0.0099,
+        "cumulative": 0.3432
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,0)"
+        ],
+        "count": 3,
+        "probability": 0.0099,
+        "cumulative": 0.3531
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "offsets": [
+          "(0,0,0)",
+          "(1/2,0,1/2)"
+        ],
+        "count": 3,
+        "probability": 0.0099,
+        "cumulative": 0.363
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(1/2,1/2,1/2)"
+        ],
+        "count": 2,
+        "probability": 0.0066,
+        "cumulative": 0.3696
+      },
+      {
+        "system": "Cubic",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(1/2,1/2,1/2)"
+        ],
+        "count": 2,
+        "probability": 0.0066,
+        "cumulative": 0.3762
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,1/4)"
+        ],
+        "count": 2,
+        "probability": 0.0066,
+        "cumulative": 0.3828
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(1/2,1/2,1/2)"
+        ],
+        "count": 2,
+        "probability": 0.0066,
+        "cumulative": 0.3894
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,5/6)"
+        ],
+        "count": 2,
+        "probability": 0.0066,
+        "cumulative": 0.396
+      }
+    ]
+  },
+  "3": {
+    "total_structures": 66,
+    "unique_patterns": 59,
+    "predictability": "low",
+    "recommendation": "Use lattice_type + z_pattern only; exact offsets are compound-specific",
+    "lattice_type": [
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "count": 18,
+        "probability": 0.2727,
+        "cumulative": 0.2727
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "count": 18,
+        "probability": 0.2727,
+        "cumulative": 0.5455
+      },
+      {
+        "system": "Triclinic",
+        "centering": "P",
+        "count": 12,
+        "probability": 0.1818,
+        "cumulative": 0.7273
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "count": 7,
+        "probability": 0.1061,
+        "cumulative": 0.8333
+      },
+      {
+        "system": "Cubic",
+        "centering": "P",
+        "count": 5,
+        "probability": 0.0758,
+        "cumulative": 0.9091
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "P",
+        "count": 3,
+        "probability": 0.0455,
+        "cumulative": 0.9545
+      },
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "count": 3,
+        "probability": 0.0455,
+        "cumulative": 1.0
+      }
+    ],
+    "z_pattern": [
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "z_values": [
+          "0"
+        ],
+        "count": 10,
+        "probability": 0.1515,
+        "cumulative": 0.1515
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "z_values": [
+          "0",
+          "1/3",
+          "2/3"
+        ],
+        "count": 8,
+        "probability": 0.1212,
+        "cumulative": 0.2727
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "z_values": [
+          "0"
+        ],
+        "count": 7,
+        "probability": 0.1061,
+        "cumulative": 0.3788
+      },
+      {
+        "system": "Cubic",
+        "centering": "P",
+        "z_values": [
+          "0",
+          "1/2"
+        ],
+        "count": 5,
+        "probability": 0.0758,
+        "cumulative": 0.4545
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "z_values": [
+          "0",
+          "1/2"
+        ],
+        "count": 5,
+        "probability": 0.0758,
+        "cumulative": 0.5303
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "z_values": [
+          "0",
+          "1/4",
+          "3/4"
+        ],
+        "count": 2,
+        "probability": 0.0303,
+        "cumulative": 0.5606
+      },
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "z_values": [
+          "0",
+          "1/2",
+          "3/4"
+        ],
+        "count": 2,
+        "probability": 0.0303,
+        "cumulative": 0.5909
+      },
+      {
+        "system": "Triclinic",
+        "centering": "P",
+        "z_values": [
+          "0",
+          "1/4",
+          "3/4"
+        ],
+        "count": 2,
+        "probability": 0.0303,
+        "cumulative": 0.6212
+      },
+      {
+        "system": "Triclinic",
+        "centering": "P",
+        "z_values": [
+          "0",
+          "1/6",
+          "5/6"
+        ],
+        "count": 2,
+        "probability": 0.0303,
+        "cumulative": 0.6515
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "z_values": [
+          "0",
+          "0.2750",
+          "0.7250"
+        ],
+        "count": 1,
+        "probability": 0.0152,
+        "cumulative": 0.6667
+      }
+    ],
+    "full_offsets": [
+      {
+        "system": "Cubic",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(1/2,0,1/2)",
+          "(1/2,1/2,0)"
+        ],
+        "count": 3,
+        "probability": 0.0455,
+        "cumulative": 0.0455
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/4)",
+          "(0,0,3/4)"
+        ],
+        "count": 2,
+        "probability": 0.0303,
+        "cumulative": 0.0758
+      },
+      {
+        "system": "Cubic",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,1/2)",
+          "(1/2,1/2,0)"
+        ],
+        "count": 2,
+        "probability": 0.0303,
+        "cumulative": 0.1061
+      },
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "offsets": [
+          "(0,0,0)",
+          "(1/2,1/2,1/2)",
+          "(3/4,3/4,3/4)"
+        ],
+        "count": 2,
+        "probability": 0.0303,
+        "cumulative": 0.1364
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "offsets": [
+          "(0,0,0)",
+          "(1/2,0,0)",
+          "(1/2,1/2,0)"
+        ],
+        "count": 2,
+        "probability": 0.0303,
+        "cumulative": 0.1667
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(1/3,2/3,0)",
+          "(2/3,1/3,0)"
+        ],
+        "count": 2,
+        "probability": 0.0303,
+        "cumulative": 0.197
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0.0606,0.5303,2/3)",
+          "(0.5303,0.4697,1/3)"
+        ],
+        "count": 1,
+        "probability": 0.0152,
+        "cumulative": 0.2121
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,0.2750)",
+          "(0,0,0.7250)"
+        ],
+        "count": 1,
+        "probability": 0.0152,
+        "cumulative": 0.2273
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,0,1/4)"
+        ],
+        "count": 1,
+        "probability": 0.0152,
+        "cumulative": 0.2424
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,1/2)",
+          "(1/2,0,1/2)"
+        ],
+        "count": 1,
+        "probability": 0.0152,
+        "cumulative": 0.2576
+      },
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,1/2)",
+          "(1/4,1/4,1/4)"
+        ],
+        "count": 1,
+        "probability": 0.0152,
+        "cumulative": 0.2727
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,0.5448)",
+          "(1/2,1/2,0.7724)"
+        ],
+        "count": 1,
+        "probability": 0.0152,
+        "cumulative": 0.2879
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "offsets": [
+          "(0,0,0)",
+          "(0.3767,0,0)",
+          "(0.6883,0,1/2)"
+        ],
+        "count": 1,
+        "probability": 0.0152,
+        "cumulative": 0.303
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,0,3/4)"
+        ],
+        "count": 1,
+        "probability": 0.0152,
+        "cumulative": 0.3182
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0.3885,0.7770,0)",
+          "(0.7770,0.3885,0)"
+        ],
+        "count": 1,
+        "probability": 0.0152,
+        "cumulative": 0.3333
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,0)",
+          "(1/2,0,0)"
+        ],
+        "count": 1,
+        "probability": 0.0152,
+        "cumulative": 0.3485
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "offsets": [
+          "(0,0,0)",
+          "(0.0274,0.4645,0)",
+          "(0.4645,0.4371,0)"
+        ],
+        "count": 1,
+        "probability": 0.0152,
+        "cumulative": 0.3636
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0.0776,0.5388,2/3)",
+          "(0.5388,0.4612,1/3)"
+        ],
+        "count": 1,
+        "probability": 0.0152,
+        "cumulative": 0.3788
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(1/3,2/3,5/6)",
+          "(2/3,1/3,2/3)"
+        ],
+        "count": 1,
+        "probability": 0.0152,
+        "cumulative": 0.3939
+      },
+      {
+        "system": "Triclinic",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(1/3,0.0960,0.7901)",
+          "(2/3,0.9040,0.2099)"
+        ],
+        "count": 1,
+        "probability": 0.0152,
+        "cumulative": 0.4091
+      }
+    ]
+  },
+  "4": {
+    "total_structures": 585,
+    "unique_patterns": 532,
+    "predictability": "low",
+    "recommendation": "Use lattice_type + z_pattern only; exact offsets are compound-specific",
+    "lattice_type": [
+      {
+        "system": "Monoclinic",
+        "centering": "P",
+        "count": 176,
+        "probability": 0.3009,
+        "cumulative": 0.3009
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "count": 142,
+        "probability": 0.2427,
+        "cumulative": 0.5436
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "P",
+        "count": 83,
+        "probability": 0.1419,
+        "cumulative": 0.6855
+      },
+      {
+        "system": "Triclinic",
+        "centering": "P",
+        "count": 54,
+        "probability": 0.0923,
+        "cumulative": 0.7778
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "C",
+        "count": 33,
+        "probability": 0.0564,
+        "cumulative": 0.8342
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "P",
+        "count": 32,
+        "probability": 0.0547,
+        "cumulative": 0.8889
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "count": 24,
+        "probability": 0.041,
+        "cumulative": 0.9299
+      },
+      {
+        "system": "Cubic",
+        "centering": "P",
+        "count": 18,
+        "probability": 0.0308,
+        "cumulative": 0.9607
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "count": 9,
+        "probability": 0.0154,
+        "cumulative": 0.9761
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "count": 8,
+        "probability": 0.0137,
+        "cumulative": 0.9897
+      }
+    ],
+    "z_pattern": [
+      {
+        "system": "Orthorhombic",
+        "centering": "P",
+        "z_values": [
+          "0",
+          "1/2"
+        ],
+        "count": 50,
+        "probability": 0.0855,
+        "cumulative": 0.0855
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "z_values": [
+          "0",
+          "1/2"
+        ],
+        "count": 44,
+        "probability": 0.0752,
+        "cumulative": 0.1607
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "C",
+        "z_values": [
+          "0",
+          "1/2"
+        ],
+        "count": 30,
+        "probability": 0.0513,
+        "cumulative": 0.212
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "P",
+        "z_values": [
+          "0",
+          "1/2"
+        ],
+        "count": 26,
+        "probability": 0.0444,
+        "cumulative": 0.2564
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "P",
+        "z_values": [
+          "0"
+        ],
+        "count": 16,
+        "probability": 0.0274,
+        "cumulative": 0.2838
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "P",
+        "z_values": [
+          "0",
+          "1/2",
+          "1/6",
+          "2/3"
+        ],
+        "count": 16,
+        "probability": 0.0274,
+        "cumulative": 0.3111
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "z_values": [
+          "0",
+          "2/3"
+        ],
+        "count": 9,
+        "probability": 0.0154,
+        "cumulative": 0.3265
+      },
+      {
+        "system": "Cubic",
+        "centering": "P",
+        "z_values": [
+          "0",
+          "1/2"
+        ],
+        "count": 8,
+        "probability": 0.0137,
+        "cumulative": 0.3402
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "P",
+        "z_values": [
+          "0",
+          "1/2"
+        ],
+        "count": 8,
+        "probability": 0.0137,
+        "cumulative": 0.3538
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "z_values": [
+          "0",
+          "1/2",
+          "1/6",
+          "2/3"
+        ],
+        "count": 7,
+        "probability": 0.012,
+        "cumulative": 0.3658
+      }
+    ],
+    "full_offsets": [
+      {
+        "system": "Tetragonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,0)",
+          "(1/2,0,0)",
+          "(1/2,1/2,0)"
+        ],
+        "count": 10,
+        "probability": 0.0171,
+        "cumulative": 0.0171
+      },
+      {
+        "system": "Cubic",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,1/2)",
+          "(1/2,0,1/2)",
+          "(1/2,1/2,0)"
+        ],
+        "count": 7,
+        "probability": 0.012,
+        "cumulative": 0.0291
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,0)",
+          "(1/2,0,1/2)",
+          "(1/2,1/2,1/2)"
+        ],
+        "count": 7,
+        "probability": 0.012,
+        "cumulative": 0.041
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(2/3,1/3,0)",
+          "(2/3,1/3,1/2)"
+        ],
+        "count": 6,
+        "probability": 0.0103,
+        "cumulative": 0.0513
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(1/2,1/6,0)",
+          "(1/3,2/3,0)",
+          "(5/6,1/2,0)"
+        ],
+        "count": 4,
+        "probability": 0.0068,
+        "cumulative": 0.0581
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(1/2,0,0)",
+          "(1/2,0,1/2)"
+        ],
+        "count": 4,
+        "probability": 0.0068,
+        "cumulative": 0.065
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(1/3,0,0)",
+          "(1/3,0,1/2)"
+        ],
+        "count": 3,
+        "probability": 0.0051,
+        "cumulative": 0.0701
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(1/2,1/2,0)",
+          "(1/2,1/2,1/2)"
+        ],
+        "count": 3,
+        "probability": 0.0051,
+        "cumulative": 0.0752
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(2/3,0,0)",
+          "(2/3,0,1/2)"
+        ],
+        "count": 3,
+        "probability": 0.0051,
+        "cumulative": 0.0803
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(2/3,0,0)",
+          "(2/3,0,1/2)"
+        ],
+        "count": 3,
+        "probability": 0.0051,
+        "cumulative": 0.0855
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,1/2)",
+          "(1/2,0,0)",
+          "(1/2,1/2,1/2)"
+        ],
+        "count": 2,
+        "probability": 0.0034,
+        "cumulative": 0.0889
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,2/3,0)",
+          "(0,2/3,1/2)"
+        ],
+        "count": 2,
+        "probability": 0.0034,
+        "cumulative": 0.0923
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(1/2,1/2,0)",
+          "(1/2,1/2,1/2)"
+        ],
+        "count": 2,
+        "probability": 0.0034,
+        "cumulative": 0.0957
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,1/2)",
+          "(1/2,0,1/2)",
+          "(1/2,1/2,0)"
+        ],
+        "count": 2,
+        "probability": 0.0034,
+        "cumulative": 0.0991
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(1/2,2/3,0)",
+          "(1/2,2/3,1/2)"
+        ],
+        "count": 2,
+        "probability": 0.0034,
+        "cumulative": 0.1026
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(1/2,0,0)",
+          "(1/3,1/2,1/2)",
+          "(5/6,1/2,1/2)"
+        ],
+        "count": 2,
+        "probability": 0.0034,
+        "cumulative": 0.106
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,1/2,0)",
+          "(0,1/2,1/2)"
+        ],
+        "count": 2,
+        "probability": 0.0034,
+        "cumulative": 0.1094
+      },
+      {
+        "system": "Cubic",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(1/2,1/6,2/3)",
+          "(1/6,2/3,1/2)",
+          "(2/3,1/2,1/6)"
+        ],
+        "count": 2,
+        "probability": 0.0034,
+        "cumulative": 0.1128
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,3/4,0)",
+          "(1/4,0,0)",
+          "(1/4,3/4,0)"
+        ],
+        "count": 2,
+        "probability": 0.0034,
+        "cumulative": 0.1162
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,1/2)",
+          "(1/2,0,1/2)",
+          "(1/2,1/2,0)"
+        ],
+        "count": 2,
+        "probability": 0.0034,
+        "cumulative": 0.1197
+      }
+    ]
+  },
+  "5": {
+    "total_structures": 24,
+    "unique_patterns": 21,
+    "predictability": "moderate",
+    "recommendation": "Use lattice_type + z_pattern; full_offsets for refinement",
+    "lattice_type": [
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "count": 13,
+        "probability": 0.5417,
+        "cumulative": 0.5417
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "count": 8,
+        "probability": 0.3333,
+        "cumulative": 0.875
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "count": 1,
+        "probability": 0.0417,
+        "cumulative": 0.9167
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "count": 1,
+        "probability": 0.0417,
+        "cumulative": 0.9583
+      },
+      {
+        "system": "Triclinic",
+        "centering": "P",
+        "count": 1,
+        "probability": 0.0417,
+        "cumulative": 1.0
+      }
+    ],
+    "z_pattern": [
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "z_values": [
+          "0",
+          "1/2"
+        ],
+        "count": 6,
+        "probability": 0.25,
+        "cumulative": 0.25
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "z_values": [
+          "0",
+          "1/3",
+          "2/3"
+        ],
+        "count": 3,
+        "probability": 0.125,
+        "cumulative": 0.375
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "z_values": [
+          "0",
+          "1/2",
+          "3/4"
+        ],
+        "count": 2,
+        "probability": 0.0833,
+        "cumulative": 0.4583
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "z_values": [
+          "0"
+        ],
+        "count": 1,
+        "probability": 0.0417,
+        "cumulative": 0.5
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "z_values": [
+          "0",
+          "0.1218",
+          "0.8782"
+        ],
+        "count": 1,
+        "probability": 0.0417,
+        "cumulative": 0.5417
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "z_values": [
+          "0",
+          "0.2255",
+          "0.7745"
+        ],
+        "count": 1,
+        "probability": 0.0417,
+        "cumulative": 0.5833
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "z_values": [
+          "0",
+          "0.4685",
+          "0.5315"
+        ],
+        "count": 1,
+        "probability": 0.0417,
+        "cumulative": 0.625
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "z_values": [
+          "0",
+          "0.3770",
+          "0.6230"
+        ],
+        "count": 1,
+        "probability": 0.0417,
+        "cumulative": 0.6667
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "z_values": [
+          "0",
+          "1/3",
+          "1/6",
+          "2/3",
+          "5/6"
+        ],
+        "count": 1,
+        "probability": 0.0417,
+        "cumulative": 0.7083
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "z_values": [
+          "0",
+          "0.2788",
+          "0.7212"
+        ],
+        "count": 1,
+        "probability": 0.0417,
+        "cumulative": 0.75
+      }
+    ],
+    "full_offsets": [
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(1/4,1/4,1/2)",
+          "(1/4,3/4,1/2)",
+          "(3/4,1/4,1/2)",
+          "(3/4,3/4,1/2)"
+        ],
+        "count": 3,
+        "probability": 0.125,
+        "cumulative": 0.125
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(0.3750,0.3750,1/2)",
+          "(0.3750,0.6250,1/2)",
+          "(0.6250,0.3750,1/2)",
+          "(0.6250,0.6250,1/2)"
+        ],
+        "count": 2,
+        "probability": 0.0833,
+        "cumulative": 0.2083
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(1/4,1/4,0)",
+          "(1/4,3/4,0)",
+          "(3/4,1/4,0)",
+          "(3/4,3/4,0)"
+        ],
+        "count": 1,
+        "probability": 0.0417,
+        "cumulative": 0.25
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.3580,0.1218)",
+          "(0,0.3580,0.8782)",
+          "(0,0.6420,0.1218)",
+          "(0,0.6420,0.8782)"
+        ],
+        "count": 1,
+        "probability": 0.0417,
+        "cumulative": 0.2917
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,0.4563,3/4)",
+          "(0,0.9126,0)",
+          "(0,0.9126,1/2)"
+        ],
+        "count": 1,
+        "probability": 0.0417,
+        "cumulative": 0.3333
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.3626,0.2255)",
+          "(0,0.3626,0.7745)",
+          "(0,0.6374,0.2255)",
+          "(0,0.6374,0.7745)"
+        ],
+        "count": 1,
+        "probability": 0.0417,
+        "cumulative": 0.375
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/4,0)",
+          "(0.3750,0.6250,1/2)",
+          "(3/4,0,0)",
+          "(3/4,1/4,0)"
+        ],
+        "count": 1,
+        "probability": 0.0417,
+        "cumulative": 0.4167
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "offsets": [
+          "(0,0,0)",
+          "(0.1953,0.3723,0.4685)",
+          "(0.1953,0.6277,0.4685)",
+          "(0.8047,0.3723,0.5315)",
+          "(0.8047,0.6277,0.5315)"
+        ],
+        "count": 1,
+        "probability": 0.0417,
+        "cumulative": 0.4583
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(0.4328,0.5612,0.6230)",
+          "(0.4388,0.4328,0.3770)",
+          "(0.5612,0.5672,0.3770)",
+          "(0.5672,0.4388,0.6230)"
+        ],
+        "count": 1,
+        "probability": 0.0417,
+        "cumulative": 0.5
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/3)",
+          "(0,0,1/6)",
+          "(0,0,2/3)",
+          "(0,0,5/6)"
+        ],
+        "count": 1,
+        "probability": 0.0417,
+        "cumulative": 0.5417
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0.5833,2/3,0.7212)",
+          "(0.9167,1/3,0.2788)",
+          "(1/2,1/4,0)",
+          "(1/4,3/4,0)"
+        ],
+        "count": 1,
+        "probability": 0.0417,
+        "cumulative": 0.5833
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/3,0.0293)",
+          "(0,1/3,0.9707)",
+          "(0,2/3,0.0293)",
+          "(0,2/3,0.9707)"
+        ],
+        "count": 1,
+        "probability": 0.0417,
+        "cumulative": 0.625
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.2886,1/3)",
+          "(0,0.2886,2/3)",
+          "(0,0.7114,1/3)",
+          "(0,0.7114,2/3)"
+        ],
+        "count": 1,
+        "probability": 0.0417,
+        "cumulative": 0.6667
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.3594,0.2069)",
+          "(0,0.3594,0.7931)",
+          "(0,0.6406,0.2069)",
+          "(0,0.6406,0.7931)"
+        ],
+        "count": 1,
+        "probability": 0.0417,
+        "cumulative": 0.7083
+      },
+      {
+        "system": "Triclinic",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(1/3,0.9458,2/3)",
+          "(1/4,2/3,0.5439)",
+          "(2/3,0.0542,1/3)",
+          "(3/4,1/3,0.4561)"
+        ],
+        "count": 1,
+        "probability": 0.0417,
+        "cumulative": 0.75
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.2959,1/3)",
+          "(0,0.2959,2/3)",
+          "(0,0.7041,1/3)",
+          "(0,0.7041,2/3)"
+        ],
+        "count": 1,
+        "probability": 0.0417,
+        "cumulative": 0.7917
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/3,0.0991)",
+          "(0,1/3,0.9009)",
+          "(0,2/3,0.0991)",
+          "(0,2/3,0.9009)"
+        ],
+        "count": 1,
+        "probability": 0.0417,
+        "cumulative": 0.8333
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.3705,0.0315)",
+          "(0,0.3705,0.9685)",
+          "(0,0.6295,0.0315)",
+          "(0,0.6295,0.9685)"
+        ],
+        "count": 1,
+        "probability": 0.0417,
+        "cumulative": 0.875
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,0.8767,3/4)",
+          "(0,3/4,0)",
+          "(0,3/4,1/2)"
+        ],
+        "count": 1,
+        "probability": 0.0417,
+        "cumulative": 0.9167
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/4,0.2981)",
+          "(0,1/4,0.7019)",
+          "(0,3/4,0.2981)",
+          "(0,3/4,0.7019)"
+        ],
+        "count": 1,
+        "probability": 0.0417,
+        "cumulative": 0.9583
+      }
+    ]
+  },
+  "6": {
+    "total_structures": 142,
+    "unique_patterns": 137,
+    "predictability": "low",
+    "recommendation": "Use lattice_type + z_pattern only; exact offsets are compound-specific",
+    "lattice_type": [
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "count": 42,
+        "probability": 0.2958,
+        "cumulative": 0.2958
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "count": 33,
+        "probability": 0.2324,
+        "cumulative": 0.5282
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "count": 21,
+        "probability": 0.1479,
+        "cumulative": 0.6761
+      },
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "count": 14,
+        "probability": 0.0986,
+        "cumulative": 0.7746
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "P",
+        "count": 13,
+        "probability": 0.0915,
+        "cumulative": 0.8662
+      },
+      {
+        "system": "Cubic",
+        "centering": "P",
+        "count": 6,
+        "probability": 0.0423,
+        "cumulative": 0.9085
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "P",
+        "count": 5,
+        "probability": 0.0352,
+        "cumulative": 0.9437
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "C",
+        "count": 5,
+        "probability": 0.0352,
+        "cumulative": 0.9789
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "I",
+        "count": 2,
+        "probability": 0.0141,
+        "cumulative": 0.993
+      },
+      {
+        "system": "Cubic",
+        "centering": "I",
+        "count": 1,
+        "probability": 0.007,
+        "cumulative": 1.0
+      }
+    ],
+    "z_pattern": [
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "z_values": [
+          "0",
+          "1/2"
+        ],
+        "count": 19,
+        "probability": 0.1338,
+        "cumulative": 0.1338
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "z_values": [
+          "0",
+          "1/3",
+          "2/3"
+        ],
+        "count": 8,
+        "probability": 0.0563,
+        "cumulative": 0.1901
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "z_values": [
+          "0",
+          "1/2"
+        ],
+        "count": 8,
+        "probability": 0.0563,
+        "cumulative": 0.2465
+      },
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "z_values": [
+          "0",
+          "1/4",
+          "3/4"
+        ],
+        "count": 6,
+        "probability": 0.0423,
+        "cumulative": 0.2887
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "z_values": [
+          "0",
+          "1/2",
+          "1/3",
+          "1/6",
+          "2/3",
+          "5/6"
+        ],
+        "count": 6,
+        "probability": 0.0423,
+        "cumulative": 0.331
+      },
+      {
+        "system": "Cubic",
+        "centering": "P",
+        "z_values": [
+          "0",
+          "1/2",
+          "1/4",
+          "3/4"
+        ],
+        "count": 5,
+        "probability": 0.0352,
+        "cumulative": 0.3662
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "C",
+        "z_values": [
+          "0",
+          "1/2",
+          "1/4",
+          "3/4"
+        ],
+        "count": 5,
+        "probability": 0.0352,
+        "cumulative": 0.4014
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "z_values": [
+          "0",
+          "1/2",
+          "1/4",
+          "3/4"
+        ],
+        "count": 4,
+        "probability": 0.0282,
+        "cumulative": 0.4296
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "z_values": [
+          "0"
+        ],
+        "count": 3,
+        "probability": 0.0211,
+        "cumulative": 0.4507
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "z_values": [
+          "0",
+          "5/6"
+        ],
+        "count": 3,
+        "probability": 0.0211,
+        "cumulative": 0.4718
+      }
+    ],
+    "full_offsets": [
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "offsets": [
+          "(0,0,0)",
+          "(1/2,0,0)",
+          "(3/4,0,1/4)",
+          "(3/4,0,3/4)",
+          "(3/4,1/4,0)",
+          "(3/4,3/4,0)"
+        ],
+        "count": 2,
+        "probability": 0.0141,
+        "cumulative": 0.0141
+      },
+      {
+        "system": "Cubic",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(1/2,0,0)",
+          "(1/4,1/4,1/2)",
+          "(1/4,3/4,1/2)",
+          "(3/4,1/2,1/4)",
+          "(3/4,1/2,3/4)"
+        ],
+        "count": 2,
+        "probability": 0.0141,
+        "cumulative": 0.0282
+      },
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,1/4,3/4)",
+          "(0,3/4,3/4)",
+          "(1/4,0,3/4)",
+          "(3/4,0,3/4)"
+        ],
+        "count": 2,
+        "probability": 0.0141,
+        "cumulative": 0.0423
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "offsets": [
+          "(0,0,0)",
+          "(1/3,0,0)",
+          "(1/6,1/4,1/3)",
+          "(1/6,1/4,2/3)",
+          "(1/6,3/4,1/3)",
+          "(1/6,3/4,2/3)"
+        ],
+        "count": 2,
+        "probability": 0.0141,
+        "cumulative": 0.0563
+      },
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,0)",
+          "(0,1/4,3/4)",
+          "(1/2,1/4,3/4)",
+          "(1/4,0,1/4)",
+          "(1/4,0,3/4)"
+        ],
+        "count": 2,
+        "probability": 0.0141,
+        "cumulative": 0.0704
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "offsets": [
+          "(0,0,0)",
+          "(0.0833,0.3927,0)",
+          "(0.4167,0.2740,0)",
+          "(0.6907,0.0833,0)",
+          "(0.8093,0.5833,0)",
+          "(1/2,2/3,0)"
+        ],
+        "count": 1,
+        "probability": 0.007,
+        "cumulative": 0.0775
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,2/3)",
+          "(0.4701,0.9403,0)",
+          "(0.4701,0.9403,1/3)",
+          "(0.5299,0.4701,1/3)",
+          "(0.5299,0.4701,2/3)"
+        ],
+        "count": 1,
+        "probability": 0.007,
+        "cumulative": 0.0845
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,0)",
+          "(1/2,0,0)",
+          "(1/3,1/6,1/2)",
+          "(1/3,2/3,1/2)",
+          "(5/6,2/3,1/2)"
+        ],
+        "count": 1,
+        "probability": 0.007,
+        "cumulative": 0.0915
+      },
+      {
+        "system": "Cubic",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(1/2,0,0)",
+          "(1/4,1/2,1/4)",
+          "(1/4,1/2,3/4)",
+          "(3/4,1/4,1/2)",
+          "(3/4,3/4,1/2)"
+        ],
+        "count": 1,
+        "probability": 0.007,
+        "cumulative": 0.0986
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0.0840,0.3902,1/2)",
+          "(0.3063,0.9160,1/2)",
+          "(0.4742,0.6965,0)",
+          "(0.6965,0.2223,0)",
+          "(0.7805,0.6126,1/2)"
+        ],
+        "count": 1,
+        "probability": 0.007,
+        "cumulative": 0.1056
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.5770,5/6)",
+          "(0.1942,0.7885,0)",
+          "(0.2115,0.9828,5/6)",
+          "(0.7885,0.5943,0)",
+          "(0.8058,0.7885,5/6)"
+        ],
+        "count": 1,
+        "probability": 0.007,
+        "cumulative": 0.1127
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "offsets": [
+          "(0,0,0)",
+          "(0.0253,0.6914,0.1889)",
+          "(0.3086,1/3,0.1889)",
+          "(0.3580,0.7167,0)",
+          "(0.6414,0.3580,0)",
+          "(2/3,0.0494,0.1889)"
+        ],
+        "count": 1,
+        "probability": 0.007,
+        "cumulative": 0.1197
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/6,1/2)",
+          "(2/3,0,1/2)",
+          "(2/3,5/6,0)",
+          "(5/6,1/6,0)",
+          "(5/6,5/6,1/2)"
+        ],
+        "count": 1,
+        "probability": 0.007,
+        "cumulative": 0.1268
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(1/3,2/3,1/3)",
+          "(1/3,2/3,2/3)",
+          "(2/3,1/3,1/6)",
+          "(2/3,1/3,5/6)"
+        ],
+        "count": 1,
+        "probability": 0.007,
+        "cumulative": 0.1338
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/3,1/2)",
+          "(0.3570,1/6,0)",
+          "(0.6430,1/6,1/2)",
+          "(1/6,0.8096,0)",
+          "(5/6,0.5237,1/2)"
+        ],
+        "count": 1,
+        "probability": 0.007,
+        "cumulative": 0.1408
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "offsets": [
+          "(0,0,0)",
+          "(0.5897,1/6,0)",
+          "(0.8461,1/2,5/6)",
+          "(1/4,1/3,5/6)",
+          "(1/6,0.5833,0)",
+          "(2/3,0.9167,5/6)"
+        ],
+        "count": 1,
+        "probability": 0.007,
+        "cumulative": 0.1479
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,0)",
+          "(1/2,1/2,0)",
+          "(1/6,5/6,0.5444)",
+          "(2/3,1/3,0.5444)",
+          "(2/3,5/6,0.5444)"
+        ],
+        "count": 1,
+        "probability": 0.007,
+        "cumulative": 0.1549
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/6)",
+          "(0,0,5/6)",
+          "(2/3,1/3,1/2)",
+          "(2/3,1/3,1/3)",
+          "(2/3,1/3,2/3)"
+        ],
+        "count": 1,
+        "probability": 0.007,
+        "cumulative": 0.162
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.7999,1/2)",
+          "(0.4468,0.4468,1/2)",
+          "(0.4468,0.7999,0)",
+          "(0.6469,0,1/2)",
+          "(0.6469,0.4468,0)"
+        ],
+        "count": 1,
+        "probability": 0.007,
+        "cumulative": 0.169
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(1/2,0,0)",
+          "(1/2,1/2,0)",
+          "(1/6,1/3,1/2)",
+          "(1/6,5/6,1/2)",
+          "(2/3,1/3,1/2)"
+        ],
+        "count": 1,
+        "probability": 0.007,
+        "cumulative": 0.1761
+      }
+    ]
+  },
+  "7": {
+    "total_structures": 11,
+    "unique_patterns": 11,
+    "predictability": "high",
+    "recommendation": "Use full_offsets directly - patterns are predictable",
+    "lattice_type": [
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "count": 4,
+        "probability": 0.3636,
+        "cumulative": 0.3636
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "count": 3,
+        "probability": 0.2727,
+        "cumulative": 0.6364
+      },
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "count": 3,
+        "probability": 0.2727,
+        "cumulative": 0.9091
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "F",
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 1.0
+      }
+    ],
+    "z_pattern": [
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "z_values": [
+          "0",
+          "1/2"
+        ],
+        "count": 4,
+        "probability": 0.3636,
+        "cumulative": 0.3636
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "z_values": [
+          "0",
+          "0.4238",
+          "0.5762"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.4545
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "z_values": [
+          "0",
+          "0.0886",
+          "0.9114"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.5455
+      },
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "z_values": [
+          "0",
+          "1/2",
+          "1/4",
+          "3/4"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.6364
+      },
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "z_values": [
+          "0",
+          "1/4",
+          "3/4"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.7273
+      },
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "z_values": [
+          "0",
+          "0.2169",
+          "0.7831",
+          "1/2"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.8182
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "F",
+        "z_values": [
+          "0",
+          "1/2",
+          "1/4"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.9091
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "z_values": [
+          "0",
+          "0.4696",
+          "0.5304"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 1.0
+      }
+    ],
+    "full_offsets": [
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "offsets": [
+          "(0,0,0)",
+          "(0.0326,0.3023,0.5762)",
+          "(0.3023,1/4,0.4238)",
+          "(0.6977,3/4,0.5762)",
+          "(0.9674,0.6977,0.4238)",
+          "(1/4,0.9674,0.5762)",
+          "(3/4,0.0326,0.4238)"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.0909
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "offsets": [
+          "(0,0,0)",
+          "(0.0394,2/3,0.0886)",
+          "(0.3666,0.0394,0.9114)",
+          "(0.6334,0.9606,0.0886)",
+          "(0.9606,1/3,0.9114)",
+          "(1/3,0.3666,0.0886)",
+          "(2/3,0.6334,0.9114)"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.1818
+      },
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "offsets": [
+          "(0,0,0)",
+          "(1/2,1/2,1/4)",
+          "(1/2,1/2,3/4)",
+          "(1/2,1/4,1/2)",
+          "(1/2,3/4,1/2)",
+          "(1/4,1/2,1/2)",
+          "(3/4,1/2,1/2)"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.2727
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1.0000,0)",
+          "(0.1004,0.5161,0)",
+          "(0.2282,0.8722,1/2)",
+          "(0.5161,0.4157,0)",
+          "(0.6439,0.7718,1/2)",
+          "(3/4,0.2879,1/2)"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.3636
+      },
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/4)",
+          "(0,0,3/4)",
+          "(0,1/4,0)",
+          "(0,3/4,0)",
+          "(1/4,0,0)",
+          "(3/4,0,0)"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.4545
+      },
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "offsets": [
+          "(0,0,0)",
+          "(0.2169,1/2,1/2)",
+          "(0.7831,1/2,1/2)",
+          "(1/2,0.2169,1/2)",
+          "(1/2,0.7831,1/2)",
+          "(1/2,1/2,0.2169)",
+          "(1/2,1/2,0.7831)"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.5455
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.1229,1/2)",
+          "(0,1.0000,0)",
+          "(0.4300,0.5615,0)",
+          "(0.4385,0.9914,1/2)",
+          "(0.5615,0.1315,0)",
+          "(0.5700,0.5615,1/2)"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.6364
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0.1320,0.4401,0)",
+          "(0.3802,1/2,1/2)",
+          "(0.3803,1/2,1/2)",
+          "(0.4401,0.3081,0)",
+          "(0.9401,0.1919,1/2)",
+          "(1/4,0.0599,1/2)"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.7273
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "F",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,1/2)",
+          "(0.1545,2/3,0)",
+          "(0.4106,1/4,1/4)",
+          "(0.6545,2/3,1/2)",
+          "(1/4,0.9191,1/4)",
+          "(3/4,0.4191,1/4)"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.8182
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "offsets": [
+          "(0,0,0)",
+          "(0.2775,0.4430,0.4696)",
+          "(0.4430,1/6,0.5304)",
+          "(0.5570,5/6,0.4696)",
+          "(0.7225,0.5570,0.5304)",
+          "(1/6,0.7225,0.4696)",
+          "(5/6,0.2775,0.5304)"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.9091
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0.0781,0,1/2)",
+          "(0.5391,0,0)",
+          "(0.5391,0,1/2)",
+          "(0.5391,0.4609,1/2)",
+          "(0.5391,0.5391,0)",
+          "(1.0000,0,0)"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 1.0
+      }
+    ]
+  },
+  "8": {
+    "total_structures": 382,
+    "unique_patterns": 364,
+    "predictability": "low",
+    "recommendation": "Use lattice_type + z_pattern only; exact offsets are compound-specific",
+    "lattice_type": [
+      {
+        "system": "Orthorhombic",
+        "centering": "P",
+        "count": 131,
+        "probability": 0.3429,
+        "cumulative": 0.3429
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "P",
+        "count": 86,
+        "probability": 0.2251,
+        "cumulative": 0.5681
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "count": 49,
+        "probability": 0.1283,
+        "cumulative": 0.6963
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "count": 43,
+        "probability": 0.1126,
+        "cumulative": 0.8089
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "C",
+        "count": 18,
+        "probability": 0.0471,
+        "cumulative": 0.856
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "P",
+        "count": 15,
+        "probability": 0.0393,
+        "cumulative": 0.8953
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "count": 12,
+        "probability": 0.0314,
+        "cumulative": 0.9267
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "count": 6,
+        "probability": 0.0157,
+        "cumulative": 0.9424
+      },
+      {
+        "system": "Cubic",
+        "centering": "P",
+        "count": 6,
+        "probability": 0.0157,
+        "cumulative": 0.9581
+      },
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "count": 5,
+        "probability": 0.0131,
+        "cumulative": 0.9712
+      }
+    ],
+    "z_pattern": [
+      {
+        "system": "Orthorhombic",
+        "centering": "P",
+        "z_values": [
+          "0",
+          "1/2"
+        ],
+        "count": 30,
+        "probability": 0.0785,
+        "cumulative": 0.0785
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "P",
+        "z_values": [
+          "0",
+          "1/2",
+          "1/3",
+          "5/6"
+        ],
+        "count": 16,
+        "probability": 0.0419,
+        "cumulative": 0.1204
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "P",
+        "z_values": [
+          "0",
+          "1/2"
+        ],
+        "count": 16,
+        "probability": 0.0419,
+        "cumulative": 0.1623
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "P",
+        "z_values": [
+          "0",
+          "1/2",
+          "1/4",
+          "3/4"
+        ],
+        "count": 12,
+        "probability": 0.0314,
+        "cumulative": 0.1937
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "P",
+        "z_values": [
+          "0",
+          "1/2",
+          "1/6",
+          "2/3"
+        ],
+        "count": 8,
+        "probability": 0.0209,
+        "cumulative": 0.2147
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "z_values": [
+          "0",
+          "1/2"
+        ],
+        "count": 8,
+        "probability": 0.0209,
+        "cumulative": 0.2356
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "z_values": [
+          "0"
+        ],
+        "count": 7,
+        "probability": 0.0183,
+        "cumulative": 0.2539
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "z_values": [
+          "0",
+          "1/2"
+        ],
+        "count": 7,
+        "probability": 0.0183,
+        "cumulative": 0.2723
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "C",
+        "z_values": [
+          "0",
+          "1/2"
+        ],
+        "count": 7,
+        "probability": 0.0183,
+        "cumulative": 0.2906
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "P",
+        "z_values": [
+          "0",
+          "1/2",
+          "1/3",
+          "5/6"
+        ],
+        "count": 5,
+        "probability": 0.0131,
+        "cumulative": 0.3037
+      }
+    ],
+    "full_offsets": [
+      {
+        "system": "Orthorhombic",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,1/2,0)",
+          "(0,1/2,1/2)",
+          "(1/2,0,0)",
+          "(1/2,0,1/2)",
+          "(1/2,1/2,0)",
+          "(1/2,1/2,1/2)"
+        ],
+        "count": 8,
+        "probability": 0.0209,
+        "cumulative": 0.0209
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,0)",
+          "(0.1250,0.1250,0)",
+          "(0.1250,0.3750,0)",
+          "(0.3750,0.1250,0)",
+          "(0.3750,0.3750,0)",
+          "(1/2,0,0)",
+          "(1/2,1/2,0)"
+        ],
+        "count": 4,
+        "probability": 0.0105,
+        "cumulative": 0.0314
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,1/2,0)",
+          "(0,1/2,1/2)",
+          "(1/2,0,0)",
+          "(1/2,0,1/2)",
+          "(1/2,1/2,0)",
+          "(1/2,1/2,1/2)"
+        ],
+        "count": 3,
+        "probability": 0.0079,
+        "cumulative": 0.0393
+      },
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "offsets": [
+          "(0,0,0)",
+          "(0,3/4,3/4)",
+          "(1/2,1/2,1/2)",
+          "(1/2,3/4,3/4)",
+          "(3/4,0,3/4)",
+          "(3/4,1/2,3/4)",
+          "(3/4,3/4,0)",
+          "(3/4,3/4,1/2)"
+        ],
+        "count": 2,
+        "probability": 0.0052,
+        "cumulative": 0.0445
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,1/4)",
+          "(0,1/4,0)",
+          "(0,3/4,1/4)",
+          "(3/4,0,0)",
+          "(3/4,1/2,1/4)",
+          "(3/4,1/4,0)",
+          "(3/4,3/4,1/4)"
+        ],
+        "count": 2,
+        "probability": 0.0052,
+        "cumulative": 0.0497
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,1/4,0)",
+          "(0,1/4,1/2)",
+          "(1/4,0,0)",
+          "(1/4,0,1/2)",
+          "(1/4,1/4,0)",
+          "(1/4,1/4,1/2)"
+        ],
+        "count": 2,
+        "probability": 0.0052,
+        "cumulative": 0.055
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,1/2,0)",
+          "(0,1/2,1/2)",
+          "(1/2,0,0)",
+          "(1/2,0,1/2)",
+          "(1/2,1/2,0)",
+          "(1/2,1/2,1/2)"
+        ],
+        "count": 2,
+        "probability": 0.0052,
+        "cumulative": 0.0602
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,1/2)",
+          "(0,1/6,0)",
+          "(0,2/3,1/2)",
+          "(1/2,0,3/4)",
+          "(1/2,1/2,1/4)",
+          "(1/2,1/6,3/4)",
+          "(1/2,2/3,1/4)"
+        ],
+        "count": 2,
+        "probability": 0.0052,
+        "cumulative": 0.0654
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,3/4,0)",
+          "(0,3/4,1/2)",
+          "(1/4,0,0)",
+          "(1/4,0,1/2)",
+          "(1/4,3/4,0)",
+          "(1/4,3/4,1/2)"
+        ],
+        "count": 2,
+        "probability": 0.0052,
+        "cumulative": 0.0707
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,2/3)",
+          "(0.0213,0.3685,3/4)",
+          "(0.3685,1/3,0.9135)",
+          "(0.6315,2/3,3/4)",
+          "(0.9787,0.6315,0.9135)",
+          "(1/3,0.9787,3/4)",
+          "(2/3,0.0213,0.9135)"
+        ],
+        "count": 1,
+        "probability": 0.0026,
+        "cumulative": 0.0733
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,0)",
+          "(0.0634,0,0.4366)",
+          "(0.0634,1/2,0.4366)",
+          "(0.5634,0,1/2)",
+          "(0.5634,1/2,1/2)",
+          "(1/2,0,0.9366)",
+          "(1/2,1/2,0.9366)"
+        ],
+        "count": 1,
+        "probability": 0.0026,
+        "cumulative": 0.0759
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.2793,1/2)",
+          "(0,0.7793,0)",
+          "(0,1/2,1/2)",
+          "(1/2,0,0.3501)",
+          "(1/2,0.2793,0.8501)",
+          "(1/2,0.7793,0.3501)",
+          "(1/2,1/2,0.8501)"
+        ],
+        "count": 1,
+        "probability": 0.0026,
+        "cumulative": 0.0785
+      },
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "offsets": [
+          "(0,0,0)",
+          "(0,3/4,3/4)",
+          "(1/2,0,0)",
+          "(1/2,1/4,1/4)",
+          "(1/4,0,1/4)",
+          "(1/4,0,3/4)",
+          "(1/4,1/4,0)",
+          "(1/4,3/4,0)"
+        ],
+        "count": 1,
+        "probability": 0.0026,
+        "cumulative": 0.0812
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0.1348,0.7798,0.9632)",
+          "(0.2202,0.3551,0.9632)",
+          "(0.3551,0.1348,0.4632)",
+          "(0.6449,0.8652,0.9632)",
+          "(0.7798,0.6449,0.4632)",
+          "(0.8652,0.2202,0.4632)"
+        ],
+        "count": 1,
+        "probability": 0.0026,
+        "cumulative": 0.0838
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,0.5904)",
+          "(0,1/2,0)",
+          "(0,1/2,0.5904)",
+          "(1/2,0,0)",
+          "(1/2,0,0.5904)",
+          "(1/2,1/2,0)",
+          "(1/2,1/2,0.5904)"
+        ],
+        "count": 1,
+        "probability": 0.0026,
+        "cumulative": 0.0864
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.3750,1/4)",
+          "(0,0.8750,1/2)",
+          "(0,1/2,3/4)",
+          "(0.1250,0,1/2)",
+          "(0.1250,0.3750,3/4)",
+          "(0.1250,0.8750,0)",
+          "(0.1250,1/2,1/4)"
+        ],
+        "count": 1,
+        "probability": 0.0026,
+        "cumulative": 0.089
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,3/4)",
+          "(0,1/3,0)",
+          "(0,1/3,3/4)",
+          "(1/2,1/2,1/2)",
+          "(1/2,1/2,1/4)",
+          "(1/2,5/6,1/2)",
+          "(1/2,5/6,1/4)"
+        ],
+        "count": 1,
+        "probability": 0.0026,
+        "cumulative": 0.0916
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0.0572,1/4,0.6350)",
+          "(0.0572,3/4,0.1350)",
+          "(0.3810,0,0)",
+          "(0.3810,0,1/2)",
+          "(1/3,1/4,0.3650)",
+          "(1/3,3/4,0.8650)"
+        ],
+        "count": 1,
+        "probability": 0.0026,
+        "cumulative": 0.0942
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,3/4)",
+          "(1/2,0.3537,0)",
+          "(1/2,0.8537,3/4)",
+          "(1/4,0.3537,1/4)",
+          "(1/4,0.8537,1/2)",
+          "(3/4,0,1/4)",
+          "(3/4,1/2,1/2)"
+        ],
+        "count": 1,
+        "probability": 0.0026,
+        "cumulative": 0.0969
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,0.0757)",
+          "(1/2,0.1557,0)",
+          "(1/2,0.6557,0.0757)",
+          "(2/3,1/3,1/4)",
+          "(2/3,5/6,0.8181)",
+          "(5/6,1/3,0.8181)",
+          "(5/6,5/6,1/4)"
+        ],
+        "count": 1,
+        "probability": 0.0026,
+        "cumulative": 0.0995
+      }
+    ]
+  },
+  "9": {
+    "total_structures": 11,
+    "unique_patterns": 11,
+    "predictability": "high",
+    "recommendation": "Use full_offsets directly - patterns are predictable",
+    "lattice_type": [
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "count": 4,
+        "probability": 0.3636,
+        "cumulative": 0.3636
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "count": 2,
+        "probability": 0.1818,
+        "cumulative": 0.5455
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "I",
+        "count": 2,
+        "probability": 0.1818,
+        "cumulative": 0.7273
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "count": 2,
+        "probability": 0.1818,
+        "cumulative": 0.9091
+      },
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 1.0
+      }
+    ],
+    "z_pattern": [
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "z_values": [
+          "0",
+          "1/4",
+          "3/4"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.0909
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "z_values": [
+          "0",
+          "0.1387",
+          "0.8613"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.1818
+      },
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "z_values": [
+          "0",
+          "0.2245",
+          "0.7755",
+          "1/2",
+          "1/4",
+          "3/4"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.2727
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "I",
+        "z_values": [
+          "0",
+          "0.4436",
+          "0.5564"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.3636
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "z_values": [
+          "0",
+          "1.0000",
+          "1/2"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.4545
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "I",
+        "z_values": [
+          "0",
+          "1/3",
+          "2/3"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.5455
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "z_values": [
+          "0",
+          "0.2262",
+          "0.7738"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.6364
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "z_values": [
+          "0",
+          "0.1261",
+          "0.2961",
+          "0.7039",
+          "0.8739"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.7273
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "z_values": [
+          "0",
+          "0.4598",
+          "0.9195",
+          "1/4",
+          "2/3"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.8182
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "z_values": [
+          "0",
+          "0.2057",
+          "0.4636",
+          "0.5364",
+          "0.7943"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.9091
+      }
+    ],
+    "full_offsets": [
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(0.3545,0.3935,1/4)",
+          "(0.3545,0.3935,3/4)",
+          "(0.3935,0.6455,1/4)",
+          "(0.3935,0.6455,3/4)",
+          "(0.6065,0.3545,1/4)",
+          "(0.6065,0.3545,3/4)",
+          "(0.6455,0.6065,1/4)",
+          "(0.6455,0.6065,3/4)"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.0909
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(0.0693,0.0693,0.1387)",
+          "(0.0693,0.0693,0.8613)",
+          "(0.0693,0.9307,0.1387)",
+          "(0.0693,0.9307,0.8613)",
+          "(0.9307,0.0693,0.1387)",
+          "(0.9307,0.0693,0.8613)",
+          "(0.9307,0.9307,0.1387)",
+          "(0.9307,0.9307,0.8613)"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.1818
+      },
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "offsets": [
+          "(0,0,0)",
+          "(0.2245,1/2,1/2)",
+          "(0.7755,1/2,1/2)",
+          "(1/2,0.2245,1/2)",
+          "(1/2,0.7755,1/2)",
+          "(1/2,1/2,0.2245)",
+          "(1/2,1/2,0.7755)",
+          "(1/4,1/4,1/4)",
+          "(3/4,3/4,3/4)"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.2727
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(1/3,0.4032,0.4436)",
+          "(1/3,0.4032,0.5564)",
+          "(1/3,0.5968,0.4436)",
+          "(1/3,0.5968,0.5564)",
+          "(2/3,0.4032,0.4436)",
+          "(2/3,0.4032,0.5564)",
+          "(2/3,0.5968,0.4436)",
+          "(2/3,0.5968,0.5564)"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.3636
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1.0000)",
+          "(0,1/2,0)",
+          "(0,1/2,1.0000)",
+          "(1/2,1/2,0)",
+          "(1/2,1/2,1.0000)",
+          "(1/6,5/6,1/2)",
+          "(2/3,1/3,1/2)",
+          "(2/3,5/6,1/2)"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.4545
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(1/3,1/3,1/3)",
+          "(1/3,1/3,2/3)",
+          "(1/3,2/3,1/3)",
+          "(1/3,2/3,2/3)",
+          "(2/3,1/3,1/3)",
+          "(2/3,1/3,2/3)",
+          "(2/3,2/3,1/3)",
+          "(2/3,2/3,2/3)"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.5455
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,0)",
+          "(1/2,1/2,0)",
+          "(1/2,1/3,0.7738)",
+          "(1/2,2/3,0.2262)",
+          "(1/6,0,0.2262)",
+          "(1/6,2/3,0.7738)",
+          "(5/6,0,0.7738)",
+          "(5/6,1/3,0.2262)"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.6364
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/4,0.1261)",
+          "(0,1/4,0.8739)",
+          "(0,3/4,0.1261)",
+          "(0,3/4,0.8739)",
+          "(0.1976,0.3579,0.7039)",
+          "(0.1976,0.6421,0.7039)",
+          "(0.8024,0.3579,0.2961)",
+          "(0.8024,0.6421,0.2961)"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.7273
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,0.9195)",
+          "(0,0.5754,1/4)",
+          "(0,0.5754,2/3)",
+          "(0,1/3,0)",
+          "(0,1/3,0.9195)",
+          "(0,1/6,0.4598)",
+          "(0,3/4,1/4)",
+          "(0,3/4,2/3)"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.8182
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.4082,0.2057)",
+          "(0,0.4082,0.7943)",
+          "(0,0.5918,0.2057)",
+          "(0,0.5918,0.7943)",
+          "(0,1/6,0.4636)",
+          "(0,1/6,0.5364)",
+          "(0,5/6,0.4636)",
+          "(0,5/6,0.5364)"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.9091
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,0.1111,0.0476)",
+          "(0,0.1111,0.4524)",
+          "(0,0.6111,0.0476)",
+          "(0,0.6111,0.4524)",
+          "(0,0.7222,0)",
+          "(0,0.7222,1/2)",
+          "(0,0.8611,3/4)"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 1.0
+      }
+    ]
+  },
+  "10": {
+    "total_structures": 11,
+    "unique_patterns": 9,
+    "predictability": "high",
+    "recommendation": "Use full_offsets directly - patterns are predictable",
+    "lattice_type": [
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "count": 4,
+        "probability": 0.3636,
+        "cumulative": 0.3636
+      },
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "count": 2,
+        "probability": 0.1818,
+        "cumulative": 0.5455
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "C",
+        "count": 2,
+        "probability": 0.1818,
+        "cumulative": 0.7273
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "P",
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.8182
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "I",
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.9091
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "P",
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 1.0
+      }
+    ],
+    "z_pattern": [
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "z_values": [
+          "0",
+          "1/2",
+          "1/4",
+          "3/4"
+        ],
+        "count": 4,
+        "probability": 0.3636,
+        "cumulative": 0.3636
+      },
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "z_values": [
+          "0",
+          "0.6250",
+          "0.8750",
+          "1/4",
+          "3/4"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.4545
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "C",
+        "z_values": [
+          "0",
+          "1/2",
+          "1/4",
+          "3/4"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.5455
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "P",
+        "z_values": [
+          "0",
+          "0.2170",
+          "0.7830"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.6364
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "C",
+        "z_values": [
+          "0",
+          "1/2",
+          "1/4"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.7273
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "I",
+        "z_values": [
+          "0",
+          "1/4",
+          "3/4"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.8182
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "P",
+        "z_values": [
+          "0",
+          "1/2",
+          "3/4"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.9091
+      },
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "z_values": [
+          "0",
+          "0.1250",
+          "0.3750",
+          "1/2",
+          "1/4"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 1.0
+      }
+    ],
+    "full_offsets": [
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,1/4)",
+          "(0.3750,0.1250,3/4)",
+          "(0.3750,0.3750,1/2)",
+          "(0.3750,0.6250,1/2)",
+          "(0.3750,0.8750,3/4)",
+          "(0.6250,0.1250,3/4)",
+          "(0.6250,0.3750,1/2)",
+          "(0.6250,0.6250,1/2)",
+          "(0.6250,0.8750,3/4)"
+        ],
+        "count": 3,
+        "probability": 0.2727,
+        "cumulative": 0.2727
+      },
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,0)",
+          "(0,1/4,1/4)",
+          "(0,1/4,3/4)",
+          "(0.3750,0.1250,0.8750)",
+          "(0.6250,0.8750,0.6250)",
+          "(1/4,1/2,1/4)",
+          "(1/4,1/4,0)",
+          "(3/4,0,3/4)",
+          "(3/4,1/4,0)"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.3636
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "C",
+        "offsets": [
+          "(0,0,0)",
+          "(0.1308,1/4,3/4)",
+          "(0.1308,3/4,1/4)",
+          "(0.3692,1/4,3/4)",
+          "(0.3692,3/4,1/4)",
+          "(0.6308,1/4,3/4)",
+          "(0.6308,3/4,1/4)",
+          "(0.8692,1/4,3/4)",
+          "(0.8692,3/4,1/4)",
+          "(1/2,0,1/2)"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.4545
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.3702,0.2170)",
+          "(0,0.3702,0.7830)",
+          "(0,0.6298,0.2170)",
+          "(0,0.6298,0.7830)",
+          "(1/2,0.1298,0.2170)",
+          "(1/2,0.1298,0.7830)",
+          "(1/2,0.8702,0.2170)",
+          "(1/2,0.8702,0.7830)",
+          "(1/2,1/2,0)"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.5455
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,0.5424,0)",
+          "(0,0.5424,1/2)",
+          "(0.1086,0.0212,1/4)",
+          "(0.8914,0.5212,1/4)",
+          "(1/2,0,0)",
+          "(1/2,0,1/2)",
+          "(1/2,0.5424,0)",
+          "(1/2,0.5424,1/2)"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.6364
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,0)",
+          "(1/4,0,1/4)",
+          "(1/4,0,3/4)",
+          "(1/4,1/2,1/4)",
+          "(1/4,1/2,3/4)",
+          "(3/4,0,1/4)",
+          "(3/4,0,3/4)",
+          "(3/4,1/2,1/4)",
+          "(3/4,1/2,3/4)"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.7273
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,1/4)",
+          "(1/2,1/4,1/2)",
+          "(1/2,1/4,3/4)",
+          "(1/2,3/4,1/2)",
+          "(1/2,3/4,3/4)",
+          "(1/4,0,0)",
+          "(1/4,1/2,1/4)",
+          "(3/4,0,0)",
+          "(3/4,1/2,1/4)"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.8182
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,0)",
+          "(0,1/4,3/4)",
+          "(1/2,0,1/2)",
+          "(1/2,1/2,1/2)",
+          "(1/2,3/4,3/4)",
+          "(1/4,1/4,0)",
+          "(1/4,3/4,1/2)",
+          "(3/4,1/4,0)",
+          "(3/4,3/4,1/2)"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 0.9091
+      },
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/4,1/4)",
+          "(0.1250,0.1250,0.1250)",
+          "(0.3750,0.3750,0.3750)",
+          "(1/2,1/2,1/2)",
+          "(1/2,1/4,1/4)",
+          "(1/4,0,1/4)",
+          "(1/4,1/2,1/4)",
+          "(1/4,1/4,0)",
+          "(1/4,1/4,1/2)"
+        ],
+        "count": 1,
+        "probability": 0.0909,
+        "cumulative": 1.0
+      }
+    ]
+  },
+  "12": {
+    "total_structures": 49,
+    "unique_patterns": 48,
+    "predictability": "low",
+    "recommendation": "Use lattice_type + z_pattern only; exact offsets are compound-specific",
+    "lattice_type": [
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "count": 10,
+        "probability": 0.2041,
+        "cumulative": 0.2041
+      },
+      {
+        "system": "Cubic",
+        "centering": "I",
+        "count": 9,
+        "probability": 0.1837,
+        "cumulative": 0.3878
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "count": 7,
+        "probability": 0.1429,
+        "cumulative": 0.5306
+      },
+      {
+        "system": "Cubic",
+        "centering": "P",
+        "count": 5,
+        "probability": 0.102,
+        "cumulative": 0.6327
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "count": 4,
+        "probability": 0.0816,
+        "cumulative": 0.7143
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "C",
+        "count": 4,
+        "probability": 0.0816,
+        "cumulative": 0.7959
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "I",
+        "count": 3,
+        "probability": 0.0612,
+        "cumulative": 0.8571
+      },
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "count": 3,
+        "probability": 0.0612,
+        "cumulative": 0.9184
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "P",
+        "count": 2,
+        "probability": 0.0408,
+        "cumulative": 0.9592
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "count": 2,
+        "probability": 0.0408,
+        "cumulative": 1.0
+      }
+    ],
+    "z_pattern": [
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "z_values": [
+          "0",
+          "1/2",
+          "1/6",
+          "2/3"
+        ],
+        "count": 5,
+        "probability": 0.102,
+        "cumulative": 0.102
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "z_values": [
+          "0",
+          "1/2",
+          "1/3",
+          "5/6"
+        ],
+        "count": 3,
+        "probability": 0.0612,
+        "cumulative": 0.1633
+      },
+      {
+        "system": "Cubic",
+        "centering": "I",
+        "z_values": [
+          "0",
+          "1/2",
+          "1/4",
+          "3/4"
+        ],
+        "count": 2,
+        "probability": 0.0408,
+        "cumulative": 0.2041
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "z_values": [
+          "0",
+          "1/2"
+        ],
+        "count": 1,
+        "probability": 0.0204,
+        "cumulative": 0.2245
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "I",
+        "z_values": [
+          "0",
+          "0.0467",
+          "0.9533"
+        ],
+        "count": 1,
+        "probability": 0.0204,
+        "cumulative": 0.2449
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "z_values": [
+          "0",
+          "1/2",
+          "1/3",
+          "5/6"
+        ],
+        "count": 1,
+        "probability": 0.0204,
+        "cumulative": 0.2653
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "z_values": [
+          "0",
+          "0.1946",
+          "0.3054",
+          "1/2"
+        ],
+        "count": 1,
+        "probability": 0.0204,
+        "cumulative": 0.2857
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "P",
+        "z_values": [
+          "0",
+          "0.5967",
+          "0.5968"
+        ],
+        "count": 1,
+        "probability": 0.0204,
+        "cumulative": 0.3061
+      },
+      {
+        "system": "Cubic",
+        "centering": "I",
+        "z_values": [
+          "0",
+          "0.0800",
+          "1/6",
+          "2/3",
+          "3/4",
+          "5/6"
+        ],
+        "count": 1,
+        "probability": 0.0204,
+        "cumulative": 0.3265
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "z_values": [
+          "0",
+          "0.0604",
+          "0.4396",
+          "0.5604",
+          "0.9396",
+          "1/2"
+        ],
+        "count": 1,
+        "probability": 0.0204,
+        "cumulative": 0.3469
+      }
+    ],
+    "full_offsets": [
+      {
+        "system": "Cubic",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,1/2)",
+          "(0,1/4,3/4)",
+          "(0,3/4,1/4)",
+          "(1/2,0,1/2)",
+          "(1/2,1/2,0)",
+          "(1/2,1/4,1/4)",
+          "(1/2,3/4,3/4)",
+          "(1/4,1/4,1/2)",
+          "(1/4,3/4,0)",
+          "(3/4,1/4,0)",
+          "(3/4,3/4,1/2)"
+        ],
+        "count": 2,
+        "probability": 0.0408,
+        "cumulative": 0.0408
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,2/3)",
+          "(0,2/3,1/2)",
+          "(0,2/3,1/6)",
+          "(1/3,1/3,1/2)",
+          "(1/3,1/3,1/6)",
+          "(1/3,2/3,0)",
+          "(1/3,2/3,2/3)",
+          "(2/3,0,1/2)",
+          "(2/3,0,1/6)",
+          "(2/3,1/3,0)",
+          "(2/3,1/3,2/3)"
+        ],
+        "count": 1,
+        "probability": 0.0204,
+        "cumulative": 0.0612
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,1/4,0)",
+          "(0,3/4,0)",
+          "(0,3/4,1/2)",
+          "(1/2,1.0000,0)",
+          "(1/4,0,0)",
+          "(1/4,0,1/2)",
+          "(1/4,1/2,0)",
+          "(1/4,3/4,0)",
+          "(1/4,3/4,1/2)",
+          "(3/4,3/4,0)"
+        ],
+        "count": 1,
+        "probability": 0.0204,
+        "cumulative": 0.0816
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.3004,1/2)",
+          "(0.0329,0.3662,1/6)",
+          "(0.0329,0.9671,2/3)",
+          "(0.3991,0,1/2)",
+          "(0.3991,0.6996,0)",
+          "(0.6996,0.3004,0)",
+          "(0.6996,0.6996,1/2)",
+          "(0.7325,0.3662,2/3)",
+          "(0.7325,2/3,1/6)",
+          "(1/3,0.9671,1/6)",
+          "(1/3,2/3,2/3)"
+        ],
+        "count": 1,
+        "probability": 0.0204,
+        "cumulative": 0.102
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,0)",
+          "(0.1484,0.0833,0.0467)",
+          "(0.1484,0.0833,0.9533)",
+          "(0.1484,0.4167,0.0467)",
+          "(0.1484,0.4167,0.9533)",
+          "(0.3516,0.0833,0.0467)",
+          "(0.3516,0.0833,0.9533)",
+          "(0.3516,0.4167,0.0467)",
+          "(0.3516,0.4167,0.9533)",
+          "(1/2,0,0)",
+          "(1/2,1/2,0)"
+        ],
+        "count": 1,
+        "probability": 0.0204,
+        "cumulative": 0.1224
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.3215,1/2)",
+          "(0.1116,0.0558,1/3)",
+          "(0.1116,0.3773,5/6)",
+          "(0.3671,0.0558,5/6)",
+          "(0.3671,0.6329,1/3)",
+          "(0.4229,0,1/2)",
+          "(0.4229,3/4,0)",
+          "(0.6886,0.3773,1/3)",
+          "(0.6886,0.6329,5/6)",
+          "(3/4,0.3215,0)",
+          "(3/4,3/4,1/2)"
+        ],
+        "count": 1,
+        "probability": 0.0204,
+        "cumulative": 0.1429
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.3544,1/2)",
+          "(0.2911,0,1/2)",
+          "(0.2911,0.6456,0)",
+          "(0.3122,0.6878,1/3)",
+          "(0.3122,0.9789,5/6)",
+          "(0.6456,0.3544,0)",
+          "(0.6456,0.6456,1/2)",
+          "(0.9578,0.9789,1/3)",
+          "(0.9578,1/3,5/6)",
+          "(2/3,0.6878,5/6)",
+          "(2/3,1/3,1/3)"
+        ],
+        "count": 1,
+        "probability": 0.0204,
+        "cumulative": 0.1633
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,1/2)",
+          "(0.0554,0,1/2)",
+          "(0.0554,1/2,0)",
+          "(0.1944,0.0833,0.1946)",
+          "(0.1944,0.4167,0.3054)",
+          "(0.2777,0.2223,1/2)",
+          "(0.2777,0.2777,0)",
+          "(0.7777,0.2223,0)",
+          "(0.7777,0.2777,1/2)",
+          "(0.8610,0.0833,0.3054)",
+          "(0.8610,0.4167,0.1946)"
+        ],
+        "count": 1,
+        "probability": 0.0204,
+        "cumulative": 0.1837
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,0.5967)",
+          "(0,0,0.5968)",
+          "(0,1/2,0)",
+          "(0,1/2,0.5967)",
+          "(0,1/2,0.5968)",
+          "(1/2,0,0)",
+          "(1/2,0,0.5967)",
+          "(1/2,0,0.5968)",
+          "(1/2,1/2,0)",
+          "(1/2,1/2,0.5967)",
+          "(1/2,1/2,0.5968)"
+        ],
+        "count": 1,
+        "probability": 0.0204,
+        "cumulative": 0.2041
+      },
+      {
+        "system": "Cubic",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,5/6)",
+          "(0.0833,2/3,3/4)",
+          "(0.0833,5/6,0.0800)",
+          "(0.5833,2/3,0.0800)",
+          "(0.5833,5/6,3/4)",
+          "(0.9200,0.5833,2/3)",
+          "(0.9200,0.9167,1/6)",
+          "(2/3,0,5/6)",
+          "(2/3,1/2,0)",
+          "(3/4,0.5833,1/6)",
+          "(3/4,0.9167,2/3)"
+        ],
+        "count": 1,
+        "probability": 0.0204,
+        "cumulative": 0.2245
+      },
+      {
+        "system": "Monoclinic",
+        "centering": "C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0.5931,0,0)",
+          "(0.5931,0,1/2)",
+          "(0.7104,0.1295,0.0604)",
+          "(0.7104,0.1295,0.4396)",
+          "(0.7104,0.8705,0.5604)",
+          "(0.7104,0.8705,0.9396)",
+          "(0.8827,0.1295,0.5604)",
+          "(0.8827,0.1295,0.9396)",
+          "(0.8827,0.8705,0.0604)",
+          "(0.8827,0.8705,0.4396)"
+        ],
+        "count": 1,
+        "probability": 0.0204,
+        "cumulative": 0.2449
+      },
+      {
+        "system": "Cubic",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0.1436,0.8848,1/4)",
+          "(0.1518,0.6436,1/2)",
+          "(0.2671,0.3848,0.3482)",
+          "(0.4106,1/2,0.6070)",
+          "(0.6436,1/2,0.8482)",
+          "(0.6518,0.7329,0.6152)",
+          "(0.7671,0.9918,3/4)",
+          "(0.9106,0.8765,1/2)",
+          "(1/2,0.3765,0.1070)",
+          "(1/4,0.1436,0.1152)",
+          "(3/4,0.2329,0.9918)"
+        ],
+        "count": 1,
+        "probability": 0.0204,
+        "cumulative": 0.2653
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0.1440,0.1440,0.2119)",
+          "(0.1440,0.1440,0.2881)",
+          "(0.1440,0.8560,0.2119)",
+          "(0.1440,0.8560,0.2881)",
+          "(0.3560,0.1440,0.2119)",
+          "(0.3560,0.1440,0.2881)",
+          "(0.3560,0.8560,0.2119)",
+          "(0.3560,0.8560,0.2881)",
+          "(1/2,0,0)",
+          "(1/2,0,1/2)"
+        ],
+        "count": 1,
+        "probability": 0.0204,
+        "cumulative": 0.2857
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,3/4,0)",
+          "(0.5157,0.2657,0.2814)",
+          "(0.5157,0.2657,0.7186)",
+          "(0.5157,0.4843,0.2814)",
+          "(0.5157,0.4843,0.7186)",
+          "(0.7343,0.2657,0.2814)",
+          "(0.7343,0.2657,0.7186)",
+          "(0.7343,0.4843,0.2814)",
+          "(0.7343,0.4843,0.7186)",
+          "(1/4,0,0)",
+          "(1/4,3/4,0)"
+        ],
+        "count": 1,
+        "probability": 0.0204,
+        "cumulative": 0.3061
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.6454,1/2)",
+          "(0.1367,0,1/2)",
+          "(0.1367,0.2908,0.3651)",
+          "(0.1367,0.7821,0)",
+          "(0.1367,1/2,0.8651)",
+          "(0.2734,0.2908,0.8651)",
+          "(0.2734,0.6454,0.3651)",
+          "(0.7821,0.6454,0)",
+          "(0.7821,0.7821,1/2)",
+          "(1/2,0.6454,0.8651)",
+          "(1/2,1/2,0.3651)"
+        ],
+        "count": 1,
+        "probability": 0.0204,
+        "cumulative": 0.3265
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.1376,1/2)",
+          "(0.0244,0.1957,0.2028)",
+          "(0.0244,0.9756,0.7028)",
+          "(0.2202,0,1/2)",
+          "(0.2202,0.3578,0)",
+          "(0.3578,0.1376,0)",
+          "(0.3578,0.3578,1/2)",
+          "(0.3822,0.1957,0.7028)",
+          "(0.3822,1/3,0.2028)",
+          "(1/6,0.9756,0.2028)",
+          "(1/6,1/3,0.7028)"
+        ],
+        "count": 1,
+        "probability": 0.0204,
+        "cumulative": 0.3469
+      },
+      {
+        "system": "Cubic",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0.0316,1/3,0.2964)",
+          "(0.1553,0.5316,0.6237)",
+          "(0.2036,2/3,0.1237)",
+          "(0.3589,0.2043,1/2)",
+          "(0.5316,0.3763,0.1553)",
+          "(0.6553,1/6,5/6)",
+          "(0.7036,0.0316,1/3)",
+          "(0.8589,1/2,0.9518)",
+          "(1/2,0.7043,0.4518)",
+          "(1/3,0.8763,0.7964)",
+          "(5/6,5/6,0.6553)"
+        ],
+        "count": 1,
+        "probability": 0.0204,
+        "cumulative": 0.3673
+      },
+      {
+        "system": "Cubic",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/4)",
+          "(0,3/4,0)",
+          "(0,3/4,1/4)",
+          "(0.1228,0.8772,0)",
+          "(0.1228,0.8772,1/4)",
+          "(0.1270,0,0.1270)",
+          "(0.1270,3/4,0.1270)",
+          "(0.8730,0,0.1270)",
+          "(0.8730,3/4,0.1270)",
+          "(0.8772,0.8772,0)",
+          "(0.8772,0.8772,1/4)"
+        ],
+        "count": 1,
+        "probability": 0.0204,
+        "cumulative": 0.3878
+      },
+      {
+        "system": "Cubic",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.1250,0.1250)",
+          "(0,0.1250,0.8750)",
+          "(0,1/4,0)",
+          "(0.8750,0,0.1250)",
+          "(0.8750,0,0.8750)",
+          "(0.8750,1/4,0.1250)",
+          "(0.8750,1/4,0.8750)",
+          "(3/4,0,0)",
+          "(3/4,0.1250,0.1250)",
+          "(3/4,0.1250,0.8750)",
+          "(3/4,1/4,0)"
+        ],
+        "count": 1,
+        "probability": 0.0204,
+        "cumulative": 0.4082
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,0.7176)",
+          "(0,0,0.8588)",
+          "(0,1/2,0)",
+          "(0,1/2,0.7176)",
+          "(0,1/2,0.8588)",
+          "(1/2,0,0)",
+          "(1/2,0,0.7176)",
+          "(1/2,0,0.8588)",
+          "(1/2,1/2,0)",
+          "(1/2,1/2,0.7176)",
+          "(1/2,1/2,0.8588)"
+        ],
+        "count": 1,
+        "probability": 0.0204,
+        "cumulative": 0.4286
+      }
+    ]
+  },
+  "13": {
+    "total_structures": 3,
+    "unique_patterns": 3,
+    "predictability": "high",
+    "recommendation": "Use full_offsets directly - patterns are predictable",
+    "lattice_type": [
+      {
+        "system": "Orthorhombic",
+        "centering": "I",
+        "count": 2,
+        "probability": 0.6667,
+        "cumulative": 0.6667
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "count": 1,
+        "probability": 0.3333,
+        "cumulative": 1.0
+      }
+    ],
+    "z_pattern": [
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "z_values": [
+          "0",
+          "1/2",
+          "1/4",
+          "3/4"
+        ],
+        "count": 1,
+        "probability": 0.3333,
+        "cumulative": 0.3333
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "I",
+        "z_values": [
+          "0",
+          "1/2",
+          "1/4",
+          "3/4"
+        ],
+        "count": 1,
+        "probability": 0.3333,
+        "cumulative": 0.6667
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "I",
+        "z_values": [
+          "0",
+          "0.4538",
+          "0.5462",
+          "1/2"
+        ],
+        "count": 1,
+        "probability": 0.3333,
+        "cumulative": 1.0
+      }
+    ],
+    "full_offsets": [
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(0.3789,0.3789,1/4)",
+          "(0.3789,0.3789,3/4)",
+          "(0.3789,0.6211,1/4)",
+          "(0.3789,0.6211,3/4)",
+          "(0.6211,0.3789,1/4)",
+          "(0.6211,0.3789,3/4)",
+          "(0.6211,0.6211,1/4)",
+          "(0.6211,0.6211,3/4)",
+          "(1/4,1/4,1/2)",
+          "(1/4,3/4,1/2)",
+          "(3/4,1/4,1/2)",
+          "(3/4,3/4,1/2)"
+        ],
+        "count": 1,
+        "probability": 0.3333,
+        "cumulative": 0.3333
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,0)",
+          "(0.5550,0.0833,1/4)",
+          "(0.5550,0.0833,3/4)",
+          "(0.5550,0.4167,1/4)",
+          "(0.5550,0.4167,3/4)",
+          "(0.9450,0.0833,1/4)",
+          "(0.9450,0.0833,3/4)",
+          "(0.9450,0.4167,1/4)",
+          "(0.9450,0.4167,3/4)",
+          "(1/2,0,0)",
+          "(1/2,1/2,0)",
+          "(3/4,3/4,1/2)"
+        ],
+        "count": 1,
+        "probability": 0.3333,
+        "cumulative": 0.6667
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(1/3,0.3981,0.4538)",
+          "(1/3,0.3981,0.5462)",
+          "(1/3,0.6019,0.4538)",
+          "(1/3,0.6019,0.5462)",
+          "(1/4,1/4,1/2)",
+          "(1/4,3/4,1/2)",
+          "(2/3,0.3981,0.4538)",
+          "(2/3,0.3981,0.5462)",
+          "(2/3,0.6019,0.4538)",
+          "(2/3,0.6019,0.5462)",
+          "(3/4,1/4,1/2)",
+          "(3/4,3/4,1/2)"
+        ],
+        "count": 1,
+        "probability": 0.3333,
+        "cumulative": 1.0
+      }
+    ]
+  },
+  "14": {
+    "total_structures": 14,
+    "unique_patterns": 13,
+    "predictability": "high",
+    "recommendation": "Use full_offsets directly - patterns are predictable",
+    "lattice_type": [
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "count": 6,
+        "probability": 0.4286,
+        "cumulative": 0.4286
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "count": 6,
+        "probability": 0.4286,
+        "cumulative": 0.8571
+      },
+      {
+        "system": "Cubic",
+        "centering": "I",
+        "count": 1,
+        "probability": 0.0714,
+        "cumulative": 0.9286
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "count": 1,
+        "probability": 0.0714,
+        "cumulative": 1.0
+      }
+    ],
+    "z_pattern": [
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "z_values": [
+          "0",
+          "1/2",
+          "1/4",
+          "3/4"
+        ],
+        "count": 6,
+        "probability": 0.4286,
+        "cumulative": 0.4286
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "z_values": [
+          "0",
+          "0.0833",
+          "0.4167",
+          "0.5833",
+          "0.9167",
+          "1/2"
+        ],
+        "count": 2,
+        "probability": 0.1429,
+        "cumulative": 0.5714
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "z_values": [
+          "0",
+          "0.1928",
+          "0.3072",
+          "0.6928",
+          "0.8072",
+          "1/2"
+        ],
+        "count": 1,
+        "probability": 0.0714,
+        "cumulative": 0.6429
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "z_values": [
+          "0",
+          "0.1989",
+          "0.3011",
+          "0.6989",
+          "0.8011",
+          "1/2"
+        ],
+        "count": 1,
+        "probability": 0.0714,
+        "cumulative": 0.7143
+      },
+      {
+        "system": "Cubic",
+        "centering": "I",
+        "z_values": [
+          "0",
+          "1/2",
+          "1/4",
+          "3/4"
+        ],
+        "count": 1,
+        "probability": 0.0714,
+        "cumulative": 0.7857
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "z_values": [
+          "0",
+          "0.0508",
+          "0.4492",
+          "0.5508",
+          "0.9492",
+          "1/2"
+        ],
+        "count": 1,
+        "probability": 0.0714,
+        "cumulative": 0.8571
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "z_values": [
+          "0",
+          "0.3060",
+          "0.8060",
+          "1/2"
+        ],
+        "count": 1,
+        "probability": 0.0714,
+        "cumulative": 0.9286
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "z_values": [
+          "0",
+          "0.0682",
+          "0.4318",
+          "0.5682",
+          "0.9318",
+          "1/2"
+        ],
+        "count": 1,
+        "probability": 0.0714,
+        "cumulative": 1.0
+      }
+    ],
+    "full_offsets": [
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,3/4)",
+          "(0,1/2,3/4)",
+          "(0,3/4,0)",
+          "(1/2,1/4,3/4)",
+          "(1/2,3/4,0)",
+          "(1/2,3/4,3/4)",
+          "(1/4,1/4,1/4)",
+          "(1/4,3/4,1/2)",
+          "(3/4,0,0)",
+          "(3/4,0,1/2)",
+          "(3/4,1/2,1/4)",
+          "(3/4,1/2,3/4)",
+          "(3/4,3/4,1/2)"
+        ],
+        "count": 2,
+        "probability": 0.1429,
+        "cumulative": 0.1429
+      },
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,1/4)",
+          "(0,1/4,1/4)",
+          "(0,1/4,3/4)",
+          "(1/2,1/2,1/4)",
+          "(1/2,1/4,0)",
+          "(1/2,1/4,1/2)",
+          "(1/4,0,1/2)",
+          "(1/4,0,1/4)",
+          "(1/4,1/2,1/2)",
+          "(1/4,1/4,0)",
+          "(1/4,1/4,1/4)",
+          "(1/4,3/4,0)",
+          "(3/4,0,1/4)"
+        ],
+        "count": 1,
+        "probability": 0.0714,
+        "cumulative": 0.2143
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0.1213,0.7879,0.5833)",
+          "(0.1213,1/3,0.0833)",
+          "(0.2121,0.8787,0.0833)",
+          "(0.2121,1/3,0.5833)",
+          "(0.7879,0.1213,0.9167)",
+          "(0.7879,2/3,0.4167)",
+          "(0.8787,0.2121,0.4167)",
+          "(0.8787,2/3,0.9167)",
+          "(1/3,0.1213,0.4167)",
+          "(1/3,0.2121,0.9167)",
+          "(2/3,0.7879,0.0833)",
+          "(2/3,0.8787,0.5833)"
+        ],
+        "count": 1,
+        "probability": 0.0714,
+        "cumulative": 0.2857
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,0.1964,0.1928)",
+          "(0,0.8036,0.8072)",
+          "(0,1/6,0.3072)",
+          "(0,5/6,0.6928)",
+          "(0.1964,0,0.3072)",
+          "(0.1964,1/6,0.8072)",
+          "(0.8036,0,0.6928)",
+          "(0.8036,5/6,0.1928)",
+          "(1/6,0,0.1928)",
+          "(1/6,0.1964,0.6928)",
+          "(5/6,0,0.8072)",
+          "(5/6,0.8036,0.3072)"
+        ],
+        "count": 1,
+        "probability": 0.0714,
+        "cumulative": 0.3571
+      },
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,3/4)",
+          "(0,3/4,0)",
+          "(0,3/4,1/2)",
+          "(1/2,0,3/4)",
+          "(1/2,3/4,1/4)",
+          "(1/2,3/4,3/4)",
+          "(1/4,1/2,3/4)",
+          "(1/4,1/4,1/4)",
+          "(3/4,0,0)",
+          "(3/4,1/2,0)",
+          "(3/4,1/2,3/4)",
+          "(3/4,1/4,1/2)",
+          "(3/4,3/4,1/2)"
+        ],
+        "count": 1,
+        "probability": 0.0714,
+        "cumulative": 0.4286
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0.3552,1/2,0.3011)",
+          "(0.3552,5/6,0.8011)",
+          "(0.6448,1/2,0.1989)",
+          "(0.6448,1/6,0.6989)",
+          "(1/2,0.3552,0.6989)",
+          "(1/2,0.6448,0.8011)",
+          "(1/2,1/6,0.1989)",
+          "(1/2,5/6,0.3011)",
+          "(1/6,0.6448,0.3011)",
+          "(1/6,1/2,0.8011)",
+          "(5/6,0.3552,0.1989)",
+          "(5/6,1/2,0.6989)"
+        ],
+        "count": 1,
+        "probability": 0.0714,
+        "cumulative": 0.5
+      },
+      {
+        "system": "Cubic",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(1/2,1/2,1/2)",
+          "(1/2,1/4,1/4)",
+          "(1/2,1/4,3/4)",
+          "(1/2,3/4,1/4)",
+          "(1/2,3/4,3/4)",
+          "(1/4,1/2,1/4)",
+          "(1/4,1/2,3/4)",
+          "(1/4,1/4,1/2)",
+          "(1/4,3/4,1/2)",
+          "(3/4,1/2,1/4)",
+          "(3/4,1/2,3/4)",
+          "(3/4,1/4,1/2)",
+          "(3/4,3/4,1/2)"
+        ],
+        "count": 1,
+        "probability": 0.0714,
+        "cumulative": 0.5714
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0.3534,1/2,0.5508)",
+          "(0.3534,5/6,0.0508)",
+          "(0.6466,1/2,0.4492)",
+          "(0.6466,1/6,0.9492)",
+          "(1/2,0.3534,0.9492)",
+          "(1/2,0.6466,0.0508)",
+          "(1/2,1/6,0.4492)",
+          "(1/2,5/6,0.5508)",
+          "(1/6,0.6466,0.5508)",
+          "(1/6,1/2,0.0508)",
+          "(5/6,0.3534,0.4492)",
+          "(5/6,1/2,0.9492)"
+        ],
+        "count": 1,
+        "probability": 0.0714,
+        "cumulative": 0.6429
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0.0347,0.7014,0.5833)",
+          "(0.0347,1/3,0.0833)",
+          "(0.2986,0.9653,0.0833)",
+          "(0.2986,1/3,0.5833)",
+          "(0.7014,0.0347,0.9167)",
+          "(0.7014,2/3,0.4167)",
+          "(0.9653,0.2986,0.4167)",
+          "(0.9653,2/3,0.9167)",
+          "(1/3,0.0347,0.4167)",
+          "(1/3,0.2986,0.9167)",
+          "(2/3,0.7014,0.0833)",
+          "(2/3,0.9653,0.5833)"
+        ],
+        "count": 1,
+        "probability": 0.0714,
+        "cumulative": 0.7143
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,0.3060)",
+          "(0.2886,2/3,0.8060)",
+          "(0.2886,2/3,1/2)",
+          "(0.4776,0,0)",
+          "(0.4776,0,0.3060)",
+          "(0.4776,0.4776,0)",
+          "(0.4776,0.4776,0.3060)",
+          "(0.8110,0.1890,0.8060)",
+          "(0.8110,0.1890,1/2)",
+          "(0.8110,2/3,0.8060)",
+          "(0.8110,2/3,1/2)",
+          "(1.0000,0,0)",
+          "(1.0000,0,0.3060)"
+        ],
+        "count": 1,
+        "probability": 0.0714,
+        "cumulative": 0.7857
+      },
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/4)",
+          "(0,1/2,1/4)",
+          "(0,1/4,0)",
+          "(0,1/4,1/4)",
+          "(0,1/4,3/4)",
+          "(1/2,1/4,0)",
+          "(1/4,0,0)",
+          "(1/4,0,1/2)",
+          "(1/4,0,1/4)",
+          "(1/4,1/4,0)",
+          "(1/4,1/4,1/4)",
+          "(1/4,3/4,0)",
+          "(3/4,0,1/4)"
+        ],
+        "count": 1,
+        "probability": 0.0714,
+        "cumulative": 0.8571
+      },
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,3/4)",
+          "(1/2,1/2,3/4)",
+          "(1/2,1/4,1/4)",
+          "(1/2,1/4,3/4)",
+          "(1/2,3/4,0)",
+          "(1/2,3/4,1/2)",
+          "(1/4,1/2,1/4)",
+          "(1/4,1/4,1/2)",
+          "(1/4,1/4,1/4)",
+          "(1/4,3/4,1/2)",
+          "(3/4,0,1/2)",
+          "(3/4,1/2,1/2)",
+          "(3/4,1/2,1/4)"
+        ],
+        "count": 1,
+        "probability": 0.0714,
+        "cumulative": 0.9286
+      },
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0.3614,1/2,0.0682)",
+          "(0.3614,5/6,0.5682)",
+          "(0.6386,1/2,0.9318)",
+          "(0.6386,1/6,0.4318)",
+          "(1/2,0.3614,0.4318)",
+          "(1/2,0.6386,0.5682)",
+          "(1/2,1/6,0.9318)",
+          "(1/2,5/6,0.0682)",
+          "(1/6,0.6386,0.0682)",
+          "(1/6,1/2,0.5682)",
+          "(5/6,0.3614,0.9318)",
+          "(5/6,1/2,0.4318)"
+        ],
+        "count": 1,
+        "probability": 0.0714,
+        "cumulative": 1.0
+      }
+    ]
+  },
+  "15": {
+    "total_structures": 1,
+    "unique_patterns": 1,
+    "predictability": "high",
+    "recommendation": "Use full_offsets directly - patterns are predictable",
+    "lattice_type": [
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "count": 1,
+        "probability": 1.0,
+        "cumulative": 1.0
+      }
+    ],
+    "z_pattern": [
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "z_values": [
+          "0",
+          "1.0000",
+          "1/2",
+          "1/6",
+          "2/3"
+        ],
+        "count": 1,
+        "probability": 1.0,
+        "cumulative": 1.0
+      }
+    ],
+    "full_offsets": [
+      {
+        "system": "Rhombohedral",
+        "centering": "R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1.0000)",
+          "(0,0,2/3)",
+          "(0,2/3,1/2)",
+          "(0,2/3,1/6)",
+          "(1/3,1/3,1/2)",
+          "(1/3,1/3,1/6)",
+          "(1/3,2/3,0)",
+          "(1/3,2/3,1.0000)",
+          "(1/3,2/3,2/3)",
+          "(2/3,0,1/2)",
+          "(2/3,0,1/6)",
+          "(2/3,1/3,0)",
+          "(2/3,1/3,1.0000)",
+          "(2/3,1/3,2/3)"
+        ],
+        "count": 1,
+        "probability": 1.0,
+        "cumulative": 1.0
+      }
+    ]
+  },
+  "16": {
+    "total_structures": 88,
+    "unique_patterns": 88,
+    "predictability": "low",
+    "recommendation": "Use lattice_type + z_pattern only; exact offsets are compound-specific",
+    "lattice_type": [
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "count": 36,
+        "probability": 0.4091,
+        "cumulative": 0.4091
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "P",
+        "count": 35,
+        "probability": 0.3977,
+        "cumulative": 0.8068
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "P",
+        "count": 7,
+        "probability": 0.0795,
+        "cumulative": 0.8864
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "I",
+        "count": 6,
+        "probability": 0.0682,
+        "cumulative": 0.9545
+      },
+      {
+        "system": "Cubic",
+        "centering": "I",
+        "count": 2,
+        "probability": 0.0227,
+        "cumulative": 0.9773
+      },
+      {
+        "system": "Cubic",
+        "centering": "F",
+        "count": 1,
+        "probability": 0.0114,
+        "cumulative": 0.9886
+      },
+      {
+        "system": "Hexagonal",
+        "centering": "P",
+        "count": 1,
+        "probability": 0.0114,
+        "cumulative": 1.0
+      }
+    ],
+    "z_pattern": [
+      {
+        "system": "Orthorhombic",
+        "centering": "P",
+        "z_values": [
+          "0",
+          "1/2"
+        ],
+        "count": 7,
+        "probability": 0.0795,
+        "cumulative": 0.0795
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "z_values": [
+          "0",
+          "1/2",
+          "1/4",
+          "3/4"
+        ],
+        "count": 6,
+        "probability": 0.0682,
+        "cumulative": 0.1477
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "P",
+        "z_values": [
+          "0",
+          "1/2",
+          "1/3",
+          "5/6"
+        ],
+        "count": 4,
+        "probability": 0.0455,
+        "cumulative": 0.1932
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "z_values": [
+          "0",
+          "1/2"
+        ],
+        "count": 4,
+        "probability": 0.0455,
+        "cumulative": 0.2386
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "P",
+        "z_values": [
+          "0",
+          "1/2",
+          "1/4",
+          "3/4"
+        ],
+        "count": 3,
+        "probability": 0.0341,
+        "cumulative": 0.2727
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "z_values": [
+          "0",
+          "2/3"
+        ],
+        "count": 3,
+        "probability": 0.0341,
+        "cumulative": 0.3068
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "z_values": [
+          "0",
+          "1/4"
+        ],
+        "count": 2,
+        "probability": 0.0227,
+        "cumulative": 0.3295
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "I",
+        "z_values": [
+          "0",
+          "1/2",
+          "1/4",
+          "3/4"
+        ],
+        "count": 2,
+        "probability": 0.0227,
+        "cumulative": 0.3523
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "z_values": [
+          "0",
+          "1/2",
+          "1/4"
+        ],
+        "count": 2,
+        "probability": 0.0227,
+        "cumulative": 0.375
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "P",
+        "z_values": [
+          "0",
+          "0.3007",
+          "0.8007",
+          "1/2"
+        ],
+        "count": 1,
+        "probability": 0.0114,
+        "cumulative": 0.3864
+      }
+    ],
+    "full_offsets": [
+      {
+        "system": "Tetragonal",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,0.8007)",
+          "(0.1026,0.6982,0.3007)",
+          "(0.1026,0.6982,1/2)",
+          "(0.3018,0.1026,0.3007)",
+          "(0.3018,0.1026,1/2)",
+          "(0.4044,0.8008,0)",
+          "(0.4044,0.8008,0.8007)",
+          "(0.6026,0.6026,0)",
+          "(0.6026,0.6026,0.8007)",
+          "(0.8018,0.1982,0)",
+          "(0.8018,0.1982,0.8007)",
+          "(0.9044,1/2,0.3007)",
+          "(0.9044,1/2,1/2)",
+          "(1/2,0.3008,0.3007)",
+          "(1/2,0.3008,1/2)"
+        ],
+        "count": 1,
+        "probability": 0.0114,
+        "cumulative": 0.0114
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/4)",
+          "(0,1/2,0)",
+          "(0,1/2,1/4)",
+          "(0.1250,0.1250,0)",
+          "(0.1250,0.3750,0)",
+          "(0.1250,0.6250,1/4)",
+          "(0.1250,0.8750,1/4)",
+          "(0.3750,0.1250,0)",
+          "(0.3750,0.3750,0)",
+          "(0.3750,0.6250,1/4)",
+          "(0.3750,0.8750,1/4)",
+          "(1/2,0,0)",
+          "(1/2,0,1/4)",
+          "(1/2,1/2,0)",
+          "(1/2,1/2,1/4)"
+        ],
+        "count": 1,
+        "probability": 0.0114,
+        "cumulative": 0.0227
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.4038,0)",
+          "(0,0.9038,3/4)",
+          "(0,1/2,3/4)",
+          "(0.5641,0.0641,1/4)",
+          "(0.5641,0.5641,1/2)",
+          "(0.5641,1/3,1/4)",
+          "(0.5641,5/6,1/2)",
+          "(0.7244,0,0)",
+          "(0.7244,0.4038,0)",
+          "(0.7244,0.9038,3/4)",
+          "(0.7244,1/2,3/4)",
+          "(1/6,0.0641,1/4)",
+          "(1/6,0.5641,1/2)",
+          "(1/6,1/3,1/4)",
+          "(1/6,5/6,1/2)"
+        ],
+        "count": 1,
+        "probability": 0.0114,
+        "cumulative": 0.0341
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.0616,0.0785)",
+          "(0,0.5616,0)",
+          "(0,1/2,0.0785)",
+          "(0.1284,0,0)",
+          "(0.1284,0.0616,0.0785)",
+          "(0.1284,0.5616,0)",
+          "(0.1284,1/2,0.0785)",
+          "(0.3450,0.2166,5/6)",
+          "(0.3450,0.3450,5/6)",
+          "(0.3450,0.7166,1/4)",
+          "(0.3450,0.8450,1/4)",
+          "(0.7834,0.2166,5/6)",
+          "(0.7834,0.3450,5/6)",
+          "(0.7834,0.7166,1/4)",
+          "(0.7834,0.8450,1/4)"
+        ],
+        "count": 1,
+        "probability": 0.0114,
+        "cumulative": 0.0455
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,0.0598,0)",
+          "(0,0.0598,1/2)",
+          "(0,0.5598,0)",
+          "(0,0.5598,1/2)",
+          "(0,1/2,0)",
+          "(0,1/2,1/2)",
+          "(1/2,0,0.3075)",
+          "(1/2,0,0.8075)",
+          "(1/2,0.0598,0.3075)",
+          "(1/2,0.0598,0.8075)",
+          "(1/2,0.5598,0.3075)",
+          "(1/2,0.5598,0.8075)",
+          "(1/2,1/2,0.3075)",
+          "(1/2,1/2,0.8075)"
+        ],
+        "count": 1,
+        "probability": 0.0114,
+        "cumulative": 0.0568
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.0818,0)",
+          "(0,0.5818,2/3)",
+          "(0,1/2,2/3)",
+          "(0.8750,0.1250,0.4136)",
+          "(0.8750,0.4568,1/4)",
+          "(0.8750,0.6250,1/4)",
+          "(0.8750,0.9568,0.4136)",
+          "(0.9568,0.1250,0.4136)",
+          "(0.9568,0.4568,1/4)",
+          "(0.9568,0.6250,1/4)",
+          "(0.9568,0.9568,0.4136)",
+          "(5/6,0,0)",
+          "(5/6,0.0818,0)",
+          "(5/6,0.5818,2/3)",
+          "(5/6,1/2,2/3)"
+        ],
+        "count": 1,
+        "probability": 0.0114,
+        "cumulative": 0.0682
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,0.2816)",
+          "(0,0.1408,0)",
+          "(0,0.1408,0.2816)",
+          "(0.1408,0,0)",
+          "(0.1408,0,0.2816)",
+          "(0.1408,0.1408,0)",
+          "(0.1408,0.1408,0.2816)",
+          "(0.6408,0.6408,0)",
+          "(0.6408,0.6408,0.2816)",
+          "(0.6408,1/2,0)",
+          "(0.6408,1/2,0.2816)",
+          "(1/2,0.6408,0)",
+          "(1/2,0.6408,0.2816)",
+          "(1/2,1/2,0)",
+          "(1/2,1/2,0.2816)"
+        ],
+        "count": 1,
+        "probability": 0.0114,
+        "cumulative": 0.0795
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.1250,0)",
+          "(0,0.6250,1/4)",
+          "(0,1/2,1/4)",
+          "(0.3750,0,0)",
+          "(0.3750,0.1250,0)",
+          "(0.3750,0.6250,1/4)",
+          "(0.3750,1/2,1/4)",
+          "(0.6250,0.3750,0)",
+          "(0.6250,0.8750,1/4)",
+          "(0.6250,1/4,1/4)",
+          "(0.6250,3/4,0)",
+          "(3/4,0.3750,0)",
+          "(3/4,0.8750,1/4)",
+          "(3/4,1/4,1/4)",
+          "(3/4,3/4,0)"
+        ],
+        "count": 1,
+        "probability": 0.0114,
+        "cumulative": 0.0909
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,0.0286)",
+          "(0.1154,0.0537,1/2)",
+          "(0.1154,0.5537,0.5356)",
+          "(0.1468,1/4,0.7786)",
+          "(0.1468,3/4,1/4)",
+          "(0.2005,0.1388,0.2856)",
+          "(0.2005,0.4685,3/4)",
+          "(0.2005,0.6388,3/4)",
+          "(0.2005,0.9685,0.2856)",
+          "(0.2856,0.0537,1/2)",
+          "(0.2856,0.5537,0.5356)",
+          "(0.4010,0.1073,0)",
+          "(0.4010,0.6073,0.0286)",
+          "(1/4,0.3532,1/4)",
+          "(1/4,0.8532,0.7786)"
+        ],
+        "count": 1,
+        "probability": 0.0114,
+        "cumulative": 0.1023
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0.1250,0.1250,1/4)",
+          "(0.1250,0.1250,3/4)",
+          "(0.1250,0.8750,1/4)",
+          "(0.1250,0.8750,3/4)",
+          "(0.3750,0.1250,1/4)",
+          "(0.3750,0.1250,3/4)",
+          "(0.3750,0.8750,1/4)",
+          "(0.3750,0.8750,3/4)",
+          "(1/2,0,0)",
+          "(1/2,0,1/2)",
+          "(1/4,1/4,0)",
+          "(1/4,1/4,1/2)",
+          "(1/4,3/4,0)",
+          "(1/4,3/4,1/2)"
+        ],
+        "count": 1,
+        "probability": 0.0114,
+        "cumulative": 0.1136
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,0,1/4)",
+          "(0,0,3/4)",
+          "(0,1/2,0)",
+          "(0,1/2,1/2)",
+          "(0,1/2,1/4)",
+          "(0,1/2,3/4)",
+          "(1/2,0,0)",
+          "(1/2,0,1/2)",
+          "(1/2,0,1/4)",
+          "(1/2,0,3/4)",
+          "(1/2,1/2,0)",
+          "(1/2,1/2,1/2)",
+          "(1/2,1/2,1/4)",
+          "(1/2,1/2,3/4)"
+        ],
+        "count": 1,
+        "probability": 0.0114,
+        "cumulative": 0.125
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,0.7994)",
+          "(0,0.3573,0)",
+          "(0,0.3573,0.7994)",
+          "(0,0.8573,0.2994)",
+          "(0,0.8573,1/2)",
+          "(0,1/2,0.2994)",
+          "(0,1/2,1/2)",
+          "(1/2,0,0.2994)",
+          "(1/2,0,1/2)",
+          "(1/2,0.3573,0.2994)",
+          "(1/2,0.3573,1/2)",
+          "(1/2,0.8573,0)",
+          "(1/2,0.8573,0.7994)",
+          "(1/2,1/2,0)",
+          "(1/2,1/2,0.7994)"
+        ],
+        "count": 1,
+        "probability": 0.0114,
+        "cumulative": 0.1364
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,1/2,0)",
+          "(0,1/2,1/2)",
+          "(0,1/4,0)",
+          "(0,1/4,1/2)",
+          "(0,3/4,0)",
+          "(0,3/4,1/2)",
+          "(1/2,0,0.0967)",
+          "(1/2,0,0.5967)",
+          "(1/2,1/2,0.0967)",
+          "(1/2,1/2,0.5967)",
+          "(1/2,1/4,0.0967)",
+          "(1/2,1/4,0.5967)",
+          "(1/2,3/4,0.0967)",
+          "(1/2,3/4,0.5967)"
+        ],
+        "count": 1,
+        "probability": 0.0114,
+        "cumulative": 0.1477
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/3)",
+          "(0,1/2,1/2)",
+          "(0,1/2,5/6)",
+          "(0.4453,0,0)",
+          "(0.4453,0,1/3)",
+          "(0.4453,1/2,1/2)",
+          "(0.4453,1/2,5/6)",
+          "(0.9453,0,1/2)",
+          "(0.9453,0,5/6)",
+          "(0.9453,1/2,0)",
+          "(0.9453,1/2,1/3)",
+          "(1/2,0,1/2)",
+          "(1/2,0,5/6)",
+          "(1/2,1/2,0)",
+          "(1/2,1/2,1/3)"
+        ],
+        "count": 1,
+        "probability": 0.0114,
+        "cumulative": 0.1591
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,2/3)",
+          "(0,0.8437,0)",
+          "(0,0.8437,2/3)",
+          "(0.4219,1/6,0.0833)",
+          "(0.4219,1/6,0.5833)",
+          "(0.4219,2/3,0.0833)",
+          "(0.4219,2/3,0.5833)",
+          "(0.8437,0,0)",
+          "(0.8437,0,2/3)",
+          "(0.8437,0.8437,0)",
+          "(0.8437,0.8437,2/3)",
+          "(1/6,0.4219,0.0833)",
+          "(1/6,0.4219,0.5833)",
+          "(2/3,0.4219,0.0833)",
+          "(2/3,0.4219,0.5833)"
+        ],
+        "count": 1,
+        "probability": 0.0114,
+        "cumulative": 0.1705
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,0.2809)",
+          "(0,0.4584,0)",
+          "(0,0.4584,0.2809)",
+          "(0.4313,0.9584,0.7809)",
+          "(0.4313,0.9584,1/2)",
+          "(0.4313,1/2,0.7809)",
+          "(0.4313,1/2,1/2)",
+          "(0.9313,0.9584,0.7809)",
+          "(0.9313,0.9584,1/2)",
+          "(0.9313,1/2,0.7809)",
+          "(0.9313,1/2,1/2)",
+          "(1/2,0,0)",
+          "(1/2,0,0.2809)",
+          "(1/2,0.4584,0)",
+          "(1/2,0.4584,0.2809)"
+        ],
+        "count": 1,
+        "probability": 0.0114,
+        "cumulative": 0.1818
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,0.4873)",
+          "(0.4370,0.0969,0)",
+          "(0.4370,0.5969,0.4873)",
+          "(0.4685,0.1128,0.1541)",
+          "(0.4685,0.6128,1/3)",
+          "(0.6541,0.2985,0.4041)",
+          "(0.6541,0.7985,0.0832)",
+          "(0.7669,1/3,0.2373)",
+          "(0.7669,5/6,1/4)",
+          "(0.7829,0.2985,0.0832)",
+          "(0.7829,0.7985,0.4041)",
+          "(0.9685,0.4841,1/3)",
+          "(0.9685,0.9841,0.1541)",
+          "(2/3,0.2669,1/4)",
+          "(2/3,0.7669,0.2373)"
+        ],
+        "count": 1,
+        "probability": 0.0114,
+        "cumulative": 0.1932
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/3)",
+          "(0,0.1533,0)",
+          "(0,0.1533,1/3)",
+          "(0.0766,1/3,0.4167)",
+          "(0.0766,1/3,0.9167)",
+          "(0.0766,5/6,0.4167)",
+          "(0.0766,5/6,0.9167)",
+          "(0.1533,0,0)",
+          "(0.1533,0,1/3)",
+          "(0.1533,0.1533,0)",
+          "(0.1533,0.1533,1/3)",
+          "(1/3,0.0766,0.4167)",
+          "(1/3,0.0766,0.9167)",
+          "(5/6,0.0766,0.4167)",
+          "(5/6,0.0766,0.9167)"
+        ],
+        "count": 1,
+        "probability": 0.0114,
+        "cumulative": 0.2045
+      },
+      {
+        "system": "Tetragonal",
+        "centering": "I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,0.8043)",
+          "(0,1/6,0.8043)",
+          "(0,2/3,0)",
+          "(0.0398,0.2064,1/4)",
+          "(0.0398,0.4602,1/4)",
+          "(0.0398,0.7064,0.5543)",
+          "(0.0398,0.9602,0.5543)",
+          "(0.7064,0.2064,1/4)",
+          "(0.7064,0.4602,1/4)",
+          "(0.7064,0.7064,0.5543)",
+          "(0.7064,0.9602,0.5543)",
+          "(3/4,0,0)",
+          "(3/4,1/2,0.8043)",
+          "(3/4,1/6,0.8043)",
+          "(3/4,2/3,0)"
+        ],
+        "count": 1,
+        "probability": 0.0114,
+        "cumulative": 0.2159
+      },
+      {
+        "system": "Orthorhombic",
+        "centering": "P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,0.1389)",
+          "(0,0.1092,0)",
+          "(0,0.1092,0.1389)",
+          "(0,0.6092,0.6389)",
+          "(0,0.6092,1/2)",
+          "(0,1/2,0.6389)",
+          "(0,1/2,1/2)",
+          "(1/2,0,0.6389)",
+          "(1/2,0,1/2)",
+          "(1/2,0.1092,0.6389)",
+          "(1/2,0.1092,1/2)",
+          "(1/2,0.6092,0)",
+          "(1/2,0.6092,0.1389)",
+          "(1/2,1/2,0)",
+          "(1/2,1/2,0.1389)"
+        ],
+        "count": 1,
+        "probability": 0.0114,
+        "cumulative": 0.2273
+      }
+    ]
+  }
+}
