@@ -1,0 +1,364 @@
+{
+  "summary": {
+    "key_finding": "N = (in-plane multiplicity) \u00d7 (z-layers) for 90% of structures",
+    "n_divisible_by_z_layers_pct": 90.3,
+    "most_common_in_plane": [
+      {
+        "value": 1,
+        "pct": 41.3,
+        "description": "vertical stacking"
+      },
+      {
+        "value": 2,
+        "pct": 36.1,
+        "description": "pairs per layer"
+      },
+      {
+        "value": 4,
+        "pct": 13.7,
+        "description": "squares per layer"
+      }
+    ],
+    "most_common_z_layers": [
+      {
+        "value": 2,
+        "pct": 45.6
+      },
+      {
+        "value": 4,
+        "pct": 35.8
+      },
+      {
+        "value": 1,
+        "pct": 10.0
+      },
+      {
+        "value": 3,
+        "pct": 5.4
+      }
+    ]
+  },
+  "z_fraction_enrichment": {
+    "d=2": {
+      "when_d_divides_N": 21.7,
+      "when_not": 15.1,
+      "enrichment": 1.44
+    },
+    "d=3": {
+      "when_d_divides_N": 9.0,
+      "when_not": 5.3,
+      "enrichment": 1.71
+    },
+    "d=4": {
+      "when_d_divides_N": 6.6,
+      "when_not": 10.6,
+      "enrichment": 0.63
+    },
+    "d=6": {
+      "when_d_divides_N": 5.6,
+      "when_not": 3.2,
+      "enrichment": 1.77
+    }
+  },
+  "n_decompositions": {
+    "1": {
+      "total_structures": 56,
+      "decompositions": [
+        {
+          "in_plane": 1,
+          "z_layers": 1,
+          "count": 56,
+          "probability": 100.0
+        }
+      ]
+    },
+    "2": {
+      "total_structures": 303,
+      "decompositions": [
+        {
+          "in_plane": 1,
+          "z_layers": 2,
+          "count": 261,
+          "probability": 86.1
+        },
+        {
+          "in_plane": 2,
+          "z_layers": 1,
+          "count": 42,
+          "probability": 13.9
+        }
+      ]
+    },
+    "3": {
+      "total_structures": 54,
+      "decompositions": [
+        {
+          "in_plane": 1,
+          "z_layers": 3,
+          "count": 36,
+          "probability": 66.7
+        },
+        {
+          "in_plane": 3,
+          "z_layers": 1,
+          "count": 18,
+          "probability": 33.3
+        }
+      ]
+    },
+    "4": {
+      "total_structures": 566,
+      "decompositions": [
+        {
+          "in_plane": 1,
+          "z_layers": 4,
+          "count": 271,
+          "probability": 47.9
+        },
+        {
+          "in_plane": 2,
+          "z_layers": 2,
+          "count": 265,
+          "probability": 46.8
+        },
+        {
+          "in_plane": 4,
+          "z_layers": 1,
+          "count": 30,
+          "probability": 5.3
+        }
+      ]
+    },
+    "5": {
+      "total_structures": 3,
+      "decompositions": [
+        {
+          "in_plane": 1,
+          "z_layers": 5,
+          "count": 2,
+          "probability": 66.7
+        },
+        {
+          "in_plane": 5,
+          "z_layers": 1,
+          "count": 1,
+          "probability": 33.3
+        }
+      ]
+    },
+    "6": {
+      "total_structures": 116,
+      "decompositions": [
+        {
+          "in_plane": 3,
+          "z_layers": 2,
+          "count": 61,
+          "probability": 52.6
+        },
+        {
+          "in_plane": 2,
+          "z_layers": 3,
+          "count": 30,
+          "probability": 25.9
+        },
+        {
+          "in_plane": 1,
+          "z_layers": 6,
+          "count": 21,
+          "probability": 18.1
+        },
+        {
+          "in_plane": 6,
+          "z_layers": 1,
+          "count": 4,
+          "probability": 3.4
+        }
+      ]
+    },
+    "8": {
+      "total_structures": 348,
+      "decompositions": [
+        {
+          "in_plane": 2,
+          "z_layers": 4,
+          "count": 221,
+          "probability": 63.5
+        },
+        {
+          "in_plane": 4,
+          "z_layers": 2,
+          "count": 113,
+          "probability": 32.5
+        },
+        {
+          "in_plane": 8,
+          "z_layers": 1,
+          "count": 8,
+          "probability": 2.3
+        },
+        {
+          "in_plane": 1,
+          "z_layers": 8,
+          "count": 6,
+          "probability": 1.7
+        }
+      ]
+    },
+    "9": {
+      "total_structures": 6,
+      "decompositions": [
+        {
+          "in_plane": 3,
+          "z_layers": 3,
+          "count": 6,
+          "probability": 100.0
+        }
+      ]
+    },
+    "10": {
+      "total_structures": 2,
+      "decompositions": [
+        {
+          "in_plane": 2,
+          "z_layers": 5,
+          "count": 2,
+          "probability": 100.0
+        }
+      ]
+    },
+    "12": {
+      "total_structures": 47,
+      "decompositions": [
+        {
+          "in_plane": 3,
+          "z_layers": 4,
+          "count": 19,
+          "probability": 40.4
+        },
+        {
+          "in_plane": 4,
+          "z_layers": 3,
+          "count": 14,
+          "probability": 29.8
+        },
+        {
+          "in_plane": 2,
+          "z_layers": 6,
+          "count": 10,
+          "probability": 21.3
+        },
+        {
+          "in_plane": 6,
+          "z_layers": 2,
+          "count": 2,
+          "probability": 4.3
+        },
+        {
+          "in_plane": 1,
+          "z_layers": 12,
+          "count": 2,
+          "probability": 4.3
+        }
+      ]
+    },
+    "15": {
+      "total_structures": 1,
+      "decompositions": [
+        {
+          "in_plane": 3,
+          "z_layers": 5,
+          "count": 1,
+          "probability": 100.0
+        }
+      ]
+    },
+    "16": {
+      "total_structures": 80,
+      "decompositions": [
+        {
+          "in_plane": 4,
+          "z_layers": 4,
+          "count": 57,
+          "probability": 71.2
+        },
+        {
+          "in_plane": 8,
+          "z_layers": 2,
+          "count": 20,
+          "probability": 25.0
+        },
+        {
+          "in_plane": 2,
+          "z_layers": 8,
+          "count": 3,
+          "probability": 3.8
+        }
+      ]
+    },
+    "18": {
+      "total_structures": 2,
+      "decompositions": [
+        {
+          "in_plane": 3,
+          "z_layers": 6,
+          "count": 1,
+          "probability": 50.0
+        },
+        {
+          "in_plane": 9,
+          "z_layers": 2,
+          "count": 1,
+          "probability": 50.0
+        }
+      ]
+    },
+    "20": {
+      "total_structures": 3,
+      "decompositions": [
+        {
+          "in_plane": 4,
+          "z_layers": 5,
+          "count": 3,
+          "probability": 100.0
+        }
+      ]
+    }
+  },
+  "z_recommendations_by_layers": {
+    "2": {
+      "ideal": [
+        0,
+        0.5
+      ],
+      "description": "2 z-layers, 60% use z=0, 1/2"
+    },
+    "3": {
+      "ideal": [
+        0,
+        0.3333333333333333,
+        0.6666666666666666
+      ],
+      "description": "3 z-layers, 17% use z=0, 1/3, 2/3"
+    },
+    "4": {
+      "ideal": [
+        0,
+        0.25,
+        0.5,
+        0.75
+      ],
+      "description": "4 z-layers, 17% use z=0, 1/4, 1/2, 3/4"
+    },
+    "6": {
+      "ideal": [
+        0,
+        0.16666666666666666,
+        0.3333333333333333,
+        0.5,
+        0.6666666666666666,
+        0.8333333333333334
+      ],
+      "description": "6 z-layers, 24% use k/6 pattern"
+    }
+  }
+}

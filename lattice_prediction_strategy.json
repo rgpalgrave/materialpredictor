@@ -1,0 +1,3772 @@
+{
+  "strategy": {
+    "description": "\nLATTICE CONFIGURATION PREDICTION STRATEGY\n==========================================\n\nThis strategy generates the 10-20 most likely metal sublattice configurations\nfor a given N (number of unique metal positions).\n\nThe strategy combines:\n1. Empirical patterns from 1802 AFLOW structures\n2. Lattice-type-specific filling rules\n3. N-decomposition into (in-plane) \u00d7 (z-layers)\n4. Special position preferences\n\nPRIORITY ORDER:\n1. Observed high-frequency patterns for this N\n2. Lattice-specific templates at common special positions\n3. Generated patterns from N-decomposition rules\n",
+    "lattice_type_rules": {
+      "Cubic-P": {
+        "filling_order": [
+          "(0,0,0)",
+          "(1/2,1/2,1/2)",
+          "(1/2,1/2,0)",
+          "(1/2,0,1/2)",
+          "(0,1/2,1/2)"
+        ],
+        "key_insight": "BCC-like (1/2,1/2,1/2) at N=2, FCC face-centers at N=3-4",
+        "n2_pattern": [
+          "(0,0,0)",
+          "(1/2,1/2,1/2)"
+        ],
+        "n4_pattern": [
+          "(0,0,0)",
+          "(0,1/2,1/2)",
+          "(1/2,0,1/2)",
+          "(1/2,1/2,0)"
+        ]
+      },
+      "Cubic-F": {
+        "filling_order": [
+          "(0,0,0)",
+          "(1/2,1/2,1/2)",
+          "(1/4,1/4,1/4)",
+          "(3/4,3/4,3/4)"
+        ],
+        "key_insight": "Diamond positions (1/4,1/4,1/4) appear early at N=2-3"
+      },
+      "Hexagonal-P": {
+        "filling_order": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(1/3,2/3,1/2)",
+          "(2/3,1/3,1/2)"
+        ],
+        "key_insight": "Two competing N=2 patterns: z-doubled vs wurtzite-like",
+        "n2_patterns": [
+          [
+            "(0,0,0)",
+            "(0,0,1/2)"
+          ],
+          [
+            "(0,0,0)",
+            "(1/3,2/3,1/2)"
+          ]
+        ]
+      },
+      "Tetragonal-P": {
+        "filling_order": [
+          "(0,0,0)",
+          "(1/2,1/2,0)",
+          "(0,1/2,0)",
+          "(1/2,0,0)"
+        ],
+        "key_insight": "Checkerboard (1/2,1/2,0) dominates at N=2 (70%)",
+        "n2_pattern": [
+          "(0,0,0)",
+          "(1/2,1/2,0)"
+        ],
+        "n4_pattern": [
+          "(0,0,0)",
+          "(0,1/2,0)",
+          "(1/2,0,0)",
+          "(1/2,1/2,0)"
+        ]
+      },
+      "Tetragonal-I": {
+        "filling_order": [
+          "(0,0,0)",
+          "(0,1/2,1/4)",
+          "(1/4,1/4,1/2)",
+          "(3/4,3/4,1/2)"
+        ],
+        "key_insight": "Body-centering shifts preferred z from 1/2 to 1/4"
+      },
+      "Orthorhombic-P": {
+        "filling_order": [
+          "(0,0,0)",
+          "(0,1/2,1/2)",
+          "(1/2,0,1/2)",
+          "(1/2,1/2,0)",
+          "(0,1/2,0)"
+        ],
+        "key_insight": "(0,1/2,1/2) is strongly preferred (43% co-occurrence)",
+        "n4_pattern": [
+          "(0,0,0)",
+          "(0,1/2,1/2)",
+          "(1/2,0,1/2)",
+          "(1/2,1/2,0)"
+        ],
+        "n8_pattern": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,1/2,0)",
+          "(0,1/2,1/2)",
+          "(1/2,0,0)",
+          "(1/2,0,1/2)",
+          "(1/2,1/2,0)",
+          "(1/2,1/2,1/2)"
+        ]
+      },
+      "Rhombohedral-R": {
+        "filling_order": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,0,1/3)",
+          "(0,0,2/3)",
+          "(0,0,1/4)",
+          "(0,0,3/4)"
+        ],
+        "key_insight": "Almost entirely 1D filling along z-axis"
+      },
+      "Monoclinic-C": {
+        "filling_order": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,1/2,1/2)",
+          "(2/3,0,0)"
+        ],
+        "key_insight": "C-centering creates preference for x=1/3, 2/3"
+      }
+    },
+    "n_decomposition": {
+      "description": "N = (in-plane multiplicity) \u00d7 (z-layers) for 90% of structures",
+      "common_in_plane": {
+        "1": 41.3,
+        "2": 36.1,
+        "4": 13.7,
+        "3": 6.7
+      },
+      "common_z_layers": {
+        "2": 45.6,
+        "4": 35.8,
+        "1": 10.0,
+        "3": 5.4
+      },
+      "by_n": {
+        "4": [
+          [
+            1,
+            4,
+            48
+          ],
+          [
+            2,
+            2,
+            47
+          ],
+          [
+            4,
+            1,
+            5
+          ]
+        ],
+        "6": [
+          [
+            3,
+            2,
+            53
+          ],
+          [
+            2,
+            3,
+            26
+          ],
+          [
+            1,
+            6,
+            18
+          ]
+        ],
+        "8": [
+          [
+            2,
+            4,
+            64
+          ],
+          [
+            4,
+            2,
+            32
+          ],
+          [
+            8,
+            1,
+            2
+          ]
+        ],
+        "12": [
+          [
+            3,
+            4,
+            40
+          ],
+          [
+            4,
+            3,
+            30
+          ],
+          [
+            2,
+            6,
+            21
+          ]
+        ],
+        "16": [
+          [
+            4,
+            4,
+            65
+          ],
+          [
+            8,
+            2,
+            23
+          ],
+          [
+            2,
+            8,
+            3
+          ]
+        ]
+      }
+    },
+    "z_layer_templates": {
+      "1": [
+        "0"
+      ],
+      "2": [
+        "0",
+        "1/2"
+      ],
+      "3": [
+        "0",
+        "1/3",
+        "2/3"
+      ],
+      "4": [
+        "0",
+        "1/4",
+        "1/2",
+        "3/4"
+      ],
+      "6": [
+        "0",
+        "1/6",
+        "1/3",
+        "1/2",
+        "2/3",
+        "5/6"
+      ]
+    },
+    "in_plane_templates": {
+      "Cubic-P": {
+        "1": [
+          [
+            "(0,0,z)"
+          ]
+        ],
+        "2": [
+          [
+            "(0,0,z)",
+            "(1/2,1/2,z)"
+          ]
+        ],
+        "4": [
+          [
+            "(0,0,z)",
+            "(0,1/2,z)",
+            "(1/2,0,z)",
+            "(1/2,1/2,z)"
+          ]
+        ]
+      },
+      "Hexagonal-P": {
+        "1": [
+          [
+            "(0,0,z)"
+          ]
+        ],
+        "2": [
+          [
+            "(0,0,z)",
+            "(1/3,2/3,z)"
+          ],
+          [
+            "(0,0,z)",
+            "(2/3,1/3,z)"
+          ]
+        ],
+        "3": [
+          [
+            "(0,0,z)",
+            "(1/3,2/3,z)",
+            "(2/3,1/3,z)"
+          ]
+        ]
+      },
+      "Tetragonal-P": {
+        "1": [
+          [
+            "(0,0,z)"
+          ]
+        ],
+        "2": [
+          [
+            "(0,0,z)",
+            "(1/2,1/2,z)"
+          ]
+        ],
+        "4": [
+          [
+            "(0,0,z)",
+            "(0,1/2,z)",
+            "(1/2,0,z)",
+            "(1/2,1/2,z)"
+          ]
+        ]
+      },
+      "Orthorhombic-P": {
+        "1": [
+          [
+            "(0,0,z)"
+          ]
+        ],
+        "2": [
+          [
+            "(0,0,z)",
+            "(1/2,1/2,z)"
+          ],
+          [
+            "(0,0,z)",
+            "(0,1/2,z)"
+          ]
+        ],
+        "4": [
+          [
+            "(0,0,z)",
+            "(0,1/2,z)",
+            "(1/2,0,z)",
+            "(1/2,1/2,z)"
+          ]
+        ]
+      }
+    }
+  },
+  "predictions_by_n": {
+    "1": [
+      {
+        "lattice": "Hexagonal-P",
+        "offsets": [
+          "(0,0,0)"
+        ],
+        "probability": 28.57,
+        "source": "observed",
+        "count": 16
+      },
+      {
+        "lattice": "Triclinic-P",
+        "offsets": [
+          "(0,0,0)"
+        ],
+        "probability": 16.07,
+        "source": "observed",
+        "count": 9
+      },
+      {
+        "lattice": "Monoclinic-C",
+        "offsets": [
+          "(0,0,0)"
+        ],
+        "probability": 16.07,
+        "source": "observed",
+        "count": 9
+      },
+      {
+        "lattice": "Rhombohedral-R",
+        "offsets": [
+          "(0,0,0)"
+        ],
+        "probability": 12.5,
+        "source": "observed",
+        "count": 7
+      },
+      {
+        "lattice": "Cubic-F",
+        "offsets": [
+          "(0,0,0)"
+        ],
+        "probability": 10.71,
+        "source": "observed",
+        "count": 6
+      },
+      {
+        "lattice": "Tetragonal-I",
+        "offsets": [
+          "(0,0,0)"
+        ],
+        "probability": 8.93,
+        "source": "observed",
+        "count": 5
+      },
+      {
+        "lattice": "Cubic-P",
+        "offsets": [
+          "(0,0,0)"
+        ],
+        "probability": 3.57,
+        "source": "observed",
+        "count": 2
+      },
+      {
+        "lattice": "Cubic-I",
+        "offsets": [
+          "(0,0,0)"
+        ],
+        "probability": 1.79,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Orthorhombic-I",
+        "offsets": [
+          "(0,0,0)"
+        ],
+        "probability": 1.79,
+        "source": "observed",
+        "count": 1
+      }
+    ],
+    "2": [
+      {
+        "lattice": "Hexagonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)"
+        ],
+        "probability": 5.28,
+        "source": "observed",
+        "count": 16
+      },
+      {
+        "lattice": "Hexagonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(1/3,2/3,1/2)"
+        ],
+        "probability": 4.95,
+        "source": "observed",
+        "count": 15
+      },
+      {
+        "lattice": "Monoclinic-C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)"
+        ],
+        "probability": 4.29,
+        "source": "observed",
+        "count": 13
+      },
+      {
+        "lattice": "Rhombohedral-R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)"
+        ],
+        "probability": 3.63,
+        "source": "observed",
+        "count": 11
+      },
+      {
+        "lattice": "Orthorhombic-C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)"
+        ],
+        "probability": 3.3,
+        "source": "observed",
+        "count": 10
+      },
+      {
+        "lattice": "Tetragonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(1/2,1/2,0)"
+        ],
+        "probability": 2.97,
+        "source": "observed",
+        "count": 9
+      },
+      {
+        "lattice": "Monoclinic-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,1/2)"
+        ],
+        "probability": 2.31,
+        "source": "observed",
+        "count": 7
+      },
+      {
+        "lattice": "Hexagonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(2/3,1/3,1/2)"
+        ],
+        "probability": 1.98,
+        "source": "observed",
+        "count": 6
+      },
+      {
+        "lattice": "Hexagonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(1/3,2/3,0)"
+        ],
+        "probability": 1.55,
+        "source": "decomposition",
+        "count": 0
+      },
+      {
+        "lattice": "Monoclinic-C",
+        "offsets": [
+          "(0,0,0)",
+          "(2/3,0,0)"
+        ],
+        "probability": 1.32,
+        "source": "observed",
+        "count": 4
+      },
+      {
+        "lattice": "Monoclinic-C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,1/2)"
+        ],
+        "probability": 1.32,
+        "source": "observed",
+        "count": 4
+      },
+      {
+        "lattice": "Tetragonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(1/2,1/2,1/2)"
+        ],
+        "probability": 0.99,
+        "source": "observed",
+        "count": 3
+      },
+      {
+        "lattice": "Monoclinic-C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/3,0)"
+        ],
+        "probability": 0.99,
+        "source": "observed",
+        "count": 3
+      },
+      {
+        "lattice": "Monoclinic-C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/3,1/2)"
+        ],
+        "probability": 0.99,
+        "source": "observed",
+        "count": 3
+      },
+      {
+        "lattice": "Monoclinic-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,0)"
+        ],
+        "probability": 0.99,
+        "source": "observed",
+        "count": 3
+      },
+      {
+        "lattice": "Monoclinic-C",
+        "offsets": [
+          "(0,0,0)",
+          "(1/2,0,1/2)"
+        ],
+        "probability": 0.99,
+        "source": "observed",
+        "count": 3
+      },
+      {
+        "lattice": "Orthorhombic-P",
+        "offsets": [
+          "(0,0,0)",
+          "(1/2,1/2,1/2)"
+        ],
+        "probability": 0.66,
+        "source": "observed",
+        "count": 2
+      },
+      {
+        "lattice": "Cubic-P",
+        "offsets": [
+          "(0,0,0)",
+          "(1/2,1/2,1/2)"
+        ],
+        "probability": 0.66,
+        "source": "observed",
+        "count": 2
+      },
+      {
+        "lattice": "Tetragonal-I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,1/4)"
+        ],
+        "probability": 0.66,
+        "source": "observed",
+        "count": 2
+      },
+      {
+        "lattice": "Monoclinic-P",
+        "offsets": [
+          "(0,0,0)",
+          "(1/2,1/2,1/2)"
+        ],
+        "probability": 0.66,
+        "source": "observed",
+        "count": 2
+      }
+    ],
+    "3": [
+      {
+        "lattice": "Cubic-P",
+        "offsets": [
+          "(0,0,0)",
+          "(1/2,0,1/2)",
+          "(1/2,1/2,0)"
+        ],
+        "probability": 4.55,
+        "source": "observed",
+        "count": 3
+      },
+      {
+        "lattice": "Rhombohedral-R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/4)",
+          "(0,0,3/4)"
+        ],
+        "probability": 3.03,
+        "source": "observed",
+        "count": 2
+      },
+      {
+        "lattice": "Cubic-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,1/2)",
+          "(1/2,1/2,0)"
+        ],
+        "probability": 3.03,
+        "source": "observed",
+        "count": 2
+      },
+      {
+        "lattice": "Cubic-F",
+        "offsets": [
+          "(0,0,0)",
+          "(1/2,1/2,1/2)",
+          "(3/4,3/4,3/4)"
+        ],
+        "probability": 3.03,
+        "source": "observed",
+        "count": 2
+      },
+      {
+        "lattice": "Rhombohedral-R",
+        "offsets": [
+          "(0,0,0)",
+          "(1/2,0,0)",
+          "(1/2,1/2,0)"
+        ],
+        "probability": 3.03,
+        "source": "observed",
+        "count": 2
+      },
+      {
+        "lattice": "Hexagonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(1/3,2/3,0)",
+          "(2/3,1/3,0)"
+        ],
+        "probability": 3.03,
+        "source": "observed",
+        "count": 2
+      },
+      {
+        "lattice": "Hexagonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0.0606,0.5303,2/3)",
+          "(0.5303,0.4697,1/3)"
+        ],
+        "probability": 1.52,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Rhombohedral-R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,0.2750)",
+          "(0,0,0.7250)"
+        ],
+        "probability": 1.52,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Rhombohedral-R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,0,1/4)"
+        ],
+        "probability": 1.52,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Tetragonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,1/2)",
+          "(1/2,0,1/2)"
+        ],
+        "probability": 1.52,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Cubic-F",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,1/2)",
+          "(1/4,1/4,1/4)"
+        ],
+        "probability": 1.52,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Tetragonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,0.5448)",
+          "(1/2,1/2,0.7724)"
+        ],
+        "probability": 1.52,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Monoclinic-C",
+        "offsets": [
+          "(0,0,0)",
+          "(0.3767,0,0)",
+          "(0.6883,0,1/2)"
+        ],
+        "probability": 1.52,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Rhombohedral-R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,0,3/4)"
+        ],
+        "probability": 1.52,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Hexagonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0.3885,0.7770,0)",
+          "(0.7770,0.3885,0)"
+        ],
+        "probability": 1.52,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Tetragonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,0)",
+          "(1/2,0,0)"
+        ],
+        "probability": 1.52,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Rhombohedral-R",
+        "offsets": [
+          "(0,0,0)",
+          "(0.0274,0.4645,0)",
+          "(0.4645,0.4371,0)"
+        ],
+        "probability": 1.52,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Hexagonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0.0776,0.5388,2/3)",
+          "(0.5388,0.4612,1/3)"
+        ],
+        "probability": 1.52,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Hexagonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(1/3,2/3,5/6)",
+          "(2/3,1/3,2/3)"
+        ],
+        "probability": 1.52,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Triclinic-P",
+        "offsets": [
+          "(0,0,0)",
+          "(1/3,0.0960,0.7901)",
+          "(2/3,0.9040,0.2099)"
+        ],
+        "probability": 1.52,
+        "source": "observed",
+        "count": 1
+      }
+    ],
+    "4": [
+      {
+        "lattice": "Tetragonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,0)",
+          "(1/2,0,0)",
+          "(1/2,1/2,0)"
+        ],
+        "probability": 1.71,
+        "source": "observed",
+        "count": 10
+      },
+      {
+        "lattice": "Orthorhombic-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,0,1/4)",
+          "(0,0,3/4)"
+        ],
+        "probability": 1.42,
+        "source": "decomposition",
+        "count": 0
+      },
+      {
+        "lattice": "Orthorhombic-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,1/2,0)",
+          "(0,1/2,1/2)"
+        ],
+        "probability": 1.42,
+        "source": "decomposition",
+        "count": 0
+      },
+      {
+        "lattice": "Cubic-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,1/2)",
+          "(1/2,0,1/2)",
+          "(1/2,1/2,0)"
+        ],
+        "probability": 1.2,
+        "source": "observed",
+        "count": 7
+      },
+      {
+        "lattice": "Orthorhombic-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,0)",
+          "(1/2,0,1/2)",
+          "(1/2,1/2,1/2)"
+        ],
+        "probability": 1.2,
+        "source": "observed",
+        "count": 7
+      },
+      {
+        "lattice": "Hexagonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(2/3,1/3,0)",
+          "(2/3,1/3,1/2)"
+        ],
+        "probability": 1.03,
+        "source": "observed",
+        "count": 6
+      },
+      {
+        "lattice": "Tetragonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(1/2,1/6,0)",
+          "(1/3,2/3,0)",
+          "(5/6,1/2,0)"
+        ],
+        "probability": 0.68,
+        "source": "observed",
+        "count": 4
+      },
+      {
+        "lattice": "Orthorhombic-C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(1/2,0,0)",
+          "(1/2,0,1/2)"
+        ],
+        "probability": 0.68,
+        "source": "observed",
+        "count": 4
+      },
+      {
+        "lattice": "Orthorhombic-C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(1/3,0,0)",
+          "(1/3,0,1/2)"
+        ],
+        "probability": 0.51,
+        "source": "observed",
+        "count": 3
+      },
+      {
+        "lattice": "Tetragonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(1/2,1/2,0)",
+          "(1/2,1/2,1/2)"
+        ],
+        "probability": 0.51,
+        "source": "observed",
+        "count": 3
+      },
+      {
+        "lattice": "Monoclinic-C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(2/3,0,0)",
+          "(2/3,0,1/2)"
+        ],
+        "probability": 0.51,
+        "source": "observed",
+        "count": 3
+      },
+      {
+        "lattice": "Orthorhombic-C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(2/3,0,0)",
+          "(2/3,0,1/2)"
+        ],
+        "probability": 0.51,
+        "source": "observed",
+        "count": 3
+      },
+      {
+        "lattice": "Orthorhombic-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,1/2)",
+          "(1/2,0,0)",
+          "(1/2,1/2,1/2)"
+        ],
+        "probability": 0.34,
+        "source": "observed",
+        "count": 2
+      },
+      {
+        "lattice": "Monoclinic-C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,2/3,0)",
+          "(0,2/3,1/2)"
+        ],
+        "probability": 0.34,
+        "source": "observed",
+        "count": 2
+      },
+      {
+        "lattice": "Orthorhombic-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(1/2,1/2,0)",
+          "(1/2,1/2,1/2)"
+        ],
+        "probability": 0.34,
+        "source": "observed",
+        "count": 2
+      },
+      {
+        "lattice": "Orthorhombic-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,1/2)",
+          "(1/2,0,1/2)",
+          "(1/2,1/2,0)"
+        ],
+        "probability": 0.34,
+        "source": "observed",
+        "count": 2
+      },
+      {
+        "lattice": "Orthorhombic-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(1/2,2/3,0)",
+          "(1/2,2/3,1/2)"
+        ],
+        "probability": 0.34,
+        "source": "observed",
+        "count": 2
+      },
+      {
+        "lattice": "Orthorhombic-P",
+        "offsets": [
+          "(0,0,0)",
+          "(1/2,0,0)",
+          "(1/3,1/2,1/2)",
+          "(5/6,1/2,1/2)"
+        ],
+        "probability": 0.34,
+        "source": "observed",
+        "count": 2
+      },
+      {
+        "lattice": "Monoclinic-C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,1/2,0)",
+          "(0,1/2,1/2)"
+        ],
+        "probability": 0.34,
+        "source": "observed",
+        "count": 2
+      },
+      {
+        "lattice": "Cubic-P",
+        "offsets": [
+          "(0,0,0)",
+          "(1/2,1/6,2/3)",
+          "(1/6,2/3,1/2)",
+          "(2/3,1/2,1/6)"
+        ],
+        "probability": 0.34,
+        "source": "observed",
+        "count": 2
+      }
+    ],
+    "5": [
+      {
+        "lattice": "Tetragonal-I",
+        "offsets": [
+          "(0,0,0)",
+          "(1/4,1/4,1/2)",
+          "(1/4,3/4,1/2)",
+          "(3/4,1/4,1/2)",
+          "(3/4,3/4,1/2)"
+        ],
+        "probability": 12.5,
+        "source": "observed",
+        "count": 3
+      },
+      {
+        "lattice": "Tetragonal-I",
+        "offsets": [
+          "(0,0,0)",
+          "(0.3750,0.3750,1/2)",
+          "(0.3750,0.6250,1/2)",
+          "(0.6250,0.3750,1/2)",
+          "(0.6250,0.6250,1/2)"
+        ],
+        "probability": 8.33,
+        "source": "observed",
+        "count": 2
+      },
+      {
+        "lattice": "Tetragonal-I",
+        "offsets": [
+          "(0,0,0)",
+          "(1/4,1/4,0)",
+          "(1/4,3/4,0)",
+          "(3/4,1/4,0)",
+          "(3/4,3/4,0)"
+        ],
+        "probability": 4.17,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Monoclinic-C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.3580,0.1218)",
+          "(0,0.3580,0.8782)",
+          "(0,0.6420,0.1218)",
+          "(0,0.6420,0.8782)"
+        ],
+        "probability": 4.17,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Monoclinic-C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,0.4563,3/4)",
+          "(0,0.9126,0)",
+          "(0,0.9126,1/2)"
+        ],
+        "probability": 4.17,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Monoclinic-C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.3626,0.2255)",
+          "(0,0.3626,0.7745)",
+          "(0,0.6374,0.2255)",
+          "(0,0.6374,0.7745)"
+        ],
+        "probability": 4.17,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Tetragonal-I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/4,0)",
+          "(0.3750,0.6250,1/2)",
+          "(3/4,0,0)",
+          "(3/4,1/4,0)"
+        ],
+        "probability": 4.17,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Monoclinic-C",
+        "offsets": [
+          "(0,0,0)",
+          "(0.1953,0.3723,0.4685)",
+          "(0.1953,0.6277,0.4685)",
+          "(0.8047,0.3723,0.5315)",
+          "(0.8047,0.6277,0.5315)"
+        ],
+        "probability": 4.17,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Tetragonal-I",
+        "offsets": [
+          "(0,0,0)",
+          "(0.4328,0.5612,0.6230)",
+          "(0.4388,0.4328,0.3770)",
+          "(0.5612,0.5672,0.3770)",
+          "(0.5672,0.4388,0.6230)"
+        ],
+        "probability": 4.17,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Rhombohedral-R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/3)",
+          "(0,0,1/6)",
+          "(0,0,2/3)",
+          "(0,0,5/6)"
+        ],
+        "probability": 4.17,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Hexagonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0.5833,2/3,0.7212)",
+          "(0.9167,1/3,0.2788)",
+          "(1/2,1/4,0)",
+          "(1/4,3/4,0)"
+        ],
+        "probability": 4.17,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Monoclinic-C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/3,0.0293)",
+          "(0,1/3,0.9707)",
+          "(0,2/3,0.0293)",
+          "(0,2/3,0.9707)"
+        ],
+        "probability": 4.17,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Monoclinic-C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.2886,1/3)",
+          "(0,0.2886,2/3)",
+          "(0,0.7114,1/3)",
+          "(0,0.7114,2/3)"
+        ],
+        "probability": 4.17,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Monoclinic-C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.3594,0.2069)",
+          "(0,0.3594,0.7931)",
+          "(0,0.6406,0.2069)",
+          "(0,0.6406,0.7931)"
+        ],
+        "probability": 4.17,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Triclinic-P",
+        "offsets": [
+          "(0,0,0)",
+          "(1/3,0.9458,2/3)",
+          "(1/4,2/3,0.5439)",
+          "(2/3,0.0542,1/3)",
+          "(3/4,1/3,0.4561)"
+        ],
+        "probability": 4.17,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Monoclinic-C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.2959,1/3)",
+          "(0,0.2959,2/3)",
+          "(0,0.7041,1/3)",
+          "(0,0.7041,2/3)"
+        ],
+        "probability": 4.17,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Monoclinic-C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/3,0.0991)",
+          "(0,1/3,0.9009)",
+          "(0,2/3,0.0991)",
+          "(0,2/3,0.9009)"
+        ],
+        "probability": 4.17,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Monoclinic-C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.3705,0.0315)",
+          "(0,0.3705,0.9685)",
+          "(0,0.6295,0.0315)",
+          "(0,0.6295,0.9685)"
+        ],
+        "probability": 4.17,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Monoclinic-C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,0.8767,3/4)",
+          "(0,3/4,0)",
+          "(0,3/4,1/2)"
+        ],
+        "probability": 4.17,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Monoclinic-C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/4,0.2981)",
+          "(0,1/4,0.7019)",
+          "(0,3/4,0.2981)",
+          "(0,3/4,0.7019)"
+        ],
+        "probability": 4.17,
+        "source": "observed",
+        "count": 1
+      }
+    ],
+    "6": [
+      {
+        "lattice": "Hexagonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(1/3,2/3,0)",
+          "(1/3,2/3,1/2)",
+          "(2/3,1/3,0)",
+          "(2/3,1/3,1/2)"
+        ],
+        "probability": 2.96,
+        "source": "decomposition",
+        "count": 0
+      },
+      {
+        "lattice": "Hexagonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/3)",
+          "(0,0,2/3)",
+          "(1/3,2/3,0)",
+          "(1/3,2/3,1/3)",
+          "(1/3,2/3,2/3)"
+        ],
+        "probability": 2.96,
+        "source": "decomposition",
+        "count": 0
+      },
+      {
+        "lattice": "Hexagonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/3)",
+          "(0,0,2/3)",
+          "(2/3,1/3,0)",
+          "(2/3,1/3,1/3)",
+          "(2/3,1/3,2/3)"
+        ],
+        "probability": 2.96,
+        "source": "decomposition",
+        "count": 0
+      },
+      {
+        "lattice": "Hexagonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,0,1/3)",
+          "(0,0,1/6)",
+          "(0,0,2/3)",
+          "(0,0,5/6)"
+        ],
+        "probability": 2.96,
+        "source": "decomposition",
+        "count": 0
+      },
+      {
+        "lattice": "Cubic-F",
+        "offsets": [
+          "(0,0,0)",
+          "(1/2,0,0)",
+          "(3/4,0,1/4)",
+          "(3/4,0,3/4)",
+          "(3/4,1/4,0)",
+          "(3/4,3/4,0)"
+        ],
+        "probability": 1.41,
+        "source": "observed",
+        "count": 2
+      },
+      {
+        "lattice": "Cubic-P",
+        "offsets": [
+          "(0,0,0)",
+          "(1/2,0,0)",
+          "(1/4,1/4,1/2)",
+          "(1/4,3/4,1/2)",
+          "(3/4,1/2,1/4)",
+          "(3/4,1/2,3/4)"
+        ],
+        "probability": 1.41,
+        "source": "observed",
+        "count": 2
+      },
+      {
+        "lattice": "Cubic-F",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,1/4,3/4)",
+          "(0,3/4,3/4)",
+          "(1/4,0,3/4)",
+          "(3/4,0,3/4)"
+        ],
+        "probability": 1.41,
+        "source": "observed",
+        "count": 2
+      },
+      {
+        "lattice": "Monoclinic-C",
+        "offsets": [
+          "(0,0,0)",
+          "(1/3,0,0)",
+          "(1/6,1/4,1/3)",
+          "(1/6,1/4,2/3)",
+          "(1/6,3/4,1/3)",
+          "(1/6,3/4,2/3)"
+        ],
+        "probability": 1.41,
+        "source": "observed",
+        "count": 2
+      },
+      {
+        "lattice": "Cubic-F",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,0)",
+          "(0,1/4,3/4)",
+          "(1/2,1/4,3/4)",
+          "(1/4,0,1/4)",
+          "(1/4,0,3/4)"
+        ],
+        "probability": 1.41,
+        "source": "observed",
+        "count": 2
+      },
+      {
+        "lattice": "Rhombohedral-R",
+        "offsets": [
+          "(0,0,0)",
+          "(0.0833,0.3927,0)",
+          "(0.4167,0.2740,0)",
+          "(0.6907,0.0833,0)",
+          "(0.8093,0.5833,0)",
+          "(1/2,2/3,0)"
+        ],
+        "probability": 0.7,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Hexagonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,2/3)",
+          "(0.4701,0.9403,0)",
+          "(0.4701,0.9403,1/3)",
+          "(0.5299,0.4701,1/3)",
+          "(0.5299,0.4701,2/3)"
+        ],
+        "probability": 0.7,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Hexagonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,0)",
+          "(1/2,0,0)",
+          "(1/3,1/6,1/2)",
+          "(1/3,2/3,1/2)",
+          "(5/6,2/3,1/2)"
+        ],
+        "probability": 0.7,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Cubic-P",
+        "offsets": [
+          "(0,0,0)",
+          "(1/2,0,0)",
+          "(1/4,1/2,1/4)",
+          "(1/4,1/2,3/4)",
+          "(3/4,1/4,1/2)",
+          "(3/4,3/4,1/2)"
+        ],
+        "probability": 0.7,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Hexagonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0.0840,0.3902,1/2)",
+          "(0.3063,0.9160,1/2)",
+          "(0.4742,0.6965,0)",
+          "(0.6965,0.2223,0)",
+          "(0.7805,0.6126,1/2)"
+        ],
+        "probability": 0.7,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Rhombohedral-R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.5770,5/6)",
+          "(0.1942,0.7885,0)",
+          "(0.2115,0.9828,5/6)",
+          "(0.7885,0.5943,0)",
+          "(0.8058,0.7885,5/6)"
+        ],
+        "probability": 0.7,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Rhombohedral-R",
+        "offsets": [
+          "(0,0,0)",
+          "(0.0253,0.6914,0.1889)",
+          "(0.3086,1/3,0.1889)",
+          "(0.3580,0.7167,0)",
+          "(0.6414,0.3580,0)",
+          "(2/3,0.0494,0.1889)"
+        ],
+        "probability": 0.7,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Rhombohedral-R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/6,1/2)",
+          "(2/3,0,1/2)",
+          "(2/3,5/6,0)",
+          "(5/6,1/6,0)",
+          "(5/6,5/6,1/2)"
+        ],
+        "probability": 0.7,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Hexagonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(1/3,2/3,1/3)",
+          "(1/3,2/3,2/3)",
+          "(2/3,1/3,1/6)",
+          "(2/3,1/3,5/6)"
+        ],
+        "probability": 0.7,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Hexagonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/3,1/2)",
+          "(0.3570,1/6,0)",
+          "(0.6430,1/6,1/2)",
+          "(1/6,0.8096,0)",
+          "(5/6,0.5237,1/2)"
+        ],
+        "probability": 0.7,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Rhombohedral-R",
+        "offsets": [
+          "(0,0,0)",
+          "(0.5897,1/6,0)",
+          "(0.8461,1/2,5/6)",
+          "(1/4,1/3,5/6)",
+          "(1/6,0.5833,0)",
+          "(2/3,0.9167,5/6)"
+        ],
+        "probability": 0.7,
+        "source": "observed",
+        "count": 1
+      }
+    ],
+    "7": [
+      {
+        "lattice": "Rhombohedral-R",
+        "offsets": [
+          "(0,0,0)",
+          "(0.0326,0.3023,0.5762)",
+          "(0.3023,1/4,0.4238)",
+          "(0.6977,3/4,0.5762)",
+          "(0.9674,0.6977,0.4238)",
+          "(1/4,0.9674,0.5762)",
+          "(3/4,0.0326,0.4238)"
+        ],
+        "probability": 9.09,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Rhombohedral-R",
+        "offsets": [
+          "(0,0,0)",
+          "(0.0394,2/3,0.0886)",
+          "(0.3666,0.0394,0.9114)",
+          "(0.6334,0.9606,0.0886)",
+          "(0.9606,1/3,0.9114)",
+          "(1/3,0.3666,0.0886)",
+          "(2/3,0.6334,0.9114)"
+        ],
+        "probability": 9.09,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Cubic-F",
+        "offsets": [
+          "(0,0,0)",
+          "(1/2,1/2,1/4)",
+          "(1/2,1/2,3/4)",
+          "(1/2,1/4,1/2)",
+          "(1/2,3/4,1/2)",
+          "(1/4,1/2,1/2)",
+          "(3/4,1/2,1/2)"
+        ],
+        "probability": 9.09,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Hexagonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1.0000,0)",
+          "(0.1004,0.5161,0)",
+          "(0.2282,0.8722,1/2)",
+          "(0.5161,0.4157,0)",
+          "(0.6439,0.7718,1/2)",
+          "(3/4,0.2879,1/2)"
+        ],
+        "probability": 9.09,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Cubic-F",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/4)",
+          "(0,0,3/4)",
+          "(0,1/4,0)",
+          "(0,3/4,0)",
+          "(1/4,0,0)",
+          "(3/4,0,0)"
+        ],
+        "probability": 9.09,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Cubic-F",
+        "offsets": [
+          "(0,0,0)",
+          "(0.2169,1/2,1/2)",
+          "(0.7831,1/2,1/2)",
+          "(1/2,0.2169,1/2)",
+          "(1/2,0.7831,1/2)",
+          "(1/2,1/2,0.2169)",
+          "(1/2,1/2,0.7831)"
+        ],
+        "probability": 9.09,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Hexagonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.1229,1/2)",
+          "(0,1.0000,0)",
+          "(0.4300,0.5615,0)",
+          "(0.4385,0.9914,1/2)",
+          "(0.5615,0.1315,0)",
+          "(0.5700,0.5615,1/2)"
+        ],
+        "probability": 9.09,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Hexagonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0.1320,0.4401,0)",
+          "(0.3802,1/2,1/2)",
+          "(0.3803,1/2,1/2)",
+          "(0.4401,0.3081,0)",
+          "(0.9401,0.1919,1/2)",
+          "(1/4,0.0599,1/2)"
+        ],
+        "probability": 9.09,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Orthorhombic-F",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,1/2)",
+          "(0.1545,2/3,0)",
+          "(0.4106,1/4,1/4)",
+          "(0.6545,2/3,1/2)",
+          "(1/4,0.9191,1/4)",
+          "(3/4,0.4191,1/4)"
+        ],
+        "probability": 9.09,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Rhombohedral-R",
+        "offsets": [
+          "(0,0,0)",
+          "(0.2775,0.4430,0.4696)",
+          "(0.4430,1/6,0.5304)",
+          "(0.5570,5/6,0.4696)",
+          "(0.7225,0.5570,0.5304)",
+          "(1/6,0.7225,0.4696)",
+          "(5/6,0.2775,0.5304)"
+        ],
+        "probability": 9.09,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Hexagonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0.0781,0,1/2)",
+          "(0.5391,0,0)",
+          "(0.5391,0,1/2)",
+          "(0.5391,0.4609,1/2)",
+          "(0.5391,0.5391,0)",
+          "(1.0000,0,0)"
+        ],
+        "probability": 9.09,
+        "source": "observed",
+        "count": 1
+      }
+    ],
+    "8": [
+      {
+        "lattice": "Orthorhombic-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,0,1/4)",
+          "(0,0,3/4)",
+          "(1/2,1/2,0)",
+          "(1/2,1/2,1/2)",
+          "(1/2,1/2,1/4)",
+          "(1/2,1/2,3/4)"
+        ],
+        "probability": 3.43,
+        "source": "decomposition",
+        "count": 0
+      },
+      {
+        "lattice": "Orthorhombic-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,0,1/4)",
+          "(0,0,3/4)",
+          "(0,1/2,0)",
+          "(0,1/2,1/2)",
+          "(0,1/2,1/4)",
+          "(0,1/2,3/4)"
+        ],
+        "probability": 3.43,
+        "source": "decomposition",
+        "count": 0
+      },
+      {
+        "lattice": "Orthorhombic-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,1/2,0)",
+          "(0,1/2,1/2)",
+          "(1/2,0,0)",
+          "(1/2,0,1/2)",
+          "(1/2,1/2,0)",
+          "(1/2,1/2,1/2)"
+        ],
+        "probability": 2.09,
+        "source": "observed",
+        "count": 8
+      },
+      {
+        "lattice": "Tetragonal-I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,0)",
+          "(0.1250,0.1250,0)",
+          "(0.1250,0.3750,0)",
+          "(0.3750,0.1250,0)",
+          "(0.3750,0.3750,0)",
+          "(1/2,0,0)",
+          "(1/2,1/2,0)"
+        ],
+        "probability": 1.05,
+        "source": "observed",
+        "count": 4
+      },
+      {
+        "lattice": "Tetragonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,1/2,0)",
+          "(0,1/2,1/2)",
+          "(1/2,0,0)",
+          "(1/2,0,1/2)",
+          "(1/2,1/2,0)",
+          "(1/2,1/2,1/2)"
+        ],
+        "probability": 0.79,
+        "source": "observed",
+        "count": 3
+      },
+      {
+        "lattice": "Cubic-F",
+        "offsets": [
+          "(0,0,0)",
+          "(0,3/4,3/4)",
+          "(1/2,1/2,1/2)",
+          "(1/2,3/4,3/4)",
+          "(3/4,0,3/4)",
+          "(3/4,1/2,3/4)",
+          "(3/4,3/4,0)",
+          "(3/4,3/4,1/2)"
+        ],
+        "probability": 0.52,
+        "source": "observed",
+        "count": 2
+      },
+      {
+        "lattice": "Tetragonal-I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,1/4)",
+          "(0,1/4,0)",
+          "(0,3/4,1/4)",
+          "(3/4,0,0)",
+          "(3/4,1/2,1/4)",
+          "(3/4,1/4,0)",
+          "(3/4,3/4,1/4)"
+        ],
+        "probability": 0.52,
+        "source": "observed",
+        "count": 2
+      },
+      {
+        "lattice": "Tetragonal-I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,1/4,0)",
+          "(0,1/4,1/2)",
+          "(1/4,0,0)",
+          "(1/4,0,1/2)",
+          "(1/4,1/4,0)",
+          "(1/4,1/4,1/2)"
+        ],
+        "probability": 0.52,
+        "source": "observed",
+        "count": 2
+      },
+      {
+        "lattice": "Orthorhombic-C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,1/2,0)",
+          "(0,1/2,1/2)",
+          "(1/2,0,0)",
+          "(1/2,0,1/2)",
+          "(1/2,1/2,0)",
+          "(1/2,1/2,1/2)"
+        ],
+        "probability": 0.52,
+        "source": "observed",
+        "count": 2
+      },
+      {
+        "lattice": "Orthorhombic-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,1/2)",
+          "(0,1/6,0)",
+          "(0,2/3,1/2)",
+          "(1/2,0,3/4)",
+          "(1/2,1/2,1/4)",
+          "(1/2,1/6,3/4)",
+          "(1/2,2/3,1/4)"
+        ],
+        "probability": 0.52,
+        "source": "observed",
+        "count": 2
+      },
+      {
+        "lattice": "Tetragonal-I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,3/4,0)",
+          "(0,3/4,1/2)",
+          "(1/4,0,0)",
+          "(1/4,0,1/2)",
+          "(1/4,3/4,0)",
+          "(1/4,3/4,1/2)"
+        ],
+        "probability": 0.52,
+        "source": "observed",
+        "count": 2
+      },
+      {
+        "lattice": "Rhombohedral-R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,2/3)",
+          "(0.0213,0.3685,3/4)",
+          "(0.3685,1/3,0.9135)",
+          "(0.6315,2/3,3/4)",
+          "(0.9787,0.6315,0.9135)",
+          "(1/3,0.9787,3/4)",
+          "(2/3,0.0213,0.9135)"
+        ],
+        "probability": 0.26,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Orthorhombic-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,0)",
+          "(0.0634,0,0.4366)",
+          "(0.0634,1/2,0.4366)",
+          "(0.5634,0,1/2)",
+          "(0.5634,1/2,1/2)",
+          "(1/2,0,0.9366)",
+          "(1/2,1/2,0.9366)"
+        ],
+        "probability": 0.26,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Orthorhombic-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.2793,1/2)",
+          "(0,0.7793,0)",
+          "(0,1/2,1/2)",
+          "(1/2,0,0.3501)",
+          "(1/2,0.2793,0.8501)",
+          "(1/2,0.7793,0.3501)",
+          "(1/2,1/2,0.8501)"
+        ],
+        "probability": 0.26,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Cubic-F",
+        "offsets": [
+          "(0,0,0)",
+          "(0,3/4,3/4)",
+          "(1/2,0,0)",
+          "(1/2,1/4,1/4)",
+          "(1/4,0,1/4)",
+          "(1/4,0,3/4)",
+          "(1/4,1/4,0)",
+          "(1/4,3/4,0)"
+        ],
+        "probability": 0.26,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Hexagonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0.1348,0.7798,0.9632)",
+          "(0.2202,0.3551,0.9632)",
+          "(0.3551,0.1348,0.4632)",
+          "(0.6449,0.8652,0.9632)",
+          "(0.7798,0.6449,0.4632)",
+          "(0.8652,0.2202,0.4632)"
+        ],
+        "probability": 0.26,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Tetragonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,0.5904)",
+          "(0,1/2,0)",
+          "(0,1/2,0.5904)",
+          "(1/2,0,0)",
+          "(1/2,0,0.5904)",
+          "(1/2,1/2,0)",
+          "(1/2,1/2,0.5904)"
+        ],
+        "probability": 0.26,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Tetragonal-I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.3750,1/4)",
+          "(0,0.8750,1/2)",
+          "(0,1/2,3/4)",
+          "(0.1250,0,1/2)",
+          "(0.1250,0.3750,3/4)",
+          "(0.1250,0.8750,0)",
+          "(0.1250,1/2,1/4)"
+        ],
+        "probability": 0.26,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Orthorhombic-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,3/4)",
+          "(0,1/3,0)",
+          "(0,1/3,3/4)",
+          "(1/2,1/2,1/2)",
+          "(1/2,1/2,1/4)",
+          "(1/2,5/6,1/2)",
+          "(1/2,5/6,1/4)"
+        ],
+        "probability": 0.26,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Monoclinic-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0.0572,1/4,0.6350)",
+          "(0.0572,3/4,0.1350)",
+          "(0.3810,0,0)",
+          "(0.3810,0,1/2)",
+          "(1/3,1/4,0.3650)",
+          "(1/3,3/4,0.8650)"
+        ],
+        "probability": 0.26,
+        "source": "observed",
+        "count": 1
+      }
+    ],
+    "9": [
+      {
+        "lattice": "Tetragonal-I",
+        "offsets": [
+          "(0,0,0)",
+          "(0.3545,0.3935,1/4)",
+          "(0.3545,0.3935,3/4)",
+          "(0.3935,0.6455,1/4)",
+          "(0.3935,0.6455,3/4)",
+          "(0.6065,0.3545,1/4)",
+          "(0.6065,0.3545,3/4)",
+          "(0.6455,0.6065,1/4)",
+          "(0.6455,0.6065,3/4)"
+        ],
+        "probability": 9.09,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Tetragonal-I",
+        "offsets": [
+          "(0,0,0)",
+          "(0.0693,0.0693,0.1387)",
+          "(0.0693,0.0693,0.8613)",
+          "(0.0693,0.9307,0.1387)",
+          "(0.0693,0.9307,0.8613)",
+          "(0.9307,0.0693,0.1387)",
+          "(0.9307,0.0693,0.8613)",
+          "(0.9307,0.9307,0.1387)",
+          "(0.9307,0.9307,0.8613)"
+        ],
+        "probability": 9.09,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Cubic-F",
+        "offsets": [
+          "(0,0,0)",
+          "(0.2245,1/2,1/2)",
+          "(0.7755,1/2,1/2)",
+          "(1/2,0.2245,1/2)",
+          "(1/2,0.7755,1/2)",
+          "(1/2,1/2,0.2245)",
+          "(1/2,1/2,0.7755)",
+          "(1/4,1/4,1/4)",
+          "(3/4,3/4,3/4)"
+        ],
+        "probability": 9.09,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Orthorhombic-I",
+        "offsets": [
+          "(0,0,0)",
+          "(1/3,0.4032,0.4436)",
+          "(1/3,0.4032,0.5564)",
+          "(1/3,0.5968,0.4436)",
+          "(1/3,0.5968,0.5564)",
+          "(2/3,0.4032,0.4436)",
+          "(2/3,0.4032,0.5564)",
+          "(2/3,0.5968,0.4436)",
+          "(2/3,0.5968,0.5564)"
+        ],
+        "probability": 9.09,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Hexagonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1.0000)",
+          "(0,1/2,0)",
+          "(0,1/2,1.0000)",
+          "(1/2,1/2,0)",
+          "(1/2,1/2,1.0000)",
+          "(1/6,5/6,1/2)",
+          "(2/3,1/3,1/2)",
+          "(2/3,5/6,1/2)"
+        ],
+        "probability": 9.09,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Orthorhombic-I",
+        "offsets": [
+          "(0,0,0)",
+          "(1/3,1/3,1/3)",
+          "(1/3,1/3,2/3)",
+          "(1/3,2/3,1/3)",
+          "(1/3,2/3,2/3)",
+          "(2/3,1/3,1/3)",
+          "(2/3,1/3,2/3)",
+          "(2/3,2/3,1/3)",
+          "(2/3,2/3,2/3)"
+        ],
+        "probability": 9.09,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Hexagonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,0)",
+          "(1/2,1/2,0)",
+          "(1/2,1/3,0.7738)",
+          "(1/2,2/3,0.2262)",
+          "(1/6,0,0.2262)",
+          "(1/6,2/3,0.7738)",
+          "(5/6,0,0.7738)",
+          "(5/6,1/3,0.2262)"
+        ],
+        "probability": 9.09,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Monoclinic-C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/4,0.1261)",
+          "(0,1/4,0.8739)",
+          "(0,3/4,0.1261)",
+          "(0,3/4,0.8739)",
+          "(0.1976,0.3579,0.7039)",
+          "(0.1976,0.6421,0.7039)",
+          "(0.8024,0.3579,0.2961)",
+          "(0.8024,0.6421,0.2961)"
+        ],
+        "probability": 9.09,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Monoclinic-C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,0.9195)",
+          "(0,0.5754,1/4)",
+          "(0,0.5754,2/3)",
+          "(0,1/3,0)",
+          "(0,1/3,0.9195)",
+          "(0,1/6,0.4598)",
+          "(0,3/4,1/4)",
+          "(0,3/4,2/3)"
+        ],
+        "probability": 9.09,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Monoclinic-C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.4082,0.2057)",
+          "(0,0.4082,0.7943)",
+          "(0,0.5918,0.2057)",
+          "(0,0.5918,0.7943)",
+          "(0,1/6,0.4636)",
+          "(0,1/6,0.5364)",
+          "(0,5/6,0.4636)",
+          "(0,5/6,0.5364)"
+        ],
+        "probability": 9.09,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Monoclinic-C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,0.1111,0.0476)",
+          "(0,0.1111,0.4524)",
+          "(0,0.6111,0.0476)",
+          "(0,0.6111,0.4524)",
+          "(0,0.7222,0)",
+          "(0,0.7222,1/2)",
+          "(0,0.8611,3/4)"
+        ],
+        "probability": 9.09,
+        "source": "observed",
+        "count": 1
+      }
+    ],
+    "10": [
+      {
+        "lattice": "Tetragonal-I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,1/4)",
+          "(0.3750,0.1250,3/4)",
+          "(0.3750,0.3750,1/2)",
+          "(0.3750,0.6250,1/2)",
+          "(0.3750,0.8750,3/4)",
+          "(0.6250,0.1250,3/4)",
+          "(0.6250,0.3750,1/2)",
+          "(0.6250,0.6250,1/2)",
+          "(0.6250,0.8750,3/4)"
+        ],
+        "probability": 27.27,
+        "source": "observed",
+        "count": 3
+      },
+      {
+        "lattice": "Cubic-F",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,0)",
+          "(0,1/4,1/4)",
+          "(0,1/4,3/4)",
+          "(0.3750,0.1250,0.8750)",
+          "(0.6250,0.8750,0.6250)",
+          "(1/4,1/2,1/4)",
+          "(1/4,1/4,0)",
+          "(3/4,0,3/4)",
+          "(3/4,1/4,0)"
+        ],
+        "probability": 9.09,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Orthorhombic-C",
+        "offsets": [
+          "(0,0,0)",
+          "(0.1308,1/4,3/4)",
+          "(0.1308,3/4,1/4)",
+          "(0.3692,1/4,3/4)",
+          "(0.3692,3/4,1/4)",
+          "(0.6308,1/4,3/4)",
+          "(0.6308,3/4,1/4)",
+          "(0.8692,1/4,3/4)",
+          "(0.8692,3/4,1/4)",
+          "(1/2,0,1/2)"
+        ],
+        "probability": 9.09,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Orthorhombic-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.3702,0.2170)",
+          "(0,0.3702,0.7830)",
+          "(0,0.6298,0.2170)",
+          "(0,0.6298,0.7830)",
+          "(1/2,0.1298,0.2170)",
+          "(1/2,0.1298,0.7830)",
+          "(1/2,0.8702,0.2170)",
+          "(1/2,0.8702,0.7830)",
+          "(1/2,1/2,0)"
+        ],
+        "probability": 9.09,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Orthorhombic-C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,0.5424,0)",
+          "(0,0.5424,1/2)",
+          "(0.1086,0.0212,1/4)",
+          "(0.8914,0.5212,1/4)",
+          "(1/2,0,0)",
+          "(1/2,0,1/2)",
+          "(1/2,0.5424,0)",
+          "(1/2,0.5424,1/2)"
+        ],
+        "probability": 9.09,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Orthorhombic-I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,0)",
+          "(1/4,0,1/4)",
+          "(1/4,0,3/4)",
+          "(1/4,1/2,1/4)",
+          "(1/4,1/2,3/4)",
+          "(3/4,0,1/4)",
+          "(3/4,0,3/4)",
+          "(3/4,1/2,1/4)",
+          "(3/4,1/2,3/4)"
+        ],
+        "probability": 9.09,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Tetragonal-I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,1/4)",
+          "(1/2,1/4,1/2)",
+          "(1/2,1/4,3/4)",
+          "(1/2,3/4,1/2)",
+          "(1/2,3/4,3/4)",
+          "(1/4,0,0)",
+          "(1/4,1/2,1/4)",
+          "(3/4,0,0)",
+          "(3/4,1/2,1/4)"
+        ],
+        "probability": 9.09,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Tetragonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,0)",
+          "(0,1/4,3/4)",
+          "(1/2,0,1/2)",
+          "(1/2,1/2,1/2)",
+          "(1/2,3/4,3/4)",
+          "(1/4,1/4,0)",
+          "(1/4,3/4,1/2)",
+          "(3/4,1/4,0)",
+          "(3/4,3/4,1/2)"
+        ],
+        "probability": 9.09,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Cubic-F",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/4,1/4)",
+          "(0.1250,0.1250,0.1250)",
+          "(0.3750,0.3750,0.3750)",
+          "(1/2,1/2,1/2)",
+          "(1/2,1/4,1/4)",
+          "(1/4,0,1/4)",
+          "(1/4,1/2,1/4)",
+          "(1/4,1/4,0)",
+          "(1/4,1/4,1/2)"
+        ],
+        "probability": 9.09,
+        "source": "observed",
+        "count": 1
+      }
+    ],
+    "12": [
+      {
+        "lattice": "Cubic-I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,1/2)",
+          "(0,1/4,3/4)",
+          "(0,3/4,1/4)",
+          "(1/2,0,1/2)",
+          "(1/2,1/2,0)",
+          "(1/2,1/4,1/4)",
+          "(1/2,3/4,3/4)",
+          "(1/4,1/4,1/2)",
+          "(1/4,3/4,0)",
+          "(3/4,1/4,0)",
+          "(3/4,3/4,1/2)"
+        ],
+        "probability": 4.08,
+        "source": "observed",
+        "count": 2
+      },
+      {
+        "lattice": "Rhombohedral-R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,2/3)",
+          "(0,2/3,1/2)",
+          "(0,2/3,1/6)",
+          "(1/3,1/3,1/2)",
+          "(1/3,1/3,1/6)",
+          "(1/3,2/3,0)",
+          "(1/3,2/3,2/3)",
+          "(2/3,0,1/2)",
+          "(2/3,0,1/6)",
+          "(2/3,1/3,0)",
+          "(2/3,1/3,2/3)"
+        ],
+        "probability": 2.04,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Tetragonal-I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,1/4,0)",
+          "(0,3/4,0)",
+          "(0,3/4,1/2)",
+          "(1/2,1.0000,0)",
+          "(1/4,0,0)",
+          "(1/4,0,1/2)",
+          "(1/4,1/2,0)",
+          "(1/4,3/4,0)",
+          "(1/4,3/4,1/2)",
+          "(3/4,3/4,0)"
+        ],
+        "probability": 2.04,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Rhombohedral-R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.3004,1/2)",
+          "(0.0329,0.3662,1/6)",
+          "(0.0329,0.9671,2/3)",
+          "(0.3991,0,1/2)",
+          "(0.3991,0.6996,0)",
+          "(0.6996,0.3004,0)",
+          "(0.6996,0.6996,1/2)",
+          "(0.7325,0.3662,2/3)",
+          "(0.7325,2/3,1/6)",
+          "(1/3,0.9671,1/6)",
+          "(1/3,2/3,2/3)"
+        ],
+        "probability": 2.04,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Orthorhombic-I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,0)",
+          "(0.1484,0.0833,0.0467)",
+          "(0.1484,0.0833,0.9533)",
+          "(0.1484,0.4167,0.0467)",
+          "(0.1484,0.4167,0.9533)",
+          "(0.3516,0.0833,0.0467)",
+          "(0.3516,0.0833,0.9533)",
+          "(0.3516,0.4167,0.0467)",
+          "(0.3516,0.4167,0.9533)",
+          "(1/2,0,0)",
+          "(1/2,1/2,0)"
+        ],
+        "probability": 2.04,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Hexagonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.3215,1/2)",
+          "(0.1116,0.0558,1/3)",
+          "(0.1116,0.3773,5/6)",
+          "(0.3671,0.0558,5/6)",
+          "(0.3671,0.6329,1/3)",
+          "(0.4229,0,1/2)",
+          "(0.4229,3/4,0)",
+          "(0.6886,0.3773,1/3)",
+          "(0.6886,0.6329,5/6)",
+          "(3/4,0.3215,0)",
+          "(3/4,3/4,1/2)"
+        ],
+        "probability": 2.04,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Rhombohedral-R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.3544,1/2)",
+          "(0.2911,0,1/2)",
+          "(0.2911,0.6456,0)",
+          "(0.3122,0.6878,1/3)",
+          "(0.3122,0.9789,5/6)",
+          "(0.6456,0.3544,0)",
+          "(0.6456,0.6456,1/2)",
+          "(0.9578,0.9789,1/3)",
+          "(0.9578,1/3,5/6)",
+          "(2/3,0.6878,5/6)",
+          "(2/3,1/3,1/3)"
+        ],
+        "probability": 2.04,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Tetragonal-I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,1/2)",
+          "(0.0554,0,1/2)",
+          "(0.0554,1/2,0)",
+          "(0.1944,0.0833,0.1946)",
+          "(0.1944,0.4167,0.3054)",
+          "(0.2777,0.2223,1/2)",
+          "(0.2777,0.2777,0)",
+          "(0.7777,0.2223,0)",
+          "(0.7777,0.2777,1/2)",
+          "(0.8610,0.0833,0.3054)",
+          "(0.8610,0.4167,0.1946)"
+        ],
+        "probability": 2.04,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Tetragonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,0.5967)",
+          "(0,0,0.5968)",
+          "(0,1/2,0)",
+          "(0,1/2,0.5967)",
+          "(0,1/2,0.5968)",
+          "(1/2,0,0)",
+          "(1/2,0,0.5967)",
+          "(1/2,0,0.5968)",
+          "(1/2,1/2,0)",
+          "(1/2,1/2,0.5967)",
+          "(1/2,1/2,0.5968)"
+        ],
+        "probability": 2.04,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Cubic-I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,5/6)",
+          "(0.0833,2/3,3/4)",
+          "(0.0833,5/6,0.0800)",
+          "(0.5833,2/3,0.0800)",
+          "(0.5833,5/6,3/4)",
+          "(0.9200,0.5833,2/3)",
+          "(0.9200,0.9167,1/6)",
+          "(2/3,0,5/6)",
+          "(2/3,1/2,0)",
+          "(3/4,0.5833,1/6)",
+          "(3/4,0.9167,2/3)"
+        ],
+        "probability": 2.04,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Monoclinic-C",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0.5931,0,0)",
+          "(0.5931,0,1/2)",
+          "(0.7104,0.1295,0.0604)",
+          "(0.7104,0.1295,0.4396)",
+          "(0.7104,0.8705,0.5604)",
+          "(0.7104,0.8705,0.9396)",
+          "(0.8827,0.1295,0.5604)",
+          "(0.8827,0.1295,0.9396)",
+          "(0.8827,0.8705,0.0604)",
+          "(0.8827,0.8705,0.4396)"
+        ],
+        "probability": 2.04,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Cubic-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0.1436,0.8848,1/4)",
+          "(0.1518,0.6436,1/2)",
+          "(0.2671,0.3848,0.3482)",
+          "(0.4106,1/2,0.6070)",
+          "(0.6436,1/2,0.8482)",
+          "(0.6518,0.7329,0.6152)",
+          "(0.7671,0.9918,3/4)",
+          "(0.9106,0.8765,1/2)",
+          "(1/2,0.3765,0.1070)",
+          "(1/4,0.1436,0.1152)",
+          "(3/4,0.2329,0.9918)"
+        ],
+        "probability": 2.04,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Orthorhombic-I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0.1440,0.1440,0.2119)",
+          "(0.1440,0.1440,0.2881)",
+          "(0.1440,0.8560,0.2119)",
+          "(0.1440,0.8560,0.2881)",
+          "(0.3560,0.1440,0.2119)",
+          "(0.3560,0.1440,0.2881)",
+          "(0.3560,0.8560,0.2119)",
+          "(0.3560,0.8560,0.2881)",
+          "(1/2,0,0)",
+          "(1/2,0,1/2)"
+        ],
+        "probability": 2.04,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Tetragonal-I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,3/4,0)",
+          "(0.5157,0.2657,0.2814)",
+          "(0.5157,0.2657,0.7186)",
+          "(0.5157,0.4843,0.2814)",
+          "(0.5157,0.4843,0.7186)",
+          "(0.7343,0.2657,0.2814)",
+          "(0.7343,0.2657,0.7186)",
+          "(0.7343,0.4843,0.2814)",
+          "(0.7343,0.4843,0.7186)",
+          "(1/4,0,0)",
+          "(1/4,3/4,0)"
+        ],
+        "probability": 2.04,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Rhombohedral-R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.6454,1/2)",
+          "(0.1367,0,1/2)",
+          "(0.1367,0.2908,0.3651)",
+          "(0.1367,0.7821,0)",
+          "(0.1367,1/2,0.8651)",
+          "(0.2734,0.2908,0.8651)",
+          "(0.2734,0.6454,0.3651)",
+          "(0.7821,0.6454,0)",
+          "(0.7821,0.7821,1/2)",
+          "(1/2,0.6454,0.8651)",
+          "(1/2,1/2,0.3651)"
+        ],
+        "probability": 2.04,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Rhombohedral-R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.1376,1/2)",
+          "(0.0244,0.1957,0.2028)",
+          "(0.0244,0.9756,0.7028)",
+          "(0.2202,0,1/2)",
+          "(0.2202,0.3578,0)",
+          "(0.3578,0.1376,0)",
+          "(0.3578,0.3578,1/2)",
+          "(0.3822,0.1957,0.7028)",
+          "(0.3822,1/3,0.2028)",
+          "(1/6,0.9756,0.2028)",
+          "(1/6,1/3,0.7028)"
+        ],
+        "probability": 2.04,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Cubic-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0.0316,1/3,0.2964)",
+          "(0.1553,0.5316,0.6237)",
+          "(0.2036,2/3,0.1237)",
+          "(0.3589,0.2043,1/2)",
+          "(0.5316,0.3763,0.1553)",
+          "(0.6553,1/6,5/6)",
+          "(0.7036,0.0316,1/3)",
+          "(0.8589,1/2,0.9518)",
+          "(1/2,0.7043,0.4518)",
+          "(1/3,0.8763,0.7964)",
+          "(5/6,5/6,0.6553)"
+        ],
+        "probability": 2.04,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Cubic-I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/4)",
+          "(0,3/4,0)",
+          "(0,3/4,1/4)",
+          "(0.1228,0.8772,0)",
+          "(0.1228,0.8772,1/4)",
+          "(0.1270,0,0.1270)",
+          "(0.1270,3/4,0.1270)",
+          "(0.8730,0,0.1270)",
+          "(0.8730,3/4,0.1270)",
+          "(0.8772,0.8772,0)",
+          "(0.8772,0.8772,1/4)"
+        ],
+        "probability": 2.04,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Cubic-I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.1250,0.1250)",
+          "(0,0.1250,0.8750)",
+          "(0,1/4,0)",
+          "(0.8750,0,0.1250)",
+          "(0.8750,0,0.8750)",
+          "(0.8750,1/4,0.1250)",
+          "(0.8750,1/4,0.8750)",
+          "(3/4,0,0)",
+          "(3/4,0.1250,0.1250)",
+          "(3/4,0.1250,0.8750)",
+          "(3/4,1/4,0)"
+        ],
+        "probability": 2.04,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Tetragonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,0.7176)",
+          "(0,0,0.8588)",
+          "(0,1/2,0)",
+          "(0,1/2,0.7176)",
+          "(0,1/2,0.8588)",
+          "(1/2,0,0)",
+          "(1/2,0,0.7176)",
+          "(1/2,0,0.8588)",
+          "(1/2,1/2,0)",
+          "(1/2,1/2,0.7176)",
+          "(1/2,1/2,0.8588)"
+        ],
+        "probability": 2.04,
+        "source": "observed",
+        "count": 1
+      }
+    ],
+    "13": [
+      {
+        "lattice": "Tetragonal-I",
+        "offsets": [
+          "(0,0,0)",
+          "(0.3789,0.3789,1/4)",
+          "(0.3789,0.3789,3/4)",
+          "(0.3789,0.6211,1/4)",
+          "(0.3789,0.6211,3/4)",
+          "(0.6211,0.3789,1/4)",
+          "(0.6211,0.3789,3/4)",
+          "(0.6211,0.6211,1/4)",
+          "(0.6211,0.6211,3/4)",
+          "(1/4,1/4,1/2)",
+          "(1/4,3/4,1/2)",
+          "(3/4,1/4,1/2)",
+          "(3/4,3/4,1/2)"
+        ],
+        "probability": 33.33,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Orthorhombic-I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,0)",
+          "(0.5550,0.0833,1/4)",
+          "(0.5550,0.0833,3/4)",
+          "(0.5550,0.4167,1/4)",
+          "(0.5550,0.4167,3/4)",
+          "(0.9450,0.0833,1/4)",
+          "(0.9450,0.0833,3/4)",
+          "(0.9450,0.4167,1/4)",
+          "(0.9450,0.4167,3/4)",
+          "(1/2,0,0)",
+          "(1/2,1/2,0)",
+          "(3/4,3/4,1/2)"
+        ],
+        "probability": 33.33,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Orthorhombic-I",
+        "offsets": [
+          "(0,0,0)",
+          "(1/3,0.3981,0.4538)",
+          "(1/3,0.3981,0.5462)",
+          "(1/3,0.6019,0.4538)",
+          "(1/3,0.6019,0.5462)",
+          "(1/4,1/4,1/2)",
+          "(1/4,3/4,1/2)",
+          "(2/3,0.3981,0.4538)",
+          "(2/3,0.3981,0.5462)",
+          "(2/3,0.6019,0.4538)",
+          "(2/3,0.6019,0.5462)",
+          "(3/4,1/4,1/2)",
+          "(3/4,3/4,1/2)"
+        ],
+        "probability": 33.33,
+        "source": "observed",
+        "count": 1
+      }
+    ],
+    "14": [
+      {
+        "lattice": "Cubic-F",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,3/4)",
+          "(0,1/2,3/4)",
+          "(0,3/4,0)",
+          "(1/2,1/4,3/4)",
+          "(1/2,3/4,0)",
+          "(1/2,3/4,3/4)",
+          "(1/4,1/4,1/4)",
+          "(1/4,3/4,1/2)",
+          "(3/4,0,0)",
+          "(3/4,0,1/2)",
+          "(3/4,1/2,1/4)",
+          "(3/4,1/2,3/4)",
+          "(3/4,3/4,1/2)"
+        ],
+        "probability": 14.29,
+        "source": "observed",
+        "count": 2
+      },
+      {
+        "lattice": "Cubic-F",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,1/4)",
+          "(0,1/4,1/4)",
+          "(0,1/4,3/4)",
+          "(1/2,1/2,1/4)",
+          "(1/2,1/4,0)",
+          "(1/2,1/4,1/2)",
+          "(1/4,0,1/2)",
+          "(1/4,0,1/4)",
+          "(1/4,1/2,1/2)",
+          "(1/4,1/4,0)",
+          "(1/4,1/4,1/4)",
+          "(1/4,3/4,0)",
+          "(3/4,0,1/4)"
+        ],
+        "probability": 7.14,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Rhombohedral-R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0.1213,0.7879,0.5833)",
+          "(0.1213,1/3,0.0833)",
+          "(0.2121,0.8787,0.0833)",
+          "(0.2121,1/3,0.5833)",
+          "(0.7879,0.1213,0.9167)",
+          "(0.7879,2/3,0.4167)",
+          "(0.8787,0.2121,0.4167)",
+          "(0.8787,2/3,0.9167)",
+          "(1/3,0.1213,0.4167)",
+          "(1/3,0.2121,0.9167)",
+          "(2/3,0.7879,0.0833)",
+          "(2/3,0.8787,0.5833)"
+        ],
+        "probability": 7.14,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Rhombohedral-R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,0.1964,0.1928)",
+          "(0,0.8036,0.8072)",
+          "(0,1/6,0.3072)",
+          "(0,5/6,0.6928)",
+          "(0.1964,0,0.3072)",
+          "(0.1964,1/6,0.8072)",
+          "(0.8036,0,0.6928)",
+          "(0.8036,5/6,0.1928)",
+          "(1/6,0,0.1928)",
+          "(1/6,0.1964,0.6928)",
+          "(5/6,0,0.8072)",
+          "(5/6,0.8036,0.3072)"
+        ],
+        "probability": 7.14,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Cubic-F",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,3/4)",
+          "(0,3/4,0)",
+          "(0,3/4,1/2)",
+          "(1/2,0,3/4)",
+          "(1/2,3/4,1/4)",
+          "(1/2,3/4,3/4)",
+          "(1/4,1/2,3/4)",
+          "(1/4,1/4,1/4)",
+          "(3/4,0,0)",
+          "(3/4,1/2,0)",
+          "(3/4,1/2,3/4)",
+          "(3/4,1/4,1/2)",
+          "(3/4,3/4,1/2)"
+        ],
+        "probability": 7.14,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Rhombohedral-R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0.3552,1/2,0.3011)",
+          "(0.3552,5/6,0.8011)",
+          "(0.6448,1/2,0.1989)",
+          "(0.6448,1/6,0.6989)",
+          "(1/2,0.3552,0.6989)",
+          "(1/2,0.6448,0.8011)",
+          "(1/2,1/6,0.1989)",
+          "(1/2,5/6,0.3011)",
+          "(1/6,0.6448,0.3011)",
+          "(1/6,1/2,0.8011)",
+          "(5/6,0.3552,0.1989)",
+          "(5/6,1/2,0.6989)"
+        ],
+        "probability": 7.14,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Cubic-I",
+        "offsets": [
+          "(0,0,0)",
+          "(1/2,1/2,1/2)",
+          "(1/2,1/4,1/4)",
+          "(1/2,1/4,3/4)",
+          "(1/2,3/4,1/4)",
+          "(1/2,3/4,3/4)",
+          "(1/4,1/2,1/4)",
+          "(1/4,1/2,3/4)",
+          "(1/4,1/4,1/2)",
+          "(1/4,3/4,1/2)",
+          "(3/4,1/2,1/4)",
+          "(3/4,1/2,3/4)",
+          "(3/4,1/4,1/2)",
+          "(3/4,3/4,1/2)"
+        ],
+        "probability": 7.14,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Rhombohedral-R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0.3534,1/2,0.5508)",
+          "(0.3534,5/6,0.0508)",
+          "(0.6466,1/2,0.4492)",
+          "(0.6466,1/6,0.9492)",
+          "(1/2,0.3534,0.9492)",
+          "(1/2,0.6466,0.0508)",
+          "(1/2,1/6,0.4492)",
+          "(1/2,5/6,0.5508)",
+          "(1/6,0.6466,0.5508)",
+          "(1/6,1/2,0.0508)",
+          "(5/6,0.3534,0.4492)",
+          "(5/6,1/2,0.9492)"
+        ],
+        "probability": 7.14,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Rhombohedral-R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0.0347,0.7014,0.5833)",
+          "(0.0347,1/3,0.0833)",
+          "(0.2986,0.9653,0.0833)",
+          "(0.2986,1/3,0.5833)",
+          "(0.7014,0.0347,0.9167)",
+          "(0.7014,2/3,0.4167)",
+          "(0.9653,0.2986,0.4167)",
+          "(0.9653,2/3,0.9167)",
+          "(1/3,0.0347,0.4167)",
+          "(1/3,0.2986,0.9167)",
+          "(2/3,0.7014,0.0833)",
+          "(2/3,0.9653,0.5833)"
+        ],
+        "probability": 7.14,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Hexagonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,0.3060)",
+          "(0.2886,2/3,0.8060)",
+          "(0.2886,2/3,1/2)",
+          "(0.4776,0,0)",
+          "(0.4776,0,0.3060)",
+          "(0.4776,0.4776,0)",
+          "(0.4776,0.4776,0.3060)",
+          "(0.8110,0.1890,0.8060)",
+          "(0.8110,0.1890,1/2)",
+          "(0.8110,2/3,0.8060)",
+          "(0.8110,2/3,1/2)",
+          "(1.0000,0,0)",
+          "(1.0000,0,0.3060)"
+        ],
+        "probability": 7.14,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Cubic-F",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/4)",
+          "(0,1/2,1/4)",
+          "(0,1/4,0)",
+          "(0,1/4,1/4)",
+          "(0,1/4,3/4)",
+          "(1/2,1/4,0)",
+          "(1/4,0,0)",
+          "(1/4,0,1/2)",
+          "(1/4,0,1/4)",
+          "(1/4,1/4,0)",
+          "(1/4,1/4,1/4)",
+          "(1/4,3/4,0)",
+          "(3/4,0,1/4)"
+        ],
+        "probability": 7.14,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Cubic-F",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,3/4)",
+          "(1/2,1/2,3/4)",
+          "(1/2,1/4,1/4)",
+          "(1/2,1/4,3/4)",
+          "(1/2,3/4,0)",
+          "(1/2,3/4,1/2)",
+          "(1/4,1/2,1/4)",
+          "(1/4,1/4,1/2)",
+          "(1/4,1/4,1/4)",
+          "(1/4,3/4,1/2)",
+          "(3/4,0,1/2)",
+          "(3/4,1/2,1/2)",
+          "(3/4,1/2,1/4)"
+        ],
+        "probability": 7.14,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Rhombohedral-R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0.3614,1/2,0.0682)",
+          "(0.3614,5/6,0.5682)",
+          "(0.6386,1/2,0.9318)",
+          "(0.6386,1/6,0.4318)",
+          "(1/2,0.3614,0.4318)",
+          "(1/2,0.6386,0.5682)",
+          "(1/2,1/6,0.9318)",
+          "(1/2,5/6,0.0682)",
+          "(1/6,0.6386,0.0682)",
+          "(1/6,1/2,0.5682)",
+          "(5/6,0.3614,0.9318)",
+          "(5/6,1/2,0.4318)"
+        ],
+        "probability": 7.14,
+        "source": "observed",
+        "count": 1
+      }
+    ],
+    "15": [
+      {
+        "lattice": "Rhombohedral-R",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1.0000)",
+          "(0,0,2/3)",
+          "(0,2/3,1/2)",
+          "(0,2/3,1/6)",
+          "(1/3,1/3,1/2)",
+          "(1/3,1/3,1/6)",
+          "(1/3,2/3,0)",
+          "(1/3,2/3,1.0000)",
+          "(1/3,2/3,2/3)",
+          "(2/3,0,1/2)",
+          "(2/3,0,1/6)",
+          "(2/3,1/3,0)",
+          "(2/3,1/3,1.0000)",
+          "(2/3,1/3,2/3)"
+        ],
+        "probability": 100.0,
+        "source": "observed",
+        "count": 1
+      }
+    ],
+    "16": [
+      {
+        "lattice": "Tetragonal-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,0.8007)",
+          "(0.1026,0.6982,0.3007)",
+          "(0.1026,0.6982,1/2)",
+          "(0.3018,0.1026,0.3007)",
+          "(0.3018,0.1026,1/2)",
+          "(0.4044,0.8008,0)",
+          "(0.4044,0.8008,0.8007)",
+          "(0.6026,0.6026,0)",
+          "(0.6026,0.6026,0.8007)",
+          "(0.8018,0.1982,0)",
+          "(0.8018,0.1982,0.8007)",
+          "(0.9044,1/2,0.3007)",
+          "(0.9044,1/2,1/2)",
+          "(1/2,0.3008,0.3007)",
+          "(1/2,0.3008,1/2)"
+        ],
+        "probability": 1.14,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Tetragonal-I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/4)",
+          "(0,1/2,0)",
+          "(0,1/2,1/4)",
+          "(0.1250,0.1250,0)",
+          "(0.1250,0.3750,0)",
+          "(0.1250,0.6250,1/4)",
+          "(0.1250,0.8750,1/4)",
+          "(0.3750,0.1250,0)",
+          "(0.3750,0.3750,0)",
+          "(0.3750,0.6250,1/4)",
+          "(0.3750,0.8750,1/4)",
+          "(1/2,0,0)",
+          "(1/2,0,1/4)",
+          "(1/2,1/2,0)",
+          "(1/2,1/2,1/4)"
+        ],
+        "probability": 1.14,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Tetragonal-I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.4038,0)",
+          "(0,0.9038,3/4)",
+          "(0,1/2,3/4)",
+          "(0.5641,0.0641,1/4)",
+          "(0.5641,0.5641,1/2)",
+          "(0.5641,1/3,1/4)",
+          "(0.5641,5/6,1/2)",
+          "(0.7244,0,0)",
+          "(0.7244,0.4038,0)",
+          "(0.7244,0.9038,3/4)",
+          "(0.7244,1/2,3/4)",
+          "(1/6,0.0641,1/4)",
+          "(1/6,0.5641,1/2)",
+          "(1/6,1/3,1/4)",
+          "(1/6,5/6,1/2)"
+        ],
+        "probability": 1.14,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Tetragonal-I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.0616,0.0785)",
+          "(0,0.5616,0)",
+          "(0,1/2,0.0785)",
+          "(0.1284,0,0)",
+          "(0.1284,0.0616,0.0785)",
+          "(0.1284,0.5616,0)",
+          "(0.1284,1/2,0.0785)",
+          "(0.3450,0.2166,5/6)",
+          "(0.3450,0.3450,5/6)",
+          "(0.3450,0.7166,1/4)",
+          "(0.3450,0.8450,1/4)",
+          "(0.7834,0.2166,5/6)",
+          "(0.7834,0.3450,5/6)",
+          "(0.7834,0.7166,1/4)",
+          "(0.7834,0.8450,1/4)"
+        ],
+        "probability": 1.14,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Orthorhombic-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,0.0598,0)",
+          "(0,0.0598,1/2)",
+          "(0,0.5598,0)",
+          "(0,0.5598,1/2)",
+          "(0,1/2,0)",
+          "(0,1/2,1/2)",
+          "(1/2,0,0.3075)",
+          "(1/2,0,0.8075)",
+          "(1/2,0.0598,0.3075)",
+          "(1/2,0.0598,0.8075)",
+          "(1/2,0.5598,0.3075)",
+          "(1/2,0.5598,0.8075)",
+          "(1/2,1/2,0.3075)",
+          "(1/2,1/2,0.8075)"
+        ],
+        "probability": 1.14,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Tetragonal-I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.0818,0)",
+          "(0,0.5818,2/3)",
+          "(0,1/2,2/3)",
+          "(0.8750,0.1250,0.4136)",
+          "(0.8750,0.4568,1/4)",
+          "(0.8750,0.6250,1/4)",
+          "(0.8750,0.9568,0.4136)",
+          "(0.9568,0.1250,0.4136)",
+          "(0.9568,0.4568,1/4)",
+          "(0.9568,0.6250,1/4)",
+          "(0.9568,0.9568,0.4136)",
+          "(5/6,0,0)",
+          "(5/6,0.0818,0)",
+          "(5/6,0.5818,2/3)",
+          "(5/6,1/2,2/3)"
+        ],
+        "probability": 1.14,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Tetragonal-I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,0.2816)",
+          "(0,0.1408,0)",
+          "(0,0.1408,0.2816)",
+          "(0.1408,0,0)",
+          "(0.1408,0,0.2816)",
+          "(0.1408,0.1408,0)",
+          "(0.1408,0.1408,0.2816)",
+          "(0.6408,0.6408,0)",
+          "(0.6408,0.6408,0.2816)",
+          "(0.6408,1/2,0)",
+          "(0.6408,1/2,0.2816)",
+          "(1/2,0.6408,0)",
+          "(1/2,0.6408,0.2816)",
+          "(1/2,1/2,0)",
+          "(1/2,1/2,0.2816)"
+        ],
+        "probability": 1.14,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Tetragonal-I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0.1250,0)",
+          "(0,0.6250,1/4)",
+          "(0,1/2,1/4)",
+          "(0.3750,0,0)",
+          "(0.3750,0.1250,0)",
+          "(0.3750,0.6250,1/4)",
+          "(0.3750,1/2,1/4)",
+          "(0.6250,0.3750,0)",
+          "(0.6250,0.8750,1/4)",
+          "(0.6250,1/4,1/4)",
+          "(0.6250,3/4,0)",
+          "(3/4,0.3750,0)",
+          "(3/4,0.8750,1/4)",
+          "(3/4,1/4,1/4)",
+          "(3/4,3/4,0)"
+        ],
+        "probability": 1.14,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Tetragonal-I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,0.0286)",
+          "(0.1154,0.0537,1/2)",
+          "(0.1154,0.5537,0.5356)",
+          "(0.1468,1/4,0.7786)",
+          "(0.1468,3/4,1/4)",
+          "(0.2005,0.1388,0.2856)",
+          "(0.2005,0.4685,3/4)",
+          "(0.2005,0.6388,3/4)",
+          "(0.2005,0.9685,0.2856)",
+          "(0.2856,0.0537,1/2)",
+          "(0.2856,0.5537,0.5356)",
+          "(0.4010,0.1073,0)",
+          "(0.4010,0.6073,0.0286)",
+          "(1/4,0.3532,1/4)",
+          "(1/4,0.8532,0.7786)"
+        ],
+        "probability": 1.14,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Tetragonal-I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0.1250,0.1250,1/4)",
+          "(0.1250,0.1250,3/4)",
+          "(0.1250,0.8750,1/4)",
+          "(0.1250,0.8750,3/4)",
+          "(0.3750,0.1250,1/4)",
+          "(0.3750,0.1250,3/4)",
+          "(0.3750,0.8750,1/4)",
+          "(0.3750,0.8750,3/4)",
+          "(1/2,0,0)",
+          "(1/2,0,1/2)",
+          "(1/4,1/4,0)",
+          "(1/4,1/4,1/2)",
+          "(1/4,3/4,0)",
+          "(1/4,3/4,1/2)"
+        ],
+        "probability": 1.14,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Orthorhombic-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,0,1/4)",
+          "(0,0,3/4)",
+          "(0,1/2,0)",
+          "(0,1/2,1/2)",
+          "(0,1/2,1/4)",
+          "(0,1/2,3/4)",
+          "(1/2,0,0)",
+          "(1/2,0,1/2)",
+          "(1/2,0,1/4)",
+          "(1/2,0,3/4)",
+          "(1/2,1/2,0)",
+          "(1/2,1/2,1/2)",
+          "(1/2,1/2,1/4)",
+          "(1/2,1/2,3/4)"
+        ],
+        "probability": 1.14,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Orthorhombic-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,0.7994)",
+          "(0,0.3573,0)",
+          "(0,0.3573,0.7994)",
+          "(0,0.8573,0.2994)",
+          "(0,0.8573,1/2)",
+          "(0,1/2,0.2994)",
+          "(0,1/2,1/2)",
+          "(1/2,0,0.2994)",
+          "(1/2,0,1/2)",
+          "(1/2,0.3573,0.2994)",
+          "(1/2,0.3573,1/2)",
+          "(1/2,0.8573,0)",
+          "(1/2,0.8573,0.7994)",
+          "(1/2,1/2,0)",
+          "(1/2,1/2,0.7994)"
+        ],
+        "probability": 1.14,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Orthorhombic-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/2)",
+          "(0,1/2,0)",
+          "(0,1/2,1/2)",
+          "(0,1/4,0)",
+          "(0,1/4,1/2)",
+          "(0,3/4,0)",
+          "(0,3/4,1/2)",
+          "(1/2,0,0.0967)",
+          "(1/2,0,0.5967)",
+          "(1/2,1/2,0.0967)",
+          "(1/2,1/2,0.5967)",
+          "(1/2,1/4,0.0967)",
+          "(1/2,1/4,0.5967)",
+          "(1/2,3/4,0.0967)",
+          "(1/2,3/4,0.5967)"
+        ],
+        "probability": 1.14,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Orthorhombic-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/3)",
+          "(0,1/2,1/2)",
+          "(0,1/2,5/6)",
+          "(0.4453,0,0)",
+          "(0.4453,0,1/3)",
+          "(0.4453,1/2,1/2)",
+          "(0.4453,1/2,5/6)",
+          "(0.9453,0,1/2)",
+          "(0.9453,0,5/6)",
+          "(0.9453,1/2,0)",
+          "(0.9453,1/2,1/3)",
+          "(1/2,0,1/2)",
+          "(1/2,0,5/6)",
+          "(1/2,1/2,0)",
+          "(1/2,1/2,1/3)"
+        ],
+        "probability": 1.14,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Tetragonal-I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,2/3)",
+          "(0,0.8437,0)",
+          "(0,0.8437,2/3)",
+          "(0.4219,1/6,0.0833)",
+          "(0.4219,1/6,0.5833)",
+          "(0.4219,2/3,0.0833)",
+          "(0.4219,2/3,0.5833)",
+          "(0.8437,0,0)",
+          "(0.8437,0,2/3)",
+          "(0.8437,0.8437,0)",
+          "(0.8437,0.8437,2/3)",
+          "(1/6,0.4219,0.0833)",
+          "(1/6,0.4219,0.5833)",
+          "(2/3,0.4219,0.0833)",
+          "(2/3,0.4219,0.5833)"
+        ],
+        "probability": 1.14,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Orthorhombic-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,0.2809)",
+          "(0,0.4584,0)",
+          "(0,0.4584,0.2809)",
+          "(0.4313,0.9584,0.7809)",
+          "(0.4313,0.9584,1/2)",
+          "(0.4313,1/2,0.7809)",
+          "(0.4313,1/2,1/2)",
+          "(0.9313,0.9584,0.7809)",
+          "(0.9313,0.9584,1/2)",
+          "(0.9313,1/2,0.7809)",
+          "(0.9313,1/2,1/2)",
+          "(1/2,0,0)",
+          "(1/2,0,0.2809)",
+          "(1/2,0.4584,0)",
+          "(1/2,0.4584,0.2809)"
+        ],
+        "probability": 1.14,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Tetragonal-I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,0.4873)",
+          "(0.4370,0.0969,0)",
+          "(0.4370,0.5969,0.4873)",
+          "(0.4685,0.1128,0.1541)",
+          "(0.4685,0.6128,1/3)",
+          "(0.6541,0.2985,0.4041)",
+          "(0.6541,0.7985,0.0832)",
+          "(0.7669,1/3,0.2373)",
+          "(0.7669,5/6,1/4)",
+          "(0.7829,0.2985,0.0832)",
+          "(0.7829,0.7985,0.4041)",
+          "(0.9685,0.4841,1/3)",
+          "(0.9685,0.9841,0.1541)",
+          "(2/3,0.2669,1/4)",
+          "(2/3,0.7669,0.2373)"
+        ],
+        "probability": 1.14,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Tetragonal-I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,1/3)",
+          "(0,0.1533,0)",
+          "(0,0.1533,1/3)",
+          "(0.0766,1/3,0.4167)",
+          "(0.0766,1/3,0.9167)",
+          "(0.0766,5/6,0.4167)",
+          "(0.0766,5/6,0.9167)",
+          "(0.1533,0,0)",
+          "(0.1533,0,1/3)",
+          "(0.1533,0.1533,0)",
+          "(0.1533,0.1533,1/3)",
+          "(1/3,0.0766,0.4167)",
+          "(1/3,0.0766,0.9167)",
+          "(5/6,0.0766,0.4167)",
+          "(5/6,0.0766,0.9167)"
+        ],
+        "probability": 1.14,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Tetragonal-I",
+        "offsets": [
+          "(0,0,0)",
+          "(0,1/2,0.8043)",
+          "(0,1/6,0.8043)",
+          "(0,2/3,0)",
+          "(0.0398,0.2064,1/4)",
+          "(0.0398,0.4602,1/4)",
+          "(0.0398,0.7064,0.5543)",
+          "(0.0398,0.9602,0.5543)",
+          "(0.7064,0.2064,1/4)",
+          "(0.7064,0.4602,1/4)",
+          "(0.7064,0.7064,0.5543)",
+          "(0.7064,0.9602,0.5543)",
+          "(3/4,0,0)",
+          "(3/4,1/2,0.8043)",
+          "(3/4,1/6,0.8043)",
+          "(3/4,2/3,0)"
+        ],
+        "probability": 1.14,
+        "source": "observed",
+        "count": 1
+      },
+      {
+        "lattice": "Orthorhombic-P",
+        "offsets": [
+          "(0,0,0)",
+          "(0,0,0.1389)",
+          "(0,0.1092,0)",
+          "(0,0.1092,0.1389)",
+          "(0,0.6092,0.6389)",
+          "(0,0.6092,1/2)",
+          "(0,1/2,0.6389)",
+          "(0,1/2,1/2)",
+          "(1/2,0,0.6389)",
+          "(1/2,0,1/2)",
+          "(1/2,0.1092,0.6389)",
+          "(1/2,0.1092,1/2)",
+          "(1/2,0.6092,0)",
+          "(1/2,0.6092,0.1389)",
+          "(1/2,1/2,0)",
+          "(1/2,1/2,0.1389)"
+        ],
+        "probability": 1.14,
+        "source": "observed",
+        "count": 1
+      }
+    ]
+  },
+  "statistics": {
+    "total_structures": 1802,
+    "n_distribution": {
+      "1": 56,
+      "2": 303,
+      "3": 66,
+      "4": 585,
+      "5": 24,
+      "6": 142,
+      "7": 11,
+      "8": 382,
+      "9": 11,
+      "10": 11,
+      "11": 0,
+      "12": 49,
+      "13": 3,
+      "14": 14,
+      "15": 1,
+      "16": 88
+    }
+  }
+}

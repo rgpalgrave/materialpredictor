@@ -39,13 +39,12 @@ def get_default_search_configs(num_metals: int, use_predictor: bool = True) -> L
     """
     Get default search configurations for initial structure search.
     
-    When the AFLOW-based predictor is available, uses statistically-informed
-    predictions based on 1802 structures from the AFLOW Prototype Encyclopedia.
+    When the advanced predictor is available, uses multi-source predictions:
+    1. Empirical patterns from 1802 AFLOW structures
+    2. Lattice-type-specific filling rules (templates)
+    3. N-decomposition into (in-plane × z-layers)
     
-    Prediction strategy varies by N (number of metal positions):
-    - HIGH predictability (N=1,5,7): Uses exact offset patterns directly
-    - MODERATE predictability (N=2,3): Uses lattice types + best offsets  
-    - LOW predictability (N=4,6,8+): Uses lattice type priors only
+    Always includes cubic P/I/F configs as they're fast to compute.
     
     Falls back to standard search if predictor unavailable:
     - Cubic: P, F, I (c/a = 1.0)
@@ -54,23 +53,22 @@ def get_default_search_configs(num_metals: int, use_predictor: bool = True) -> L
     
     Args:
         num_metals: Number of metal sublattices (L)
-        use_predictor: Whether to use AFLOW predictor if available (default: True)
+        use_predictor: Whether to use advanced predictor if available (default: True)
         
     Returns:
         List of config dicts with keys: id, lattice, bravais_type, offsets, pattern, c_ratio
     """
-    # Try to use the AFLOW-based predictor
+    # Try to use the advanced predictor
     if use_predictor:
         try:
-            from predictor_integration import get_predictor
+            from advanced_predictor_integration import get_predictor
             predictor = get_predictor()
             
             if predictor.is_available():
-                configs = predictor.get_search_configs_from_predictor(
+                configs = predictor.get_search_configs(
                     num_metals,
-                    top_k_lattices=6,
-                    top_k_offsets=12,
-                    include_fallback=True
+                    top_k=15,
+                    always_include_cubic=True
                 )
                 if configs:
                     return configs
