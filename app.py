@@ -1011,37 +1011,65 @@ def run_full_analysis_chain(
         
         results['half_filling_results'] = half_filling_results
         
-        # Step 6: Generate 3D previews for exact matches (primary only)
+        # Step 5b: Combine exact and half-filling matches, sort by Madelung constant
+        # Higher Madelung constant = more negative energy = more stable
+        def get_madelung_sort_key(entry):
+            config_id = entry['config_id']
+            match_type = entry.get('match_type', 'exact')
+            
+            if match_type == 'exact':
+                reg_data = regularity_results.get(config_id, {})
+                madelung = reg_data.get('madelung_result')
+            else:  # half-filling
+                hf_data = half_filling_results.get(config_id, {})
+                madelung = hf_data.get('madelung_result')
+            
+            if madelung and madelung.madelung_constant is not None:
+                # Return negative so higher M sorts first
+                return -madelung.madelung_constant
+            return 0  # No Madelung = sort last
+        
+        # Combine exact and half-filling matches into single list
+        all_stoich_matches = exact_primary + half_primary
+        all_stoich_matches.sort(key=get_madelung_sort_key)
+        
+        # Update matching_configs with combined sorted list
+        results['matching_configs'] = all_stoich_matches + non_matches
+        results['all_stoich_matches'] = all_stoich_matches  # Combined list
+        results['exact_primary'] = exact_primary  # Keep for reference
+        results['half_primary'] = half_primary    # Keep for reference
+        
+        # Step 6: Generate 3D previews for top matches (combined list)
         update_progress(6, 6, "Generating 3D previews...")
         
         preview_figures = {}
-        for entry in exact_primary[:10]:  # Limit to first 10 for performance
+        for entry in all_stoich_matches[:10]:  # Top 10 by Madelung
             config_id = entry['config_id']
-            reg_data = regularity_results.get(config_id, {})
-            structure = reg_data.get('structure')
+            match_type = entry.get('match_type', 'exact')
             
-            if structure is not None:
-                try:
-                    fig = generate_preview_figure(structure, metals, config_id)
-                    preview_figures[config_id] = fig
-                except Exception:
-                    pass
-        
-        # Generate previews for half-filling matches (showing kept sites only)
-        for entry in half_primary[:10]:
-            config_id = entry['config_id']
-            hf_data = half_filling_results.get(config_id, {})
-            structure = hf_data.get('structure')
-            kept_indices = hf_data.get('kept_indices', [])
-            
-            if structure is not None and kept_indices:
-                try:
-                    fig = generate_preview_figure_half_filling(
-                        structure, metals, kept_indices, config_id
-                    )
-                    preview_figures[config_id] = fig
-                except Exception:
-                    pass
+            if match_type == 'exact':
+                reg_data = regularity_results.get(config_id, {})
+                structure = reg_data.get('structure')
+                
+                if structure is not None:
+                    try:
+                        fig = generate_preview_figure(structure, metals, config_id)
+                        preview_figures[config_id] = fig
+                    except Exception:
+                        pass
+            else:  # half-filling
+                hf_data = half_filling_results.get(config_id, {})
+                structure = hf_data.get('structure')
+                kept_indices = hf_data.get('kept_indices', [])
+                
+                if structure is not None and kept_indices:
+                    try:
+                        fig = generate_preview_figure_half_filling(
+                            structure, metals, kept_indices, config_id
+                        )
+                        preview_figures[config_id] = fig
+                    except Exception:
+                        pass
         
         results['preview_figures'] = preview_figures
         results['success'] = True
