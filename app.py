@@ -1668,13 +1668,15 @@ def main():
                     reg_data = regularity_results.get(config_id, {})
                     mean_reg = reg_data.get('mean_regularity', 0)
                     madelung_result = reg_data.get('madelung_result')
-                    per_metal = reg_data.get('per_metal_scores', [])
+                    coord_result = reg_data.get('coord_result')
+                    per_metal_scores = []  # Not used for exact matches
                     match_label = "✓"
                 else:  # half-filling
                     hf_data = half_filling_results.get(config_id, {})
                     mean_reg = hf_data.get('mean_regularity_after', 0)
                     madelung_result = hf_data.get('madelung_result')
-                    per_metal = hf_data.get('per_metal_scores', [])
+                    coord_result = None  # Half-filling uses per_metal_scores instead
+                    per_metal_scores = hf_data.get('per_metal_scores', [])
                     match_label = "½"
                 
                 # Get Madelung constant for expander title
@@ -1728,22 +1730,34 @@ def main():
                             improvement = mean_reg - reg_before
                             st.caption(f"Half-filling optimization: regularity {reg_before:.3f} → {mean_reg:.3f} (Δ={improvement:+.3f})")
                         
-                        # Coordination details table
-                        if per_metal:
+                        # Coordination details table - different format for exact vs half-filling
+                        if match_type == 'exact' and coord_result and coord_result.success:
                             st.markdown("**Coordination Environment Details:**")
-                            
                             table_data = []
-                            for pm in per_metal:
+                            for env in coord_result.environments:
+                                table_data.append({
+                                    "Metal": env.metal_symbol,
+                                    "CN": len(env.coordination_sites),
+                                    "Mean Dist (Å)": f"{env.mean_distance:.3f}",
+                                    "Dist CV": f"{env.cv_distance:.3f}",
+                                    "Ideal Polyhedron": env.ideal_polyhedron.replace('_', ' ').title(),
+                                    "Angle Dev (°)": f"{env.angle_deviation:.1f}",
+                                    "Regularity": f"{env.overall_regularity:.3f}"
+                                })
+                            st.table(table_data)
+                        elif match_type == 'half' and per_metal_scores:
+                            st.markdown("**Coordination Environment Details:**")
+                            table_data = []
+                            for pm in per_metal_scores:
                                 table_data.append({
                                     "Metal": pm['symbol'],
                                     "CN": pm['cn'],
-                                    "Mean Dist (Å)": f"{pm['mean_distance']:.3f}",
-                                    "Dist CV": f"{pm.get('distance_cv', 0):.3f}",
+                                    "Mean Dist (Å)": f"{pm.get('mean_distance', 0):.3f}" if pm.get('mean_distance') else "—",
+                                    "Dist CV": f"{pm.get('distance_cv', 0):.3f}" if pm.get('distance_cv') else "—",
                                     "Ideal Polyhedron": pm.get('ideal_geometry', 'Unknown'),
-                                    "Angle Dev (°)": f"{pm.get('angle_deviation', 0):.1f}",
+                                    "Angle Dev (°)": f"{pm.get('angle_deviation', 0):.1f}" if pm.get('angle_deviation') is not None else "—",
                                     "Regularity": f"{pm['regularity']:.3f}"
                                 })
-                            
                             st.table(table_data)
                     
                     with preview_col:
