@@ -1013,6 +1013,7 @@ def run_full_analysis_chain(
         
         # Step 5b: Combine exact and half-filling matches, sort by Madelung constant
         # Higher Madelung constant = more negative energy = more stable
+        # Structures with regularity = 0 (no valid intersections) go to the bottom
         def get_madelung_sort_key(entry):
             config_id = entry['config_id']
             match_type = entry.get('match_type', 'exact')
@@ -1020,14 +1021,23 @@ def run_full_analysis_chain(
             if match_type == 'exact':
                 reg_data = regularity_results.get(config_id, {})
                 madelung = reg_data.get('madelung_result')
+                regularity = reg_data.get('mean_regularity', 0)
             else:  # half-filling
                 hf_data = half_filling_results.get(config_id, {})
                 madelung = hf_data.get('madelung_result')
+                regularity = hf_data.get('mean_regularity_after', 0)
+            
+            # Primary sort: structures with regularity > 0 come first
+            # Secondary sort: by Madelung constant (higher = better)
+            has_valid_structure = 1 if regularity > 0.001 else 0
             
             if madelung and madelung.madelung_constant is not None:
-                # Return negative so higher M sorts first
-                return -madelung.madelung_constant
-            return 0  # No Madelung = sort last
+                madelung_val = madelung.madelung_constant
+            else:
+                madelung_val = -999  # No Madelung = sort last among valid structures
+            
+            # Return tuple: (-has_valid, -madelung) so valid structures with high M come first
+            return (-has_valid_structure, -madelung_val)
         
         # Combine exact and half-filling matches into single list
         all_stoich_matches = exact_primary + half_primary
@@ -1643,7 +1653,7 @@ def main():
         # Display all stoichiometry matches in one list, sorted by Madelung
         if all_stoich_matches:
             st.subheader("✓ Stoichiometry Matches (sorted by Madelung)")
-            st.markdown("Configurations producing the expected formula, ordered by most favorable Madelung energy. ✓ = exact match, ½ = half-filling.")
+            st.markdown("Configurations producing the expected formula. Valid structures (with anion positions) sorted by most favorable Madelung energy. ✓ = exact match, ½ = half-filling. ⚠️ = no valid structure found.")
             
             for entry in all_stoich_matches:
                 config_id = entry['config_id']
@@ -1695,8 +1705,18 @@ def main():
                 else:
                     lattice_str = f"a={a_param:.2f}Å"
                 
-                # Create expander with match type indicator
-                with st.expander(f"{match_label} **{config_id}** — {lattice} — {lattice_str} — Regularity: {mean_reg:.2f}{madelung_str}", expanded=(entry == all_stoich_matches[0])):
+                # Add warning for failed structures (no intersections found)
+                if mean_reg < 0.001:
+                    status_str = " — ⚠️ No valid structure"
+                    is_valid = False
+                else:
+                    status_str = f" — Regularity: {mean_reg:.2f}{madelung_str}"
+                    is_valid = True
+                
+                # Create expander - expand first entry only if it's valid
+                should_expand = (entry == all_stoich_matches[0]) and is_valid
+                
+                with st.expander(f"{match_label} **{config_id}** — {lattice} — {lattice_str}{status_str}", expanded=should_expand):
                     
                     # Two columns: info + 3D preview
                     info_col, preview_col = st.columns([2, 1])
@@ -1722,6 +1742,15 @@ def main():
                                 st.metric("Madelung ⓘ", "—")
                         
                         st.caption(f"Pattern: {pattern}")
+                        
+                        # Show warning for failed structures
+                        if not is_valid:
+                            st.warning(
+                                "⚠️ **No valid anion positions found.** "
+                                "This lattice configuration doesn't produce sphere intersections at the current c/a ratio. "
+                                "This often happens with monoclinic/rhombohedral structures where the geometry "
+                                "doesn't support the target coordination number."
+                            )
                         
                         # Show half-filling info if applicable
                         if match_type == 'half':
