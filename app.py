@@ -1606,11 +1606,19 @@ def main():
         matching_configs = chain.get('matching_configs', [])
         regularity_results = chain.get('regularity_results', {})
         preview_figures = chain.get('preview_figures', {})
+        half_filling_results = chain.get('half_filling_results', {})
         
-        # Use deduplicated primary lists
-        exact_matches = chain.get('exact_primary', [c for c in matching_configs if c['match_type'] == 'exact'])
-        half_matches = chain.get('half_primary', [c for c in matching_configs if c['match_type'] == 'half'])
+        # Use combined sorted list (sorted by Madelung, most favorable first)
+        all_stoich_matches = chain.get('all_stoich_matches', [])
+        if not all_stoich_matches:
+            # Fallback: reconstruct from matching_configs
+            all_stoich_matches = [c for c in matching_configs if c['match_type'] in ('exact', 'half')]
+        
         non_matches = [c for c in matching_configs if c['match_type'] == 'none']
+        
+        # Count by type for metrics
+        exact_count = sum(1 for c in all_stoich_matches if c['match_type'] == 'exact')
+        half_count = sum(1 for c in all_stoich_matches if c['match_type'] == 'half')
         
         # Get duplicate counts
         duplicate_configs = chain.get('duplicate_configs', {'exact': [], 'half': []})
@@ -1620,135 +1628,27 @@ def main():
         # Summary metrics
         summary_cols = st.columns(4)
         with summary_cols[0]:
-            total_unique = len(exact_matches) + len(half_matches) + len(non_matches)
+            total_unique = len(all_stoich_matches) + len(non_matches)
             st.metric("Unique Configurations", total_unique)
         with summary_cols[1]:
             dup_note = f" (+{n_exact_dups} equiv.)" if n_exact_dups > 0 else ""
-            st.metric("Exact Matches ✓", f"{len(exact_matches)}{dup_note}")
+            st.metric("Exact Matches ✓", f"{exact_count}{dup_note}")
         with summary_cols[2]:
             dup_note = f" (+{n_half_dups} equiv.)" if n_half_dups > 0 else ""
-            st.metric("Half-Filling Matches ½", f"{len(half_matches)}{dup_note}")
+            st.metric("Half-Filling Matches ½", f"{half_count}{dup_note}")
         with summary_cols[3]:
             target_cn = chain['stoichiometry'].get('target_cn', 0)
             st.metric("Target CN", target_cn)
         
-        # Display exact matches with regularity and 3D preview
-        if exact_matches:
-            st.subheader("✓ Exact Stoichiometry Matches")
-            st.markdown("These configurations produce the expected chemical formula with regular coordination environments.")
+        # Display all stoichiometry matches in one list, sorted by Madelung
+        if all_stoich_matches:
+            st.subheader("✓ Stoichiometry Matches (sorted by Madelung)")
+            st.markdown("Configurations producing the expected formula, ordered by most favorable Madelung energy. ✓ = exact match, ½ = half-filling.")
             
-            for entry in exact_matches:
+            for entry in all_stoich_matches:
                 config_id = entry['config_id']
-                s_star = entry['s_star']  # This is now the lattice parameter 'a' in Å
-                lattice = entry['lattice']
-                formula = entry['formula']
-                pattern = entry.get('pattern', '')
-                
-                # Calculate lattice parameters based on lattice type
-                # s_star is now 'a' in Å
-                a_param = s_star
-                c_ratio = 1.0
-                if lattice == 'Hexagonal':
-                    c_ratio = 1.633  # Ideal for HCP-like
-                elif lattice == 'Tetragonal':
-                    c_ratio = 1.0  # Could be varied
-                b_param = a_param  # b = a for most systems
-                c_param = a_param * c_ratio
-                
-                # Get regularity data
-                reg_data = regularity_results.get(config_id, {})
-                mean_reg = reg_data.get('mean_regularity', 0)
-                coord_result = reg_data.get('coord_result')
-                madelung_result = reg_data.get('madelung_result')
-                
-                # Get Madelung constant for expander title
-                madelung_str = ""
-                if madelung_result and madelung_result.success:
-                    if madelung_result.error:  # Has warning
-                        madelung_str = f" — M=⚠️"
-                    else:
-                        madelung_str = f" — M={madelung_result.madelung_constant:.3f}"
-                
-                # Format lattice params for title
-                if lattice == 'Cubic':
-                    lattice_str = f"a={a_param:.2f}Å"
-                else:
-                    lattice_str = f"a={a_param:.2f}Å, c={c_param:.2f}Å"
-                
-                # Create expander for each match
-                with st.expander(f"**{config_id}** — {lattice} — {lattice_str} — Regularity: {mean_reg:.2f}{madelung_str}", expanded=True):
-                    
-                    # Two columns: info + 3D preview
-                    info_col, preview_col = st.columns([2, 1])
-                    
-                    with info_col:
-                        # Key metrics - now showing lattice parameters
-                        met_cols = st.columns(5)
-                        with met_cols[0]:
-                            if lattice == 'Cubic':
-                                st.metric("a = b = c", f"{a_param:.3f} Å")
-                            else:
-                                st.metric("a (Å)", f"{a_param:.3f}",
-                                         help=f"b = {b_param:.3f} Å, c = {c_param:.3f} Å")
-                        with met_cols[1]:
-                            st.metric("Lattice", lattice)
-                        with met_cols[2]:
-                            st.metric("Formula", formula)
-                        with met_cols[3]:
-                            st.metric("Regularity", f"{mean_reg:.3f}")
-                        with met_cols[4]:
-                            if madelung_result and madelung_result.success:
-                                # Check for warnings (stored in error field)
-                                if madelung_result.error:
-                                    st.metric("Madelung", f"⚠️ {madelung_result.madelung_constant:.1f}",
-                                             help=f"⚠️ {madelung_result.error}")
-                                else:
-                                    st.metric("Madelung", f"{madelung_result.madelung_constant:.3f}",
-                                             help=f"Energy: {madelung_result.energy_per_formula:.2f} eV/f.u.")
-                            else:
-                                st.metric("Madelung", "—")
-                        
-                        if pattern:
-                            st.caption(f"Pattern: {pattern}")
-                        
-                        # Per-metal regularity details
-                        if coord_result and coord_result.success:
-                            st.markdown("**Coordination Environment Details:**")
-                            env_data = []
-                            for env in coord_result.environments:
-                                env_data.append({
-                                    'Metal': env.metal_symbol,
-                                    'CN': len(env.coordination_sites),
-                                    'Mean Dist (Å)': f"{env.mean_distance:.3f}",
-                                    'Dist CV': f"{env.cv_distance:.3f}",
-                                    'Ideal Polyhedron': env.ideal_polyhedron.replace('_', ' ').title(),
-                                    'Angle Dev (°)': f"{env.angle_deviation:.1f}",
-                                    'Regularity': f"{env.overall_regularity:.3f}"
-                                })
-                            env_df = pd.DataFrame(env_data)
-                            st.dataframe(env_df, use_container_width=True, hide_index=True)
-                    
-                    with preview_col:
-                        # 3D preview
-                        if config_id in preview_figures:
-                            st.plotly_chart(preview_figures[config_id], use_container_width=True)
-                        else:
-                            st.info("Preview not available")
-        
-        # Display half-filling matches with full details
-        if half_matches:
-            st.subheader("½ Half-Filling Matches")
-            st.markdown("""
-            These configurations match when only **half** the anion sites are occupied 
-            (e.g., zinc blende from fluorite, wurtzite, anti-fluorite structures).
-            The optimization finds which sites to remove for maximum coordination regularity.
-            """)
-            
-            half_filling_results = chain.get('half_filling_results', {})
-            
-            for entry in half_matches:
-                config_id = entry['config_id']
-                s_star = entry['s_star']  # This is now the lattice parameter 'a' in Å
+                match_type = entry.get('match_type', 'exact')
+                s_star = entry['s_star']
                 lattice = entry['lattice']
                 formula = entry['formula']
                 pattern = entry.get('pattern', '')
@@ -1758,22 +1658,29 @@ def main():
                 c_ratio = 1.0
                 if lattice == 'Hexagonal':
                     c_ratio = 1.633
+                elif lattice == 'Tetragonal':
+                    c_ratio = 1.0
+                b_param = a_param
                 c_param = a_param * c_ratio
                 
-                # Get half-filling optimization data
-                hf_data = half_filling_results.get(config_id, {})
-                reg_before = hf_data.get('mean_regularity_before', 0)
-                reg_after = hf_data.get('mean_regularity_after', 0)
-                per_metal = hf_data.get('per_metal_scores', [])
-                madelung_result = hf_data.get('madelung_result')
-                
-                improvement = reg_after - reg_before
-                delta_str = f"+{improvement:.3f}" if improvement > 0 else f"{improvement:.3f}"
+                # Get data based on match type
+                if match_type == 'exact':
+                    reg_data = regularity_results.get(config_id, {})
+                    mean_reg = reg_data.get('mean_regularity', 0)
+                    madelung_result = reg_data.get('madelung_result')
+                    per_metal = reg_data.get('per_metal_scores', [])
+                    match_label = "✓"
+                else:  # half-filling
+                    hf_data = half_filling_results.get(config_id, {})
+                    mean_reg = hf_data.get('mean_regularity_after', 0)
+                    madelung_result = hf_data.get('madelung_result')
+                    per_metal = hf_data.get('per_metal_scores', [])
+                    match_label = "½"
                 
                 # Get Madelung constant for expander title
                 madelung_str = ""
                 if madelung_result and madelung_result.success:
-                    if madelung_result.error:  # Has warning
+                    if madelung_result.error:
                         madelung_str = f" — M=⚠️"
                     else:
                         madelung_str = f" — M={madelung_result.madelung_constant:.3f}"
@@ -1781,72 +1688,69 @@ def main():
                 # Format lattice params for title
                 if lattice == 'Cubic':
                     lattice_str = f"a={a_param:.2f}Å"
-                else:
+                elif lattice in ['Hexagonal', 'Tetragonal', 'Rhombohedral']:
                     lattice_str = f"a={a_param:.2f}Å, c={c_param:.2f}Å"
+                else:
+                    lattice_str = f"a={a_param:.2f}Å"
                 
-                # Create expander for each half-filling match
-                with st.expander(f"**{config_id}** — {lattice} — {lattice_str} — Regularity: {reg_after:.2f} (after ½){madelung_str}", expanded=True):
+                # Create expander with match type indicator
+                with st.expander(f"{match_label} **{config_id}** — {lattice} — {lattice_str} — Regularity: {mean_reg:.2f}{madelung_str}", expanded=(entry == all_stoich_matches[0])):
                     
                     # Two columns: info + 3D preview
                     info_col, preview_col = st.columns([2, 1])
                     
                     with info_col:
-                        # Key metrics - 6 columns for half-filling with Madelung
-                        met_cols = st.columns(6)
-                        with met_cols[0]:
+                        # Basic info row
+                        col1, col2, col3, col4, col5 = st.columns(5)
+                        with col1:
                             if lattice == 'Cubic':
                                 st.metric("a = b = c", f"{a_param:.3f} Å")
                             else:
-                                st.metric("a (Å)", f"{a_param:.3f}",
-                                         help=f"c = {c_param:.3f} Å")
-                        with met_cols[1]:
+                                st.metric("a (Å) ⓘ", f"{a_param:.3f}")
+                        with col2:
                             st.metric("Lattice", lattice)
-                        with met_cols[2]:
-                            # Show half-filled formula
-                            # Parse formula to halve anion count
-                            half_formula = formula.replace('₂', '₁').replace('₄', '₂').replace('₆', '₃').replace('₈', '₄')
-                            st.metric("Formula (½)", half_formula)
-                        with met_cols[3]:
-                            st.metric("Reg. Before", f"{reg_before:.3f}")
-                        with met_cols[4]:
-                            st.metric("Reg. After", f"{reg_after:.3f}", delta=delta_str)
-                        with met_cols[5]:
-                            if madelung_result and madelung_result.success:
-                                # Check for warnings (stored in error field)
-                                if madelung_result.error:
-                                    st.metric("Madelung", f"⚠️ {madelung_result.madelung_constant:.1f}",
-                                             help=f"⚠️ {madelung_result.error}")
-                                else:
-                                    st.metric("Madelung", f"{madelung_result.madelung_constant:.3f}",
-                                             help=f"Energy: {madelung_result.energy_per_formula:.2f} eV/f.u.")
+                        with col3:
+                            st.metric("Formula", formula)
+                        with col4:
+                            st.metric("Regularity", f"{mean_reg:.3f}")
+                        with col5:
+                            if madelung_result and madelung_result.success and not madelung_result.error:
+                                st.metric("Madelung ⓘ", f"{madelung_result.madelung_constant:.3f}")
                             else:
-                                st.metric("Madelung", "—")
+                                st.metric("Madelung ⓘ", "—")
                         
-                        if pattern:
-                            st.caption(f"Pattern: {pattern}")
+                        st.caption(f"Pattern: {pattern}")
                         
-                        # Per-metal coordination details
+                        # Show half-filling info if applicable
+                        if match_type == 'half':
+                            hf_data = half_filling_results.get(config_id, {})
+                            reg_before = hf_data.get('mean_regularity_before', 0)
+                            improvement = mean_reg - reg_before
+                            st.caption(f"Half-filling optimization: regularity {reg_before:.3f} → {mean_reg:.3f} (Δ={improvement:+.3f})")
+                        
+                        # Coordination details table
                         if per_metal:
-                            st.markdown("**Per-Metal Coordination (after half-filling):**")
-                            metal_data = []
-                            for m in per_metal:
-                                metal_data.append({
-                                    'Metal': m['symbol'],
-                                    'CN': m['cn'],
-                                    'Regularity': f"{m['regularity']:.3f}"
+                            st.markdown("**Coordination Environment Details:**")
+                            
+                            table_data = []
+                            for pm in per_metal:
+                                table_data.append({
+                                    "Metal": pm['symbol'],
+                                    "CN": pm['cn'],
+                                    "Mean Dist (Å)": f"{pm['mean_distance']:.3f}",
+                                    "Dist CV": f"{pm.get('distance_cv', 0):.3f}",
+                                    "Ideal Polyhedron": pm.get('ideal_geometry', 'Unknown'),
+                                    "Angle Dev (°)": f"{pm.get('angle_deviation', 0):.1f}",
+                                    "Regularity": f"{pm['regularity']:.3f}"
                                 })
-                            metal_df = pd.DataFrame(metal_data)
-                            st.dataframe(metal_df, use_container_width=True, hide_index=True)
-                        
-                        st.info("💡 Half-filling optimization selects which anion sites to remove for maximum coordination regularity.")
+                            
+                            st.table(table_data)
                     
                     with preview_col:
-                        # 3D preview (shows kept sites in red, removed in gray)
                         if config_id in preview_figures:
                             st.plotly_chart(preview_figures[config_id], use_container_width=True)
                         else:
                             st.info("Preview not available")
-        
         # Display non-matches (collapsed)
         if non_matches:
             with st.expander(f"Other Configurations ({len(non_matches)} configs - no stoichiometry match)"):
