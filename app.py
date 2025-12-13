@@ -1014,9 +1014,11 @@ def run_full_analysis_chain(
         # Step 5b: Combine exact and half-filling matches, sort by Madelung constant
         # Higher Madelung constant = more negative energy = more stable
         # Structures with regularity = 0 (no valid intersections) go to the bottom
+        # Structures with excessive atoms also go to the bottom
         def get_madelung_sort_key(entry):
             config_id = entry['config_id']
             match_type = entry.get('match_type', 'exact')
+            stoich_result = entry.get('stoich_result')
             
             if match_type == 'exact':
                 reg_data = regularity_results.get(config_id, {})
@@ -1027,9 +1029,16 @@ def run_full_analysis_chain(
                 madelung = hf_data.get('madelung_result')
                 regularity = hf_data.get('mean_regularity_after', 0)
             
-            # Primary sort: structures with regularity > 0 come first
+            # Check for excessive atom count (indicates problematic structure)
+            excessive_atoms = False
+            if stoich_result and hasattr(stoich_result, 'metal_counts') and hasattr(stoich_result, 'anion_count'):
+                total_atoms = sum(stoich_result.metal_counts.values()) + stoich_result.anion_count
+                if total_atoms > 20:  # More than 20 atoms/cell is suspicious
+                    excessive_atoms = True
+            
+            # Primary sort: valid structures (regularity > 0, not excessive) first
             # Secondary sort: by Madelung constant (higher = better)
-            has_valid_structure = 1 if regularity > 0.001 else 0
+            has_valid_structure = 1 if (regularity > 0.001 and not excessive_atoms) else 0
             
             if madelung and madelung.madelung_constant is not None:
                 madelung_val = madelung.madelung_constant
@@ -1705,9 +1714,21 @@ def main():
                 else:
                     lattice_str = f"a={a_param:.2f}Å"
                 
-                # Add warning for failed structures (no intersections found)
+                # Check for excessive atoms
+                stoich_result = entry.get('stoich_result')
+                excessive_atoms = False
+                total_atoms = 0
+                if stoich_result and hasattr(stoich_result, 'metal_counts') and hasattr(stoich_result, 'anion_count'):
+                    total_atoms = sum(stoich_result.metal_counts.values()) + stoich_result.anion_count
+                    if total_atoms > 20:
+                        excessive_atoms = True
+                
+                # Add warning for failed structures (no intersections or excessive atoms)
                 if mean_reg < 0.001:
                     status_str = " — ⚠️ No valid structure"
+                    is_valid = False
+                elif excessive_atoms:
+                    status_str = f" — ⚠️ Excessive atoms ({total_atoms:.0f}/cell)"
                     is_valid = False
                 else:
                     status_str = f" — Regularity: {mean_reg:.2f}{madelung_str}"
@@ -1743,14 +1764,30 @@ def main():
                         
                         st.caption(f"Pattern: {pattern}")
                         
+                        # Show actual atom counts from the structure
+                        stoich_result = entry.get('stoich_result')
+                        if stoich_result and hasattr(stoich_result, 'metal_counts') and hasattr(stoich_result, 'anion_count'):
+                            actual_metals = stoich_result.metal_counts
+                            actual_anions = stoich_result.anion_count
+                            counts_str = ", ".join([f"{sym}={cnt:.1f}" for sym, cnt in actual_metals.items()])
+                            st.caption(f"Actual counts in unit cell: {counts_str}, Anions={actual_anions:.1f}")
+                        
                         # Show warning for failed structures
                         if not is_valid:
-                            st.warning(
-                                "⚠️ **No valid anion positions found.** "
-                                "This lattice configuration doesn't produce sphere intersections at the current c/a ratio. "
-                                "This often happens with monoclinic/rhombohedral structures where the geometry "
-                                "doesn't support the target coordination number."
-                            )
+                            if mean_reg < 0.001:
+                                st.warning(
+                                    "⚠️ **No valid anion positions found.** "
+                                    "This lattice configuration doesn't produce sphere intersections at the current c/a ratio. "
+                                    "This often happens with monoclinic/rhombohedral structures where the geometry "
+                                    "doesn't support the target coordination number."
+                                )
+                            elif excessive_atoms:
+                                st.warning(
+                                    f"⚠️ **Excessive atom count ({total_atoms:.0f} atoms/cell).** "
+                                    "This structure has too many sphere intersections, indicating the geometry "
+                                    "doesn't produce a sensible crystal structure. The c/a ratio or lattice type "
+                                    "may not be appropriate for this composition."
+                                )
                         
                         # Show half-filling info if applicable
                         if match_type == 'half':
