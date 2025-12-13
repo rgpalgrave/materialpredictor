@@ -35,6 +35,42 @@ from position_calculator import (
 )
 
 
+class FilteredIntersections:
+    """Helper class to wrap intersections with only kept sites for half-filling."""
+    def __init__(self, original_intersections, kept_indices):
+        # Get unique intersections
+        unique_frac, unique_mult = get_unique_intersections(original_intersections)
+        
+        # Filter to kept indices only
+        if len(kept_indices) > 0 and len(unique_frac) > 0:
+            self.fractional = unique_frac[kept_indices]
+            self.multiplicity = unique_mult[kept_indices] if len(unique_mult) > 0 else np.ones(len(kept_indices))
+        else:
+            self.fractional = np.array([]).reshape(0, 3)
+            self.multiplicity = np.array([])
+        
+        # Cartesian coordinates need to be calculated from fractional
+        # They'll be set by the wrapper class that has access to lattice vectors
+        self.cartesian = None
+
+
+class HalfFilledStructure:
+    """Wrapper structure with only kept anion sites for Madelung calculation."""
+    def __init__(self, original_structure, kept_indices):
+        self.lattice_vectors = original_structure.lattice_vectors
+        self.metal_atoms = original_structure.metal_atoms
+        self.params = original_structure.params if hasattr(original_structure, 'params') else None
+        
+        # Create filtered intersections
+        self.intersections = FilteredIntersections(original_structure.intersections, kept_indices)
+        
+        # Calculate Cartesian coordinates for filtered intersections
+        if len(self.intersections.fractional) > 0:
+            self.intersections.cartesian = self.intersections.fractional @ self.lattice_vectors
+        else:
+            self.intersections.cartesian = np.array([]).reshape(0, 3)
+
+
 def get_default_search_configs(num_metals: int, use_predictor: bool = True) -> List[dict]:
     """
     Get default search configurations for initial structure search.
@@ -980,14 +1016,29 @@ def run_full_analysis_chain(
                     target_fraction=0.5
                 )
                 
-                # Calculate Madelung energy (using full structure for now)
-                madelung_result = calculate_madelung_energy(
-                    structure=structure,
-                    metals=metals,
-                    anion_charge=-anion_charge,  # Make negative for anion
-                    target_multiplicity=target_cn,
-                    supercell_size=5
-                )
+                # Calculate Madelung energy using FILTERED structure (only kept anion sites)
+                madelung_result = None
+                if half_result.success and half_result.kept_site_indices:
+                    try:
+                        # Create structure with only the kept anion sites
+                        filtered_structure = HalfFilledStructure(structure, half_result.kept_site_indices)
+                        
+                        madelung_result = calculate_madelung_energy(
+                            structure=filtered_structure,
+                            metals=metals,
+                            anion_charge=-anion_charge,  # Make negative for anion
+                            target_multiplicity=target_cn,
+                            supercell_size=5
+                        )
+                    except Exception:
+                        # Fall back to full structure if filtering fails
+                        madelung_result = calculate_madelung_energy(
+                            structure=structure,
+                            metals=metals,
+                            anion_charge=-anion_charge,
+                            target_multiplicity=target_cn,
+                            supercell_size=5
+                        )
                 
                 half_filling_results[config_id] = {
                     'structure': structure,
