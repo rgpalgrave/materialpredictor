@@ -80,12 +80,12 @@ def get_default_search_configs(num_metals: int, use_predictor: bool = True) -> L
     2. Lattice-type-specific filling rules (templates)
     3. N-decomposition into (in-plane × z-layers)
     
-    Always includes cubic P/I/F configs as they're fast to compute.
+    Always includes common lattice types that are fast to compute:
+    - Cubic: P, I, F (c/a = 1.0)
+    - Tetragonal: P, I (c/a = num_metals)
+    - Hexagonal: H (HCP), P (c/a = 1.633)
     
-    Falls back to standard search if predictor unavailable:
-    - Cubic: P, F, I (c/a = 1.0)
-    - Hexagonal: H (HCP), P (both with c/a = 1.633)
-    - Tetragonal: P, I (with c/a = num_metals)
+    Falls back to standard search if predictor unavailable.
     
     Args:
         num_metals: Number of metal sublattices (L)
@@ -104,7 +104,8 @@ def get_default_search_configs(num_metals: int, use_predictor: bool = True) -> L
                 configs = predictor.get_search_configs(
                     num_metals,
                     top_k=15,
-                    always_include_cubic=True
+                    always_include_cubic=True,
+                    always_include_common=True
                 )
                 if configs:
                     return configs
@@ -709,10 +710,22 @@ def run_full_analysis_chain(
         if len(coord_radii) == 1:
             coord_radii = coord_radii[0]  # Single value for N=1
         
+        # Expected stoichiometry for c/a scanning
+        expected_metal_counts = dict(zip([m['symbol'] for m in metals], metal_counts))
+        expected_anion_count = anion_count
+        
+        # Separate configs into cubic (fixed c/a) and non-cubic (needs c/a scan)
+        cubic_configs = [c for c in search_configs if c['lattice'] == 'Cubic']
+        scan_configs = [c for c in search_configs 
+                       if c['lattice'] in ('Tetragonal', 'Hexagonal')]
+        other_configs = [c for c in search_configs 
+                        if c['lattice'] not in ('Cubic', 'Tetragonal', 'Hexagonal')]
+        
         scale_results = {}
-        for config in search_configs:
+        
+        # Process cubic configs with fixed c/a = 1.0
+        for config in cubic_configs:
             try:
-                # Pass c_ratio in lattice_params for non-cubic lattices
                 lattice_params = {'c_ratio': config['c_ratio']}
                 
                 s_star = compute_min_scale_for_cn(
@@ -732,7 +745,71 @@ def run_full_analysis_chain(
                         'bravais_type': config['bravais_type'],
                         'offsets': config['offsets'],
                         'coord_radii': coord_radii,
-                        'c_ratio': config['c_ratio']  # Store c_ratio used
+                        'c_ratio': config['c_ratio']
+                    }
+            except Exception:
+                pass
+        
+        # Process tetragonal and hexagonal configs with c/a scanning
+        update_progress(2, 6, "Scanning c/a ratios for tetragonal and hexagonal...")
+        
+        for config in scan_configs:
+            try:
+                scan_result = run_ca_scan_for_stoichiometry(
+                    config=config,
+                    metals=metals,
+                    anion_symbol=anion_symbol,
+                    anion_radius=anion_radius,
+                    anion_charge=anion_charge,
+                    target_cn=target_cn,
+                    expected_metal_counts=expected_metal_counts,
+                    expected_anion_count=expected_anion_count,
+                    num_metals=num_metals,
+                    n_coarse=30,  # Faster coarse scan
+                    n_fine=30     # Faster fine scan
+                )
+                
+                if scan_result is not None:
+                    config_id = f"{config['id']}-ca{scan_result['c_ratio']:.2f}"
+                    scale_results[config_id] = {
+                        's_star': scan_result['s_star'],
+                        'status': 'found',
+                        'lattice': config['lattice'],
+                        'pattern': f"{config['pattern']} (c/a scanned)",
+                        'bravais_type': config['bravais_type'],
+                        'offsets': config['offsets'],
+                        'coord_radii': coord_radii,
+                        'c_ratio': scan_result['c_ratio'],
+                        'match_type': scan_result.get('match_type', 'exact'),
+                        'scan_regularity': scan_result.get('regularity', 0),
+                        'stoich_result': scan_result.get('stoich_result')
+                    }
+            except Exception:
+                pass
+        
+        # Process other configs (monoclinic, etc.) with fixed c/a
+        for config in other_configs:
+            try:
+                lattice_params = {'c_ratio': config['c_ratio']}
+                
+                s_star = compute_min_scale_for_cn(
+                    config['offsets'],
+                    target_cn,
+                    config['lattice'],
+                    coord_radii,
+                    bravais_type=config['bravais_type'],
+                    lattice_params=lattice_params
+                )
+                if s_star is not None:
+                    scale_results[config['id']] = {
+                        's_star': s_star,
+                        'status': 'found',
+                        'lattice': config['lattice'],
+                        'pattern': config['pattern'],
+                        'bravais_type': config['bravais_type'],
+                        'offsets': config['offsets'],
+                        'coord_radii': coord_radii,
+                        'c_ratio': config['c_ratio']
                     }
             except Exception:
                 pass
@@ -748,6 +825,11 @@ def run_full_analysis_chain(
         
         stoich_results = {}
         for config_id, config_data in scale_results.items():
+            # Use existing stoich_result from c/a scan if available
+            if 'stoich_result' in config_data and config_data['stoich_result'] is not None:
+                stoich_results[config_id] = config_data['stoich_result']
+                continue
+            
             try:
                 stoich_result = calculate_stoichiometry_for_config(
                     config_id=config_id,
@@ -770,9 +852,6 @@ def run_full_analysis_chain(
         
         # Step 4: Check matches and sort
         update_progress(4, 6, "Checking stoichiometry matches...")
-        
-        expected_metal_counts = dict(zip([m['symbol'] for m in metals], metal_counts))
-        expected_anion_count = anion_count
         
         exact_matches = []
         half_matches = []
@@ -1723,13 +1802,21 @@ def main():
                 formula = entry['formula']
                 pattern = entry.get('pattern', '')
                 
-                # Calculate lattice parameters
+                # Get c_ratio from scale_results (which may have been scanned)
+                scale_results = chain.get('scale_results', {})
+                config_scale_data = scale_results.get(config_id, {})
+                
+                # Calculate lattice parameters using actual c_ratio
                 a_param = s_star
-                c_ratio = 1.0
-                if lattice == 'Hexagonal':
-                    c_ratio = 1.633
-                elif lattice == 'Tetragonal':
-                    c_ratio = 1.0
+                c_ratio = config_scale_data.get('c_ratio', 1.0)
+                if c_ratio is None or c_ratio == 0:
+                    # Fallback defaults
+                    if lattice == 'Hexagonal':
+                        c_ratio = 1.633
+                    elif lattice == 'Tetragonal':
+                        c_ratio = 1.0
+                    else:
+                        c_ratio = 1.0
                 b_param = a_param
                 c_param = a_param * c_ratio
                 
@@ -1761,7 +1848,7 @@ def main():
                 if lattice == 'Cubic':
                     lattice_str = f"a={a_param:.2f}Å"
                 elif lattice in ['Hexagonal', 'Tetragonal', 'Rhombohedral']:
-                    lattice_str = f"a={a_param:.2f}Å, c={c_param:.2f}Å"
+                    lattice_str = f"a={a_param:.2f}Å, c={c_param:.2f}Å (c/a={c_ratio:.2f})"
                 else:
                     lattice_str = f"a={a_param:.2f}Å"
                 

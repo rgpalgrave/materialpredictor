@@ -375,12 +375,19 @@ class AdvancedLatticePredictor:
         self,
         num_metals: int,
         top_k: int = 15,
-        always_include_cubic: bool = True
+        always_include_cubic: bool = True,
+        always_include_common: bool = True
     ) -> List[dict]:
         """
         Get search configurations for the app.
         
         Converts predictions to app-compatible config format.
+        
+        Args:
+            num_metals: Number of metal sublattices
+            top_k: Maximum predictions to return
+            always_include_cubic: Always include cubic P/I/F (default True)
+            always_include_common: Always include tetragonal P/I and hexagonal H/P (default True)
         """
         predictions = self.predict(num_metals, top_k=top_k)
         configs = []
@@ -426,6 +433,10 @@ class AdvancedLatticePredictor:
         # Always include cubic P/I/F
         if always_include_cubic:
             configs = self._ensure_cubic_configs(configs, num_metals)
+        
+        # Always include tetragonal P/I and hexagonal H/P
+        if always_include_common:
+            configs = self._ensure_common_configs(configs, num_metals)
         
         return configs
     
@@ -475,6 +486,71 @@ class AdvancedLatticePredictor:
                             'probability': 0.0,
                             'source': 'always_cubic'
                         })
+        
+        return configs
+    
+    def _ensure_common_configs(self, configs: List[dict], num_metals: int) -> List[dict]:
+        """Ensure tetragonal P/I and hexagonal H/P are always included."""
+        try:
+            from lattice_configs import get_configs_for_n
+            
+            existing_bravais = set(c['bravais_type'] for c in configs)
+            
+            # Common types to always include with their c/a ratios
+            common_types = {
+                'tetragonal_P': ('Tetragonal', float(num_metals)),
+                'tetragonal_I': ('Tetragonal', float(num_metals)),
+                'hexagonal_H': ('Hexagonal', 1.633),
+                'hexagonal_P': ('Hexagonal', 1.633),
+            }
+            
+            all_configs = get_configs_for_n(num_metals)
+            arity0_configs = all_configs.get('arity0', [])
+            
+            for bravais_type, (lattice_type, c_ratio) in common_types.items():
+                if bravais_type not in existing_bravais:
+                    matching = [c for c in arity0_configs 
+                               if c.bravais_type == bravais_type and c.offsets is not None]
+                    
+                    for lc in matching:
+                        prefix = bravais_type.split('_')[0].upper()[:3]  # TET or HEX
+                        configs.append({
+                            'id': f"{prefix}-{lc.id}",
+                            'lattice': lattice_type,
+                            'bravais_type': bravais_type,
+                            'offsets': list(lc.offsets),
+                            'pattern': f"{lc.pattern} (always)",
+                            'c_ratio': c_ratio,
+                            'probability': 0.0,
+                            'source': 'always_common'
+                        })
+        except ImportError:
+            # lattice_configs not available, add basic templates
+            existing = set(c['bravais_type'] for c in configs)
+            
+            # Add basic tetragonal and hexagonal templates if available
+            for lattice_key, bravais_type, lattice_type, c_ratio in [
+                ('Tetragonal-P', 'tetragonal_P', 'Tetragonal', float(num_metals)),
+                ('Tetragonal-I', 'tetragonal_I', 'Tetragonal', float(num_metals)),
+                ('Hexagonal-H', 'hexagonal_H', 'Hexagonal', 1.633),
+                ('Hexagonal-P', 'hexagonal_P', 'Hexagonal', 1.633),
+            ]:
+                if bravais_type not in existing and num_metals <= 4:
+                    templates = LATTICE_FILLING_ORDER.get(lattice_key, {}).get('templates', {})
+                    if num_metals in templates:
+                        for template in templates[num_metals]:
+                            offsets = [parse_offset_str(o) for o in template]
+                            prefix = bravais_type.split('_')[0].upper()[:3]
+                            configs.append({
+                                'id': f"{prefix}-{bravais_type}-{num_metals}",
+                                'lattice': lattice_type,
+                                'bravais_type': bravais_type,
+                                'offsets': offsets,
+                                'pattern': 'template (always)',
+                                'c_ratio': c_ratio,
+                                'probability': 0.0,
+                                'source': 'always_common'
+                            })
         
         return configs
 
