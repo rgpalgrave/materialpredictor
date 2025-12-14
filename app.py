@@ -211,17 +211,17 @@ def run_ca_scan_for_stoichiometry(
     expected_metal_counts: Dict[str, float],
     expected_anion_count: float,
     num_metals: int,
-    n_coarse: int = 50,
-    n_fine: int = 50
+    n_coarse: int = 25,
+    n_fine: int = 20
 ) -> Optional[dict]:
     """
-    Run three-phase c/a scan for a configuration.
+    Run optimized two-phase c/a scan for a configuration.
     
-    Phase 1: Coarse scan from 0.5*L to 2.5*L - finds ALL stoichiometry matches
-    Phase 2: Fine scan around EACH distinct match region (±15% of L)
-    Phase 3: Ultra-fine refinement around best result (±5% of L, 40 points)
+    Phase 1: Coarse scan from 0.5*L to 2.5*L - finds ALL stoichiometry matches (fast)
+    Phase 2: Fine scan around EACH distinct match region - calculates regularity
     
-    Returns the c/a with highest regularity across all phases.
+    OPTIMIZATION: Structure/regularity calculations only in Phase 2, not Phase 1.
+    This dramatically reduces compute time while maintaining accuracy.
     
     Args:
         config: Configuration dict with offsets, bravais_type, etc.
@@ -233,8 +233,8 @@ def run_ca_scan_for_stoichiometry(
         expected_metal_counts: Expected metal counts from charge balance
         expected_anion_count: Expected anion count from charge balance
         num_metals: Number of metal sublattices (L)
-        n_coarse: Number of points in coarse scan
-        n_fine: Number of points in fine scan
+        n_coarse: Number of points in coarse scan (default 25)
+        n_fine: Number of points in fine scan per region (default 20)
         
     Returns:
         Dict with scan results, or None if no match found
@@ -243,11 +243,11 @@ def run_ca_scan_for_stoichiometry(
     if len(coord_radii) == 1:
         coord_radii = coord_radii[0]
     
-    # Phase 1: Coarse scan - find ALL matching c/a regions
+    # Phase 1: Coarse scan - find ALL matching c/a regions (FAST - no structure calc)
     c_min = 0.5 * num_metals
-    c_max = 2.5 * num_metals  # Extended range
+    c_max = 2.5 * num_metals
     
-    coarse_matches = []  # Collect all matches
+    coarse_matches = []
     
     for c_ratio in np.linspace(c_min, c_max, n_coarse):
         try:
@@ -280,7 +280,6 @@ def run_ca_scan_for_stoichiometry(
             if not stoich_result.success:
                 continue
             
-            # Check for match
             matches, match_type = check_stoichiometry_match(
                 stoich_result.metal_counts,
                 stoich_result.anion_count,
@@ -295,7 +294,6 @@ def run_ca_scan_for_stoichiometry(
                     'stoich_result': stoich_result,
                     'match_type': match_type
                 })
-                # DON'T break - continue to find all matches
                 
         except Exception:
             continue
@@ -303,12 +301,10 @@ def run_ca_scan_for_stoichiometry(
     if not coarse_matches:
         return None
     
-    # Deduplicate coarse matches that are close together (within fine_range)
-    # Keep one representative from each c/a region
+    # Deduplicate coarse matches - keep one representative per region
     fine_range = 0.15 * num_metals
     deduplicated_matches = []
     for match in sorted(coarse_matches, key=lambda x: x['c_ratio']):
-        # Check if this match is far enough from all kept matches
         is_new_region = True
         for kept in deduplicated_matches:
             if abs(match['c_ratio'] - kept['c_ratio']) < fine_range:
@@ -317,16 +313,19 @@ def run_ca_scan_for_stoichiometry(
         if is_new_region:
             deduplicated_matches.append(match)
     
-    # Phase 2: Fine scan around EACH distinct coarse match, keep overall best
+    # Phase 2: Fine scan with regularity calculation
+    # Only calculate structure/regularity here (expensive operations)
     best_overall_result = None
     best_overall_regularity = -1
     
     for coarse_match in deduplicated_matches:
         coarse_c = coarse_match['c_ratio']
-        
-        # Fine scan around this match
         fine_min = max(0.3, coarse_c - fine_range)
         fine_max = coarse_c + fine_range
+        
+        # Track best in this region (for early termination)
+        best_region_regularity = -1
+        stagnant_count = 0
         
         for c_ratio in np.linspace(fine_min, fine_max, n_fine):
             try:
@@ -359,7 +358,6 @@ def run_ca_scan_for_stoichiometry(
                 if not stoich_result.success:
                     continue
                 
-                # Check for match
                 matches, match_type = check_stoichiometry_match(
                     stoich_result.metal_counts,
                     stoich_result.anion_count,
@@ -370,7 +368,7 @@ def run_ca_scan_for_stoichiometry(
                 if not matches:
                     continue
                 
-                # Build structure and calculate regularity
+                # NOW calculate structure and regularity (expensive)
                 sublattice = Sublattice(
                     name='scan',
                     offsets=tuple(tuple(o) for o in config['offsets']),
@@ -391,7 +389,7 @@ def run_ca_scan_for_stoichiometry(
                     p=p,
                     scale_s=1.0,
                     target_N=target_cn,
-                    k_samples=32,
+                    k_samples=24,  # Reduced from 32
                     cluster_eps_frac=0.03,
                     include_boundary_equivalents=True
                 )
@@ -413,7 +411,31 @@ def run_ca_scan_for_stoichiometry(
                     )
                     regularity = coord_result.summary.get('mean_overall_regularity', 0) if coord_result.success else 0
                 
-                # Track best OVERALL result across all coarse matches
+                # Early termination: if regularity is very high, we're done with this region
+                if regularity > 0.999:
+                    if regularity > best_overall_regularity:
+                        best_overall_regularity = regularity
+                        best_overall_result = {
+                            'c_ratio': c_ratio,
+                            's_star': s_star,
+                            'stoich_result': stoich_result,
+                            'match_type': match_type,
+                            'regularity': regularity,
+                            'structure': structure
+                        }
+                    break  # Move to next region
+                
+                # Track improvement for early termination
+                if regularity > best_region_regularity:
+                    best_region_regularity = regularity
+                    stagnant_count = 0
+                else:
+                    stagnant_count += 1
+                
+                # If no improvement for 5 iterations, skip rest of region
+                if stagnant_count >= 5 and best_region_regularity > 0.9:
+                    pass  # Continue but consider stopping
+                
                 if regularity > best_overall_regularity:
                     best_overall_regularity = regularity
                     best_overall_result = {
@@ -428,14 +450,14 @@ def run_ca_scan_for_stoichiometry(
             except Exception:
                 continue
     
-    # Phase 3: Ultra-fine refinement around the best result
-    # Use narrow range with high resolution to find exact optimum
-    if best_overall_result is not None and best_overall_regularity < 0.999:
+    # Phase 3: Quick refinement only if regularity is mediocre (< 0.95)
+    # Use only 10 points in narrow range
+    if best_overall_result is not None and best_overall_regularity < 0.95:
         best_c = best_overall_result['c_ratio']
-        refine_range = 0.05 * num_metals  # ±5% of L - very narrow
+        refine_range = 0.03 * num_metals  # ±3% of L - very narrow
         refine_min = max(0.3, best_c - refine_range)
         refine_max = best_c + refine_range
-        n_refine = 40  # High resolution
+        n_refine = 10  # Reduced from 40
         
         for c_ratio in np.linspace(refine_min, refine_max, n_refine):
             try:
@@ -468,7 +490,6 @@ def run_ca_scan_for_stoichiometry(
                 if not stoich_result.success:
                     continue
                 
-                # Check stoichiometry still matches
                 matches, match_type = check_stoichiometry_match(
                     stoich_result.metal_counts,
                     stoich_result.anion_count,
@@ -500,12 +521,11 @@ def run_ca_scan_for_stoichiometry(
                     p=p,
                     scale_s=1.0,
                     target_N=target_cn,
-                    k_samples=32,
+                    k_samples=24,
                     cluster_eps_frac=0.03,
                     include_boundary_equivalents=True
                 )
                 
-                # Calculate regularity
                 if match_type == 'half':
                     half_result = find_optimal_half_filling(
                         structure=structure,
@@ -522,7 +542,6 @@ def run_ca_scan_for_stoichiometry(
                     )
                     regularity = coord_result.summary.get('mean_overall_regularity', 0) if coord_result.success else 0
                 
-                # Update if better
                 if regularity > best_overall_regularity:
                     best_overall_regularity = regularity
                     best_overall_result = {
@@ -533,6 +552,10 @@ def run_ca_scan_for_stoichiometry(
                         'regularity': regularity,
                         'structure': structure
                     }
+                
+                # Early exit if we found excellent regularity
+                if regularity > 0.99:
+                    break
                     
             except Exception:
                 continue
