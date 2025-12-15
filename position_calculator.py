@@ -495,7 +495,9 @@ def identify_contributing_atoms(
     """
     Identify which metal atoms contribute to each intersection.
     
-    OPTIMIZED: Uses supercell KDTree for O(N log N) instead of O(N * M * 27).
+    OPTIMIZED: 
+    - Uses supercell KDTree for O(N log N) instead of O(N * M * 27)
+    - Uses squared distances to avoid sqrt in hot loop
     """
     from scipy.spatial import cKDTree
     
@@ -514,10 +516,9 @@ def identify_contributing_atoms(
     n_metals = len(metals.cartesian)
     
     # Build supercell KDTree: all metal positions + 27 periodic images
-    # This is the key optimization - build once, query many times
     all_centers = []
     all_radii = []
-    all_atom_indices = []  # Track which original atom each image belongs to
+    all_atom_indices = []
     
     for shift in shifts:
         shifted_centers = metals.cartesian + shift
@@ -529,14 +530,18 @@ def identify_contributing_atoms(
     all_radii = np.concatenate(all_radii)
     all_atom_indices = np.concatenate(all_atom_indices)
     
+    # Precompute squared radius bounds (avoid sqrt in hot loop)
+    r_lo_sq = (all_radii * (1.0 - tol)) ** 2
+    r_hi_sq = (all_radii * (1.0 + tol)) ** 2
+    
     # Build KDTree on supercell
     supercell_tree = cKDTree(all_centers)
     
-    # Maximum search radius (largest sphere radius + tolerance)
+    # Maximum search radius
     max_radius = np.max(all_radii)
     search_radius = max_radius * (1.0 + tol)
     
-    # Batch query: find all potential contributing atoms for all intersection points
+    # Batch query
     neighbors_list = supercell_tree.query_ball_point(intersection_points, r=search_radius)
     
     contributing = []
@@ -545,13 +550,12 @@ def identify_contributing_atoms(
         atoms = set()
         
         for neighbor_idx in neighbors:
-            center = all_centers[neighbor_idx]
-            radius = all_radii[neighbor_idx]
-            atom_idx = all_atom_indices[neighbor_idx]
+            # Use squared distance - no sqrt needed!
+            diff = pt - all_centers[neighbor_idx]
+            dist_sq = diff[0]*diff[0] + diff[1]*diff[1] + diff[2]*diff[2]
             
-            dist = np.linalg.norm(pt - center)
-            if abs(dist - radius) < tol * radius:
-                atoms.add(atom_idx)
+            if r_lo_sq[neighbor_idx] < dist_sq < r_hi_sq[neighbor_idx]:
+                atoms.add(all_atom_indices[neighbor_idx])
         
         contributing.append(list(atoms))
     

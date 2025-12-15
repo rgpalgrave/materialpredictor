@@ -262,6 +262,167 @@ def build_centers_and_radii(
     return np.vstack(centers).astype(float, copy=False), np.array(radii, dtype=float)
 
 
+class CachedGeometry:
+    """
+    Cache static geometry for efficient repeated multiplicity calculations.
+    
+    For a fixed configuration (sublattices, ratios, angles), the fractional
+    positions and radii don't change - only the scale `a` changes.
+    
+    This caches:
+    - Fractional positions (computed once)
+    - Radii (computed once)
+    - Fractional shifts (computed once for unit ratios)
+    
+    For each scale `a`:
+    - Recompute lat_vecs = ratios * a
+    - Convert fractional → Cartesian by simple matrix multiply
+    """
+    
+    def __init__(self, sublattices: List[Sublattice], p_template: LatticeParams):
+        """
+        Initialize with sublattices and a template LatticeParams.
+        The template's ratios and angles are used; `a` will be varied.
+        """
+        self.sublattices = sublattices
+        self.b_ratio = p_template.b_ratio
+        self.c_ratio = p_template.c_ratio
+        self.alpha = p_template.alpha
+        self.beta = p_template.beta
+        self.gamma = p_template.gamma
+        
+        # Compute fractional positions and radii ONCE
+        self._frac_positions = []
+        self._radii = []
+        
+        for sub in sublattices:
+            for pos, coord_radius in sub.get_all_positions_with_alpha():
+                self._frac_positions.append(pos)
+                self._radii.append(float(coord_radius))
+        
+        if self._frac_positions:
+            self._frac_positions = np.array(self._frac_positions, dtype=float)
+            self._radii = np.array(self._radii, dtype=float)
+        else:
+            self._frac_positions = np.empty((0, 3), dtype=float)
+            self._radii = np.empty((0,), dtype=float)
+        
+        # Precompute unit lattice vectors (for a=1.0) - will scale by `a` later
+        p_unit = LatticeParams(
+            a=1.0, b_ratio=self.b_ratio, c_ratio=self.c_ratio,
+            alpha=self.alpha, beta=self.beta, gamma=self.gamma
+        )
+        self._unit_lat_vecs = lattice_vectors(p_unit)
+        
+        # Precompute fractional shifts (for unit cell neighbors)
+        # These are the same regardless of scale
+        self._frac_shifts = []
+        for i in [-1, 0, 1]:
+            for j in [-1, 0, 1]:
+                for k in [-1, 0, 1]:
+                    self._frac_shifts.append([i, j, k])
+        self._frac_shifts = np.array(self._frac_shifts, dtype=float)
+        
+        # Precompute squared radii thresholds (with small tolerance)
+        self._rmax = float(np.max(self._radii)) if len(self._radii) > 0 else 0.0
+    
+    def get_cartesian_for_scale(self, a: float) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """
+        Get Cartesian centers, radii, and shifts for a given scale `a`.
+        This is fast - just matrix multiply, no iteration.
+        """
+        lat_vecs = self._unit_lat_vecs * a
+        centers = self._frac_positions @ lat_vecs
+        shifts = self._frac_shifts @ lat_vecs
+        return centers, self._radii, shifts
+    
+    @property
+    def radii(self) -> np.ndarray:
+        return self._radii
+    
+    @property
+    def rmax(self) -> float:
+        return self._rmax
+    
+    @property
+    def n_centers(self) -> int:
+        return len(self._frac_positions)
+
+
+def max_multiplicity_for_scale_cached(
+    geom: CachedGeometry,
+    scale_a: float,
+    k_samples: int = 16,
+    tol_inside: float = 1e-3,
+    early_stop_at: Optional[int] = None
+) -> Tuple[int, np.ndarray, np.ndarray]:
+    """
+    Find maximum intersection multiplicity using cached geometry.
+    Much faster than max_multiplicity_for_scale for repeated calls.
+    """
+    if geom.n_centers == 0:
+        return 0, np.empty((0, 3), dtype=float), np.empty((0,), dtype=int)
+    
+    # Get Cartesian coordinates for this scale (fast - just matrix multiply)
+    centers, radii, shifts = geom.get_cartesian_for_scale(scale_a)
+    
+    rmax = geom.rmax
+    cutoff = 2.0 * rmax
+    
+    # Find candidate pairs
+    pairs = periodic_candidate_pairs_fast(centers, shifts, cutoff=cutoff)
+    if not pairs:
+        return 0, np.empty((0, 3), dtype=float), np.empty((0,), dtype=int)
+    
+    # Build tree over all periodic images
+    tree_img, centers_img, radii_img = _build_periodic_image_tree(centers, radii, shifts)
+    
+    # Precompute squared thresholds
+    radii_thresh_sq = (radii_img + tol_inside) ** 2
+    
+    samples: List[np.ndarray] = []
+    counts: List[int] = []
+    search_r = rmax + float(tol_inside)
+    
+    for (i, j, s_idx) in pairs:
+        c1 = centers[i]
+        c2 = centers[j] + shifts[s_idx]
+        r1 = float(radii[i])
+        r2 = float(radii[j])
+        
+        pts = pair_circle_samples(c1, r1, c2, r2, k=int(k_samples))
+        if pts.size == 0:
+            continue
+        
+        neigh_lists = tree_img.query_ball_point(pts, r=search_r)
+        
+        total = np.zeros(len(pts), dtype=int)
+        for p_idx, neigh in enumerate(neigh_lists):
+            if not neigh:
+                continue
+            neigh = np.asarray(neigh, dtype=int)
+            diff = centers_img[neigh] - pts[p_idx]
+            d_sq = np.einsum('ij,ij->i', diff, diff)
+            total[p_idx] = int(np.sum(d_sq <= radii_thresh_sq[neigh]))
+        
+        if early_stop_at is not None and int(total.max()) >= int(early_stop_at):
+            keep = np.where(total >= 2)[0][:5]
+            if keep.size:
+                samples.extend(pts[keep])
+                counts.extend([int(x) for x in total[keep]])
+            return int(total.max()), np.array(samples) if samples else pts[keep], np.array(counts, dtype=int) if counts else total[keep].astype(int)
+        
+        good = np.where(total >= 2)[0]
+        if good.size:
+            samples.extend(pts[good])
+            counts.extend([int(x) for x in total[good]])
+    
+    if not samples:
+        return 0, np.empty((0, 3), dtype=float), np.empty((0,), dtype=int)
+    
+    return int(np.max(counts)), np.array(samples, dtype=float), np.array(counts, dtype=int)
+
+
 def periodic_candidate_pairs_fast(
     centers: np.ndarray,
     shifts: np.ndarray,
@@ -331,6 +492,8 @@ def max_multiplicity_for_scale(
         scale_s is the lattice parameter 'a' in Å.
         Sphere radii are fixed at alpha_ratio (coordination radii).
 
+    OPTIMIZED: Uses squared distances to avoid sqrt in hot loop.
+
     Returns:
         max_mult, sample_positions, multiplicities
     """
@@ -363,6 +526,9 @@ def max_multiplicity_for_scale(
 
     # Build tree over all periodic images for fast multiplicity counting
     tree_img, centers_img, radii_img = _build_periodic_image_tree(centers, radii, shifts)
+    
+    # Precompute squared thresholds (avoid sqrt in hot loop)
+    radii_thresh_sq = (radii_img + tol_inside) ** 2
 
     samples: List[np.ndarray] = []
     counts: List[int] = []
@@ -381,14 +547,15 @@ def max_multiplicity_for_scale(
         # Batch query neighbors for all sample points
         neigh_lists = tree_img.query_ball_point(pts, r=search_r)
 
-        # Compute multiplicity for each point
+        # Compute multiplicity for each point using SQUARED distances
         total = np.zeros(len(pts), dtype=int)
         for p_idx, neigh in enumerate(neigh_lists):
             if not neigh:
                 continue
             neigh = np.asarray(neigh, dtype=int)
-            d = np.linalg.norm(centers_img[neigh] - pts[p_idx], axis=1)
-            total[p_idx] = int(np.sum(d <= (radii_img[neigh] + tol_inside)))
+            diff = centers_img[neigh] - pts[p_idx]
+            d_sq = np.einsum('ij,ij->i', diff, diff)  # Fast squared distance
+            total[p_idx] = int(np.sum(d_sq <= radii_thresh_sq[neigh]))
 
         if early_stop_at is not None and int(total.max()) >= int(early_stop_at):
             keep = np.where(total >= 2)[0][:5]
@@ -429,20 +596,27 @@ def find_threshold_s_for_N(
         Find MAXIMUM lattice parameter 'a' where multiplicity >= target_N.
         Larger 'a' -> less overlap -> lower multiplicity.
 
+    OPTIMIZED: Uses CachedGeometry to avoid rebuilding positions on each iteration.
+
     Returns None if target cannot be achieved within [s_min, s_max].
     """
     target_N = int(target_N)
 
     if use_new_model:
+        # Create cached geometry ONCE - reuse for all bisection iterations
+        geom = CachedGeometry(sublattices, p)
+        
+        if geom.n_centers == 0:
+            return None
+        
         # Find bracket where multiplicity crosses target
         s_lo = None
         for s in np.linspace(s_max, s_min, 14):
-            m, _, _ = max_multiplicity_for_scale(
-                sublattices, p, float(s),
+            m, _, _ = max_multiplicity_for_scale_cached(
+                geom, float(s),
                 k_samples=k_samples_coarse,
                 tol_inside=tol_inside,
-                early_stop_at=target_N,
-                use_new_model=True
+                early_stop_at=target_N
             )
             if m >= target_N:
                 s_lo = float(s)
@@ -453,12 +627,11 @@ def find_threshold_s_for_N(
         # Find upper bound where multiplicity drops
         s_hi = float(s_max)
         for s in np.linspace(s_lo, s_max, 10):
-            m, _, _ = max_multiplicity_for_scale(
-                sublattices, p, float(s),
+            m, _, _ = max_multiplicity_for_scale_cached(
+                geom, float(s),
                 k_samples=k_samples_coarse,
                 tol_inside=tol_inside,
-                early_stop_at=target_N,
-                use_new_model=True
+                early_stop_at=target_N
             )
             if m >= target_N:
                 s_lo = float(s)
@@ -466,18 +639,17 @@ def find_threshold_s_for_N(
                 s_hi = float(s)
                 break
 
-        # Bisection refinement
+        # Bisection refinement (using cached geometry)
         for _ in range(int(max_iter)):
             if (s_hi - s_lo) < 1e-4:
                 break
             mid = 0.5 * (s_lo + s_hi)
             ks = k_samples_coarse if (s_hi - s_lo) > 0.12 else k_samples_fine
-            m, _, _ = max_multiplicity_for_scale(
-                sublattices, p, float(mid),
+            m, _, _ = max_multiplicity_for_scale_cached(
+                geom, float(mid),
                 k_samples=int(ks),
                 tol_inside=tol_inside,
-                early_stop_at=target_N,
-                use_new_model=True
+                early_stop_at=target_N
             )
             if m >= target_N:
                 s_lo = float(mid)
