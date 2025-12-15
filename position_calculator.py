@@ -223,6 +223,8 @@ def cluster_intersections_pbc(
     """
     Cluster intersection positions accounting for PBC.
     
+    OPTIMIZED: Uses KDTree + Union-Find for O(N log N) instead of O(N²).
+    
     Args:
         positions_frac: Fractional coordinates (N, 3)
         multiplicities: Multiplicity values (N,)
@@ -232,42 +234,102 @@ def cluster_intersections_pbc(
         unique_positions: Fractional coordinates of cluster centers (wrapped to [0,1))
         unique_multiplicities: Maximum multiplicity in each cluster
     """
+    from scipy.spatial import cKDTree
+    
     if len(positions_frac) == 0:
         return np.empty((0, 3)), np.empty((0,), dtype=int)
+    
+    n_points = len(positions_frac)
     
     # Wrap to unit cell
     wrapped = wrap_to_unit_cell(positions_frac)
     
-    used = np.zeros(len(wrapped), dtype=bool)
+    # Build KDTree on wrapped coordinates
+    tree = cKDTree(wrapped)
+    
+    # Find all pairs within eps_frac using KDTree - O(N log N) average
+    pairs = tree.query_pairs(r=eps_frac, output_type='ndarray')
+    
+    # Also need to check PBC - points near 0 should cluster with points near 1
+    pbc_pairs = []
+    
+    # Check which points are near boundaries (within eps_frac of 0 or 1)
+    near_zero = wrapped < eps_frac
+    near_one = wrapped > (1.0 - eps_frac)
+    boundary_mask = np.any(near_zero | near_one, axis=1)
+    boundary_indices = np.where(boundary_mask)[0]
+    
+    if len(boundary_indices) > 0:
+        # Generate all 26 non-zero shift vectors for PBC
+        shifts = []
+        for dx in [-1, 0, 1]:
+            for dy in [-1, 0, 1]:
+                for dz in [-1, 0, 1]:
+                    if dx != 0 or dy != 0 or dz != 0:
+                        shifts.append([dx, dy, dz])
+        
+        # For boundary points, check distances to shifted copies
+        for shift in shifts:
+            shift_arr = np.array(shift, dtype=float)
+            shifted = wrapped[boundary_indices] + shift_arr
+            
+            # Query tree for neighbors of shifted points
+            neighbors_list = tree.query_ball_point(shifted, r=eps_frac)
+            
+            for idx, bi in enumerate(boundary_indices):
+                for ni in neighbors_list[idx]:
+                    if ni != bi:
+                        pbc_pairs.append((min(bi, ni), max(bi, ni)))
+    
+    # Combine pairs into a set (deduplication)
+    all_pairs = set()
+    if len(pairs) > 0:
+        for i, j in pairs:
+            all_pairs.add((min(i, j), max(i, j)))
+    for p in pbc_pairs:
+        all_pairs.add(p)
+    
+    # Union-Find for fast clustering
+    parent = list(range(n_points))
+    rank = [0] * n_points
+    
+    def find(x):
+        root = x
+        while parent[root] != root:
+            root = parent[root]
+        # Path compression
+        while parent[x] != root:
+            parent[x], x = root, parent[x]
+        return root
+    
+    def union(x, y):
+        px, py = find(x), find(y)
+        if px == py:
+            return
+        if rank[px] < rank[py]:
+            px, py = py, px
+        parent[py] = px
+        if rank[px] == rank[py]:
+            rank[px] += 1
+    
+    # Union all pairs
+    for i, j in all_pairs:
+        union(i, j)
+    
+    # Group points by cluster
+    clusters = {}
+    for i in range(n_points):
+        root = find(i)
+        if root not in clusters:
+            clusters[root] = []
+        clusters[root].append(i)
+    
+    # Compute cluster representatives
     unique_pos = []
     unique_mult = []
     
-    eps2 = eps_frac ** 2
-    
-    for i in range(len(wrapped)):
-        if used[i]:
-            continue
-        
-        # Find all positions within eps of this one (considering PBC)
-        cluster = [i]
-        for j in range(i + 1, len(wrapped)):
-            if used[j]:
-                continue
-            
-            # Compute distance considering PBC wrapping
-            diff = wrapped[j] - wrapped[i]
-            # Handle periodic wrapping
-            diff = diff - np.round(diff)
-            dist2 = np.sum(diff ** 2)
-            
-            if dist2 < eps2:
-                cluster.append(j)
-        
-        # Mark as used
-        used[cluster] = True
-        
-        # Compute cluster representative
-        cluster_positions = wrapped[cluster]
+    for cluster_indices in clusters.values():
+        cluster_positions = wrapped[cluster_indices]
         
         # Handle PBC in averaging: unwrap relative to first point
         ref = cluster_positions[0]
@@ -285,7 +347,7 @@ def cluster_intersections_pbc(
         mean_pos = snap_to_symmetry(mean_pos)
         
         # Maximum multiplicity in cluster
-        max_mult = int(np.max(multiplicities[cluster]))
+        max_mult = int(np.max(multiplicities[cluster_indices]))
         
         unique_pos.append(mean_pos)
         unique_mult.append(max_mult)
@@ -432,7 +494,11 @@ def identify_contributing_atoms(
 ) -> List[List[int]]:
     """
     Identify which metal atoms contribute to each intersection.
+    
+    OPTIMIZED: Uses supercell KDTree for O(N log N) instead of O(N * M * 27).
     """
+    from scipy.spatial import cKDTree
+    
     if len(intersection_points) == 0:
         return []
     
@@ -445,22 +511,49 @@ def identify_contributing_atoms(
     if len(metals.cartesian) == 0:
         return [[] for _ in range(len(intersection_points))]
     
+    n_metals = len(metals.cartesian)
+    
+    # Build supercell KDTree: all metal positions + 27 periodic images
+    # This is the key optimization - build once, query many times
+    all_centers = []
+    all_radii = []
+    all_atom_indices = []  # Track which original atom each image belongs to
+    
+    for shift in shifts:
+        shifted_centers = metals.cartesian + shift
+        all_centers.append(shifted_centers)
+        all_radii.append(metals.radius)
+        all_atom_indices.append(np.arange(n_metals))
+    
+    all_centers = np.vstack(all_centers)
+    all_radii = np.concatenate(all_radii)
+    all_atom_indices = np.concatenate(all_atom_indices)
+    
+    # Build KDTree on supercell
+    supercell_tree = cKDTree(all_centers)
+    
+    # Maximum search radius (largest sphere radius + tolerance)
+    max_radius = np.max(all_radii)
+    search_radius = max_radius * (1.0 + tol)
+    
+    # Batch query: find all potential contributing atoms for all intersection points
+    neighbors_list = supercell_tree.query_ball_point(intersection_points, r=search_radius)
+    
     contributing = []
-    for pt in intersection_points:
-        atoms = []
-        for atom_idx in range(len(metals.cartesian)):
-            center = metals.cartesian[atom_idx]
-            radius = metals.radius[atom_idx]
-            
-            # Check all periodic images
-            for shift in shifts:
-                dist = np.linalg.norm(pt - (center + shift))
-                if abs(dist - radius) < tol * radius:
-                    if atom_idx not in atoms:
-                        atoms.append(atom_idx)
-                    break
+    for pt_idx, neighbors in enumerate(neighbors_list):
+        pt = intersection_points[pt_idx]
+        atoms = set()
         
-        contributing.append(atoms)
+        for neighbor_idx in neighbors:
+            center = all_centers[neighbor_idx]
+            radius = all_radii[neighbor_idx]
+            atom_idx = all_atom_indices[neighbor_idx]
+            
+            dist = np.linalg.norm(pt - center)
+            if abs(dist - radius) < tol * radius:
+                atoms.add(atom_idx)
+        
+        contributing.append(list(atoms))
     
     return contributing
 

@@ -35,6 +35,132 @@ from position_calculator import (
 )
 
 
+# =============================================================================
+# PERFORMANCE MONITORING SYSTEM
+# =============================================================================
+
+class PerformanceMonitor:
+    """
+    Simple performance monitoring for identifying bottlenecks.
+    
+    Usage:
+        monitor = PerformanceMonitor()
+        
+        with monitor.time("operation_name"):
+            # expensive code here
+            pass
+        
+        monitor.show_report()  # Display in Streamlit
+    """
+    
+    def __init__(self):
+        self.timings: Dict[str, List[float]] = {}
+        self.call_counts: Dict[str, int] = {}
+        self.current_operation: Optional[str] = None
+        self.start_time: Optional[float] = None
+        self.enabled = True
+    
+    class TimingContext:
+        def __init__(self, monitor: 'PerformanceMonitor', name: str):
+            self.monitor = monitor
+            self.name = name
+            self.start = None
+            
+        def __enter__(self):
+            if self.monitor.enabled:
+                self.start = time.perf_counter()
+            return self
+            
+        def __exit__(self, *args):
+            if self.monitor.enabled and self.start is not None:
+                elapsed = time.perf_counter() - self.start
+                if self.name not in self.monitor.timings:
+                    self.monitor.timings[self.name] = []
+                    self.monitor.call_counts[self.name] = 0
+                self.monitor.timings[self.name].append(elapsed)
+                self.monitor.call_counts[self.name] += 1
+    
+    def time(self, name: str) -> TimingContext:
+        """Context manager for timing a code block."""
+        return self.TimingContext(self, name)
+    
+    def reset(self):
+        """Clear all timing data."""
+        self.timings = {}
+        self.call_counts = {}
+    
+    def get_summary(self) -> Dict[str, Dict]:
+        """Get summary statistics for all timed operations."""
+        summary = {}
+        for name, times in self.timings.items():
+            if times:
+                summary[name] = {
+                    'calls': self.call_counts[name],
+                    'total': sum(times),
+                    'mean': sum(times) / len(times),
+                    'min': min(times),
+                    'max': max(times),
+                }
+        return summary
+    
+    def show_report(self, container=None):
+        """Display timing report in Streamlit."""
+        summary = self.get_summary()
+        if not summary:
+            return
+        
+        # Sort by total time descending
+        sorted_ops = sorted(summary.items(), key=lambda x: x[1]['total'], reverse=True)
+        
+        target = container if container else st
+        
+        with target.expander("⏱️ Performance Monitor", expanded=False):
+            total_tracked = sum(s['total'] for s in summary.values())
+            st.caption(f"Total tracked time: {total_tracked:.2f}s")
+            
+            # Create DataFrame for display
+            data = []
+            for name, stats in sorted_ops:
+                pct = (stats['total'] / total_tracked * 100) if total_tracked > 0 else 0
+                data.append({
+                    'Operation': name,
+                    'Calls': stats['calls'],
+                    'Total (s)': f"{stats['total']:.3f}",
+                    'Mean (s)': f"{stats['mean']:.4f}",
+                    'Max (s)': f"{stats['max']:.4f}",
+                    '% Time': f"{pct:.1f}%"
+                })
+            
+            df = pd.DataFrame(data)
+            st.dataframe(df, use_container_width=True, hide_index=True)
+            
+            # Visual bar chart of time distribution
+            if len(sorted_ops) > 1:
+                fig = go.Figure(data=[
+                    go.Bar(
+                        x=[op[0] for op in sorted_ops[:10]],  # Top 10
+                        y=[op[1]['total'] for op in sorted_ops[:10]],
+                        marker_color='steelblue'
+                    )
+                ])
+                fig.update_layout(
+                    title="Time by Operation (Top 10)",
+                    xaxis_title="Operation",
+                    yaxis_title="Total Time (s)",
+                    height=300,
+                    margin=dict(l=20, r=20, t=40, b=20)
+                )
+                st.plotly_chart(fig, use_container_width=True)
+
+
+# Global monitor instance - stored in session state for persistence
+def get_monitor() -> PerformanceMonitor:
+    """Get or create the global performance monitor."""
+    if 'perf_monitor' not in st.session_state:
+        st.session_state.perf_monitor = PerformanceMonitor()
+    return st.session_state.perf_monitor
+
+
 class FilteredIntersections:
     """Helper class to wrap intersections with only kept sites for half-filling."""
     def __init__(self, original_intersections, kept_indices):
@@ -239,6 +365,8 @@ def run_ca_scan_for_stoichiometry(
     Returns:
         Dict with scan results, or None if no match found
     """
+    monitor = get_monitor()
+    
     coord_radii = tuple(m['radius'] + anion_radius for m in metals)
     if len(coord_radii) == 1:
         coord_radii = coord_radii[0]
@@ -249,54 +377,57 @@ def run_ca_scan_for_stoichiometry(
     
     coarse_matches = []
     
-    for c_ratio in np.linspace(c_min, c_max, n_coarse):
-        try:
-            s_star = compute_min_scale_for_cn(
-                config['offsets'],
-                target_cn,
-                config['lattice'],
-                coord_radii,
-                bravais_type=config['bravais_type'],
-                lattice_params={'c_ratio': c_ratio}
-            )
-            
-            if s_star is None:
-                continue
-            
-            stoich_result = calculate_stoichiometry_for_config(
-                config_id=config['id'],
-                offsets=config['offsets'],
-                bravais_type=config['bravais_type'],
-                lattice_type=config['lattice'],
-                metals=metals,
-                anion_symbol=anion_symbol,
-                scale_s=s_star,
-                target_cn=target_cn,
-                anion_radius=anion_radius,
-                cluster_eps_frac=0.03,
-                c_ratio=c_ratio
-            )
-            
-            if not stoich_result.success:
-                continue
-            
-            matches, match_type = check_stoichiometry_match(
-                stoich_result.metal_counts,
-                stoich_result.anion_count,
-                expected_metal_counts,
-                expected_anion_count
-            )
-            
-            if matches:
-                coarse_matches.append({
-                    'c_ratio': c_ratio,
-                    's_star': s_star,
-                    'stoich_result': stoich_result,
-                    'match_type': match_type
-                })
+    with monitor.time("Phase1_Coarse_Total"):
+        for c_ratio in np.linspace(c_min, c_max, n_coarse):
+            try:
+                with monitor.time("compute_min_scale"):
+                    s_star = compute_min_scale_for_cn(
+                        config['offsets'],
+                        target_cn,
+                        config['lattice'],
+                        coord_radii,
+                        bravais_type=config['bravais_type'],
+                        lattice_params={'c_ratio': c_ratio}
+                    )
                 
-        except Exception:
-            continue
+                if s_star is None:
+                    continue
+                
+                with monitor.time("calc_stoichiometry"):
+                    stoich_result = calculate_stoichiometry_for_config(
+                        config_id=config['id'],
+                        offsets=config['offsets'],
+                        bravais_type=config['bravais_type'],
+                        lattice_type=config['lattice'],
+                        metals=metals,
+                        anion_symbol=anion_symbol,
+                        scale_s=s_star,
+                        target_cn=target_cn,
+                        anion_radius=anion_radius,
+                        cluster_eps_frac=0.03,
+                        c_ratio=c_ratio
+                    )
+                
+                if not stoich_result.success:
+                    continue
+                
+                matches, match_type = check_stoichiometry_match(
+                    stoich_result.metal_counts,
+                    stoich_result.anion_count,
+                    expected_metal_counts,
+                    expected_anion_count
+                )
+                
+                if matches:
+                    coarse_matches.append({
+                        'c_ratio': c_ratio,
+                        's_star': s_star,
+                        'stoich_result': stoich_result,
+                        'match_type': match_type
+                    })
+                    
+            except Exception:
+                continue
     
     if not coarse_matches:
         return None
@@ -318,101 +449,130 @@ def run_ca_scan_for_stoichiometry(
     best_overall_result = None
     best_overall_regularity = -1
     
-    for coarse_match in deduplicated_matches:
-        coarse_c = coarse_match['c_ratio']
-        fine_min = max(0.3, coarse_c - fine_range)
-        fine_max = coarse_c + fine_range
-        
-        # Track best in this region (for early termination)
-        best_region_regularity = -1
-        stagnant_count = 0
-        
-        for c_ratio in np.linspace(fine_min, fine_max, n_fine):
-            try:
-                s_star = compute_min_scale_for_cn(
-                    config['offsets'],
-                    target_cn,
-                    config['lattice'],
-                    coord_radii,
-                    bravais_type=config['bravais_type'],
-                    lattice_params={'c_ratio': c_ratio}
-                )
-                
-                if s_star is None:
-                    continue
-                
-                stoich_result = calculate_stoichiometry_for_config(
-                    config_id=config['id'],
-                    offsets=config['offsets'],
-                    bravais_type=config['bravais_type'],
-                    lattice_type=config['lattice'],
-                    metals=metals,
-                    anion_symbol=anion_symbol,
-                    scale_s=s_star,
-                    target_cn=target_cn,
-                    anion_radius=anion_radius,
-                    cluster_eps_frac=0.03,
-                    c_ratio=c_ratio
-                )
-                
-                if not stoich_result.success:
-                    continue
-                
-                matches, match_type = check_stoichiometry_match(
-                    stoich_result.metal_counts,
-                    stoich_result.anion_count,
-                    expected_metal_counts,
-                    expected_anion_count
-                )
-                
-                if not matches:
-                    continue
-                
-                # NOW calculate structure and regularity (expensive)
-                sublattice = Sublattice(
-                    name='scan',
-                    offsets=tuple(tuple(o) for o in config['offsets']),
-                    alpha_ratio=coord_radii,
-                    bravais_type=config['bravais_type']
-                )
-                
-                a_real = s_star * 0.9999
-                p_dict = {'a': a_real, 'b_ratio': 1.0, 'c_ratio': c_ratio,
-                          'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
-                if config['lattice'] == 'Hexagonal':
-                    p_dict['gamma'] = 120.0
-                
-                p = LatticeParams(**p_dict)
-                
-                structure = calculate_complete_structure(
-                    sublattices=[sublattice],
-                    p=p,
-                    scale_s=1.0,
-                    target_N=target_cn,
-                    k_samples=24,  # Reduced from 32
-                    cluster_eps_frac=0.03,
-                    include_boundary_equivalents=True
-                )
-                
-                # Calculate regularity
-                if match_type == 'half':
-                    half_result = find_optimal_half_filling(
-                        structure=structure,
-                        metals=metals,
-                        max_coord_sites=target_cn,
-                        target_fraction=0.5
+    with monitor.time("Phase2_Fine_Total"):
+        for coarse_match in deduplicated_matches:
+            coarse_c = coarse_match['c_ratio']
+            fine_min = max(0.3, coarse_c - fine_range)
+            fine_max = coarse_c + fine_range
+            
+            # Track best in this region (for early termination)
+            best_region_regularity = -1
+            stagnant_count = 0
+            
+            for c_ratio in np.linspace(fine_min, fine_max, n_fine):
+                try:
+                    with monitor.time("compute_min_scale"):
+                        s_star = compute_min_scale_for_cn(
+                            config['offsets'],
+                            target_cn,
+                            config['lattice'],
+                            coord_radii,
+                            bravais_type=config['bravais_type'],
+                            lattice_params={'c_ratio': c_ratio}
+                        )
+                    
+                    if s_star is None:
+                        continue
+                    
+                    with monitor.time("calc_stoichiometry"):
+                        stoich_result = calculate_stoichiometry_for_config(
+                            config_id=config['id'],
+                            offsets=config['offsets'],
+                            bravais_type=config['bravais_type'],
+                            lattice_type=config['lattice'],
+                            metals=metals,
+                            anion_symbol=anion_symbol,
+                            scale_s=s_star,
+                            target_cn=target_cn,
+                            anion_radius=anion_radius,
+                            cluster_eps_frac=0.03,
+                            c_ratio=c_ratio
+                        )
+                    
+                    if not stoich_result.success:
+                        continue
+                    
+                    matches, match_type = check_stoichiometry_match(
+                        stoich_result.metal_counts,
+                        stoich_result.anion_count,
+                        expected_metal_counts,
+                        expected_anion_count
                     )
-                    regularity = half_result.mean_regularity_after if half_result.success else 0
-                else:
-                    coord_result = analyze_all_coordination_environments(
-                        structure=structure,
-                        metals=metals,
-                        max_sites=target_cn
+                    
+                    if not matches:
+                        continue
+                    
+                    # NOW calculate structure and regularity (expensive)
+                    sublattice = Sublattice(
+                        name='scan',
+                        offsets=tuple(tuple(o) for o in config['offsets']),
+                        alpha_ratio=coord_radii,
+                        bravais_type=config['bravais_type']
                     )
-                    regularity = coord_result.summary.get('mean_overall_regularity', 0) if coord_result.success else 0
-                
-                # Early termination: if regularity is very high, we're done with this region
-                if regularity > 0.999:
+                    
+                    a_real = s_star * 0.9999
+                    p_dict = {'a': a_real, 'b_ratio': 1.0, 'c_ratio': c_ratio,
+                              'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
+                    if config['lattice'] == 'Hexagonal':
+                        p_dict['gamma'] = 120.0
+                    
+                    p = LatticeParams(**p_dict)
+                    
+                    with monitor.time("calc_structure"):
+                        structure = calculate_complete_structure(
+                            sublattices=[sublattice],
+                            p=p,
+                            scale_s=1.0,
+                            target_N=target_cn,
+                            k_samples=24,  # Reduced from 32
+                            cluster_eps_frac=0.03,
+                            include_boundary_equivalents=True
+                        )
+                    
+                    # Calculate regularity
+                    if match_type == 'half':
+                        with monitor.time("half_filling"):
+                            half_result = find_optimal_half_filling(
+                                structure=structure,
+                                metals=metals,
+                                max_coord_sites=target_cn,
+                                target_fraction=0.5
+                            )
+                        regularity = half_result.mean_regularity_after if half_result.success else 0
+                    else:
+                        with monitor.time("coord_analysis"):
+                            coord_result = analyze_all_coordination_environments(
+                                structure=structure,
+                                metals=metals,
+                                max_sites=target_cn
+                            )
+                        regularity = coord_result.summary.get('mean_overall_regularity', 0) if coord_result.success else 0
+                    
+                    # Early termination: if regularity is very high, we're done with this region
+                    if regularity > 0.999:
+                        if regularity > best_overall_regularity:
+                            best_overall_regularity = regularity
+                            best_overall_result = {
+                                'c_ratio': c_ratio,
+                                's_star': s_star,
+                                'stoich_result': stoich_result,
+                                'match_type': match_type,
+                                'regularity': regularity,
+                                'structure': structure
+                            }
+                        break  # Move to next region
+                    
+                    # Track improvement for early termination
+                    if regularity > best_region_regularity:
+                        best_region_regularity = regularity
+                        stagnant_count = 0
+                    else:
+                        stagnant_count += 1
+                    
+                    # If no improvement for 5 iterations, skip rest of region
+                    if stagnant_count >= 5 and best_region_regularity > 0.9:
+                        pass  # Continue but consider stopping
+                    
                     if regularity > best_overall_regularity:
                         best_overall_regularity = regularity
                         best_overall_result = {
@@ -423,142 +583,125 @@ def run_ca_scan_for_stoichiometry(
                             'regularity': regularity,
                             'structure': structure
                         }
-                    break  # Move to next region
-                
-                # Track improvement for early termination
-                if regularity > best_region_regularity:
-                    best_region_regularity = regularity
-                    stagnant_count = 0
-                else:
-                    stagnant_count += 1
-                
-                # If no improvement for 5 iterations, skip rest of region
-                if stagnant_count >= 5 and best_region_regularity > 0.9:
-                    pass  # Continue but consider stopping
-                
-                if regularity > best_overall_regularity:
-                    best_overall_regularity = regularity
-                    best_overall_result = {
-                        'c_ratio': c_ratio,
-                        's_star': s_star,
-                        'stoich_result': stoich_result,
-                        'match_type': match_type,
-                        'regularity': regularity,
-                        'structure': structure
-                    }
-                    
-            except Exception:
-                continue
+                        
+                except Exception:
+                    continue
     
     # Phase 3: Quick refinement only if regularity is mediocre (< 0.95)
     # Use only 10 points in narrow range
     if best_overall_result is not None and best_overall_regularity < 0.95:
-        best_c = best_overall_result['c_ratio']
-        refine_range = 0.03 * num_metals  # ±3% of L - very narrow
-        refine_min = max(0.3, best_c - refine_range)
-        refine_max = best_c + refine_range
-        n_refine = 10  # Reduced from 40
-        
-        for c_ratio in np.linspace(refine_min, refine_max, n_refine):
-            try:
-                s_star = compute_min_scale_for_cn(
-                    config['offsets'],
-                    target_cn,
-                    config['lattice'],
-                    coord_radii,
-                    bravais_type=config['bravais_type'],
-                    lattice_params={'c_ratio': c_ratio}
-                )
-                
-                if s_star is None:
-                    continue
-                
-                stoich_result = calculate_stoichiometry_for_config(
-                    config_id=config['id'],
-                    offsets=config['offsets'],
-                    bravais_type=config['bravais_type'],
-                    lattice_type=config['lattice'],
-                    metals=metals,
-                    anion_symbol=anion_symbol,
-                    scale_s=s_star,
-                    target_cn=target_cn,
-                    anion_radius=anion_radius,
-                    cluster_eps_frac=0.03,
-                    c_ratio=c_ratio
-                )
-                
-                if not stoich_result.success:
-                    continue
-                
-                matches, match_type = check_stoichiometry_match(
-                    stoich_result.metal_counts,
-                    stoich_result.anion_count,
-                    expected_metal_counts,
-                    expected_anion_count
-                )
-                
-                if not matches:
-                    continue
-                
-                # Build structure and calculate regularity
-                sublattice = Sublattice(
-                    name='refine',
-                    offsets=tuple(tuple(o) for o in config['offsets']),
-                    alpha_ratio=coord_radii,
-                    bravais_type=config['bravais_type']
-                )
-                
-                a_real = s_star * 0.9999
-                p_dict = {'a': a_real, 'b_ratio': 1.0, 'c_ratio': c_ratio,
-                          'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
-                if config['lattice'] == 'Hexagonal':
-                    p_dict['gamma'] = 120.0
-                
-                p = LatticeParams(**p_dict)
-                
-                structure = calculate_complete_structure(
-                    sublattices=[sublattice],
-                    p=p,
-                    scale_s=1.0,
-                    target_N=target_cn,
-                    k_samples=24,
-                    cluster_eps_frac=0.03,
-                    include_boundary_equivalents=True
-                )
-                
-                if match_type == 'half':
-                    half_result = find_optimal_half_filling(
-                        structure=structure,
-                        metals=metals,
-                        max_coord_sites=target_cn,
-                        target_fraction=0.5
-                    )
-                    regularity = half_result.mean_regularity_after if half_result.success else 0
-                else:
-                    coord_result = analyze_all_coordination_environments(
-                        structure=structure,
-                        metals=metals,
-                        max_sites=target_cn
-                    )
-                    regularity = coord_result.summary.get('mean_overall_regularity', 0) if coord_result.success else 0
-                
-                if regularity > best_overall_regularity:
-                    best_overall_regularity = regularity
-                    best_overall_result = {
-                        'c_ratio': c_ratio,
-                        's_star': s_star,
-                        'stoich_result': stoich_result,
-                        'match_type': match_type,
-                        'regularity': regularity,
-                        'structure': structure
-                    }
-                
-                # Early exit if we found excellent regularity
-                if regularity > 0.99:
-                    break
+        with monitor.time("Phase3_Refine_Total"):
+            best_c = best_overall_result['c_ratio']
+            refine_range = 0.03 * num_metals  # ±3% of L - very narrow
+            refine_min = max(0.3, best_c - refine_range)
+            refine_max = best_c + refine_range
+            n_refine = 10  # Reduced from 40
+            
+            for c_ratio in np.linspace(refine_min, refine_max, n_refine):
+                try:
+                    with monitor.time("compute_min_scale"):
+                        s_star = compute_min_scale_for_cn(
+                            config['offsets'],
+                            target_cn,
+                            config['lattice'],
+                            coord_radii,
+                            bravais_type=config['bravais_type'],
+                            lattice_params={'c_ratio': c_ratio}
+                        )
                     
-            except Exception:
-                continue
+                    if s_star is None:
+                        continue
+                    
+                    with monitor.time("calc_stoichiometry"):
+                        stoich_result = calculate_stoichiometry_for_config(
+                            config_id=config['id'],
+                            offsets=config['offsets'],
+                            bravais_type=config['bravais_type'],
+                            lattice_type=config['lattice'],
+                            metals=metals,
+                            anion_symbol=anion_symbol,
+                            scale_s=s_star,
+                            target_cn=target_cn,
+                            anion_radius=anion_radius,
+                            cluster_eps_frac=0.03,
+                            c_ratio=c_ratio
+                        )
+                    
+                    if not stoich_result.success:
+                        continue
+                    
+                    matches, match_type = check_stoichiometry_match(
+                        stoich_result.metal_counts,
+                        stoich_result.anion_count,
+                        expected_metal_counts,
+                        expected_anion_count
+                    )
+                    
+                    if not matches:
+                        continue
+                    
+                    # Build structure and calculate regularity
+                    sublattice = Sublattice(
+                        name='refine',
+                        offsets=tuple(tuple(o) for o in config['offsets']),
+                        alpha_ratio=coord_radii,
+                        bravais_type=config['bravais_type']
+                    )
+                    
+                    a_real = s_star * 0.9999
+                    p_dict = {'a': a_real, 'b_ratio': 1.0, 'c_ratio': c_ratio,
+                              'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
+                    if config['lattice'] == 'Hexagonal':
+                        p_dict['gamma'] = 120.0
+                    
+                    p = LatticeParams(**p_dict)
+                    
+                    with monitor.time("calc_structure"):
+                        structure = calculate_complete_structure(
+                            sublattices=[sublattice],
+                            p=p,
+                            scale_s=1.0,
+                            target_N=target_cn,
+                            k_samples=24,
+                            cluster_eps_frac=0.03,
+                            include_boundary_equivalents=True
+                        )
+                    
+                    if match_type == 'half':
+                        with monitor.time("half_filling"):
+                            half_result = find_optimal_half_filling(
+                                structure=structure,
+                                metals=metals,
+                                max_coord_sites=target_cn,
+                                target_fraction=0.5
+                            )
+                        regularity = half_result.mean_regularity_after if half_result.success else 0
+                    else:
+                        with monitor.time("coord_analysis"):
+                            coord_result = analyze_all_coordination_environments(
+                                structure=structure,
+                                metals=metals,
+                                max_sites=target_cn
+                            )
+                        regularity = coord_result.summary.get('mean_overall_regularity', 0) if coord_result.success else 0
+                    
+                    if regularity > best_overall_regularity:
+                        best_overall_regularity = regularity
+                        best_overall_result = {
+                            'c_ratio': c_ratio,
+                            's_star': s_star,
+                            'stoich_result': stoich_result,
+                            'match_type': match_type,
+                            'regularity': regularity,
+                            'structure': structure
+                        }
+                    
+                    # Early exit if we found excellent regularity
+                    if regularity > 0.99:
+                        break
+                        
+                except Exception:
+                    continue
     
     return best_overall_result
 
@@ -904,21 +1047,23 @@ def run_full_analysis_chain(
         # Process tetragonal and hexagonal configs with c/a scanning
         update_progress(2, 6, "Scanning c/a ratios for tetragonal and hexagonal...")
         
+        monitor = get_monitor()
         for config in scan_configs:
             try:
-                scan_result = run_ca_scan_for_stoichiometry(
-                    config=config,
-                    metals=metals,
-                    anion_symbol=anion_symbol,
-                    anion_radius=anion_radius,
-                    anion_charge=anion_charge,
-                    target_cn=target_cn,
-                    expected_metal_counts=expected_metal_counts,
-                    expected_anion_count=expected_anion_count,
-                    num_metals=num_metals,
-                    n_coarse=50,  # More points to find all c/a matches
-                    n_fine=30     # Fine scan around each match
-                )
+                with monitor.time(f"ca_scan_{config['bravais_type']}"):
+                    scan_result = run_ca_scan_for_stoichiometry(
+                        config=config,
+                        metals=metals,
+                        anion_symbol=anion_symbol,
+                        anion_radius=anion_radius,
+                        anion_charge=anion_charge,
+                        target_cn=target_cn,
+                        expected_metal_counts=expected_metal_counts,
+                        expected_anion_count=expected_anion_count,
+                        num_metals=num_metals,
+                        n_coarse=25,  # Reduced from 50
+                        n_fine=20     # Reduced from 30
+                    )
                 
                 if scan_result is not None:
                     config_id = f"{config['id']}-ca{scan_result['c_ratio']:.2f}"
@@ -1648,6 +1793,21 @@ def main():
                 st.session_state.chain_results = None
                 st.session_state.stoichiometry_results = {}
                 st.rerun()
+        
+        # Performance monitoring section
+        st.divider()
+        st.header("⏱️ Performance")
+        
+        monitor = get_monitor()
+        monitor.enabled = st.checkbox("Enable timing", value=True, 
+                                       help="Track execution time of key operations")
+        
+        if st.button("Reset timings", use_container_width=True):
+            monitor.reset()
+            st.success("Timings cleared!")
+        
+        # Show performance report
+        monitor.show_report(st)
     
     # Main content
     col1, col2 = st.columns([1, 1])
