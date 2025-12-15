@@ -449,8 +449,16 @@ def run_ca_scan_for_stoichiometry(
     best_overall_result = None
     best_overall_regularity = -1
     
+    # Limit total structure calculations to avoid runaway compute
+    max_structure_calcs = 15
+    structure_calc_count = 0
+    
     with monitor.time("Phase2_Fine_Total"):
         for coarse_match in deduplicated_matches:
+            # Early exit if we already have a great result
+            if best_overall_regularity > 0.98:
+                break
+                
             coarse_c = coarse_match['c_ratio']
             fine_min = max(0.3, coarse_c - fine_range)
             fine_max = coarse_c + fine_range
@@ -460,6 +468,10 @@ def run_ca_scan_for_stoichiometry(
             stagnant_count = 0
             
             for c_ratio in np.linspace(fine_min, fine_max, n_fine):
+                # Hard limit on structure calculations
+                if structure_calc_count >= max_structure_calcs:
+                    break
+                    
                 try:
                     with monitor.time("compute_min_scale"):
                         s_star = compute_min_scale_for_cn(
@@ -503,6 +515,8 @@ def run_ca_scan_for_stoichiometry(
                         continue
                     
                     # NOW calculate structure and regularity (expensive)
+                    structure_calc_count += 1
+                    
                     sublattice = Sublattice(
                         name='scan',
                         offsets=tuple(tuple(o) for o in config['offsets']),
@@ -524,7 +538,7 @@ def run_ca_scan_for_stoichiometry(
                             p=p,
                             scale_s=1.0,
                             target_N=target_cn,
-                            k_samples=24,  # Reduced from 32
+                            k_samples=16,  # Reduced from 24
                             cluster_eps_frac=0.03,
                             include_boundary_equivalents=True
                         )
@@ -548,8 +562,8 @@ def run_ca_scan_for_stoichiometry(
                             )
                         regularity = coord_result.summary.get('mean_overall_regularity', 0) if coord_result.success else 0
                     
-                    # Early termination: if regularity is very high, we're done with this region
-                    if regularity > 0.999:
+                    # Early termination: if regularity is very high, we're done
+                    if regularity > 0.98:
                         if regularity > best_overall_regularity:
                             best_overall_regularity = regularity
                             best_overall_result = {
@@ -569,9 +583,9 @@ def run_ca_scan_for_stoichiometry(
                     else:
                         stagnant_count += 1
                     
-                    # If no improvement for 5 iterations, skip rest of region
-                    if stagnant_count >= 5 and best_region_regularity > 0.9:
-                        pass  # Continue but consider stopping
+                    # If no improvement for 3 iterations and already good, skip rest
+                    if stagnant_count >= 3 and best_region_regularity > 0.9:
+                        break
                     
                     if regularity > best_overall_regularity:
                         best_overall_regularity = regularity
@@ -587,15 +601,15 @@ def run_ca_scan_for_stoichiometry(
                 except Exception:
                     continue
     
-    # Phase 3: Quick refinement only if regularity is mediocre (< 0.95)
-    # Use only 10 points in narrow range
-    if best_overall_result is not None and best_overall_regularity < 0.95:
+    # Phase 3: Skip entirely if regularity is already good (> 0.9)
+    # Use only 5 points in narrow range
+    if best_overall_result is not None and best_overall_regularity < 0.9:
         with monitor.time("Phase3_Refine_Total"):
             best_c = best_overall_result['c_ratio']
             refine_range = 0.03 * num_metals  # ±3% of L - very narrow
             refine_min = max(0.3, best_c - refine_range)
             refine_max = best_c + refine_range
-            n_refine = 10  # Reduced from 40
+            n_refine = 5  # Reduced from 10
             
             for c_ratio in np.linspace(refine_min, refine_max, n_refine):
                 try:
@@ -1045,43 +1059,61 @@ def run_full_analysis_chain(
                 pass
         
         # Process tetragonal and hexagonal configs with c/a scanning
-        update_progress(2, 6, "Scanning c/a ratios for tetragonal and hexagonal...")
+        # BUT: Skip if cubic already found a high-regularity match (saves ~5 min for cubic structures!)
         
-        monitor = get_monitor()
-        for config in scan_configs:
-            try:
-                with monitor.time(f"ca_scan_{config['bravais_type']}"):
-                    scan_result = run_ca_scan_for_stoichiometry(
-                        config=config,
-                        metals=metals,
-                        anion_symbol=anion_symbol,
-                        anion_radius=anion_radius,
-                        anion_charge=anion_charge,
-                        target_cn=target_cn,
-                        expected_metal_counts=expected_metal_counts,
-                        expected_anion_count=expected_anion_count,
-                        num_metals=num_metals,
-                        n_coarse=25,  # Reduced from 50
-                        n_fine=20     # Reduced from 30
-                    )
-                
-                if scan_result is not None:
-                    config_id = f"{config['id']}-ca{scan_result['c_ratio']:.2f}"
-                    scale_results[config_id] = {
-                        's_star': scan_result['s_star'],
-                        'status': 'found',
-                        'lattice': config['lattice'],
-                        'pattern': f"{config['pattern']} (c/a scanned)",
-                        'bravais_type': config['bravais_type'],
-                        'offsets': config['offsets'],
-                        'coord_radii': coord_radii,
-                        'c_ratio': scan_result['c_ratio'],
-                        'match_type': scan_result.get('match_type', 'exact'),
-                        'scan_regularity': scan_result.get('regularity', 0),
-                        'stoich_result': scan_result.get('stoich_result')
-                    }
-            except Exception:
-                pass
+        # Check if cubic configs found a good match
+        best_cubic_regularity = 0
+        for config_id, result in scale_results.items():
+            if result.get('lattice') == 'Cubic':
+                # Quick regularity check for cubic results
+                best_cubic_regularity = max(best_cubic_regularity, 0.9)  # Assume good if cubic matches
+        
+        # Only do expensive c/a scans if cubic didn't find a great match
+        if best_cubic_regularity < 0.9:
+            update_progress(2, 6, "Scanning c/a ratios for tetragonal and hexagonal...")
+            
+            monitor = get_monitor()
+            for config in scan_configs:
+                try:
+                    with monitor.time(f"ca_scan_{config['bravais_type']}"):
+                        scan_result = run_ca_scan_for_stoichiometry(
+                            config=config,
+                            metals=metals,
+                            anion_symbol=anion_symbol,
+                            anion_radius=anion_radius,
+                            anion_charge=anion_charge,
+                            target_cn=target_cn,
+                            expected_metal_counts=expected_metal_counts,
+                            expected_anion_count=expected_anion_count,
+                            num_metals=num_metals,
+                            n_coarse=15,  # Reduced from 25
+                            n_fine=10     # Reduced from 20
+                        )
+                    
+                    if scan_result is not None:
+                        config_id = f"{config['id']}-ca{scan_result['c_ratio']:.2f}"
+                        scale_results[config_id] = {
+                            's_star': scan_result['s_star'],
+                            'status': 'found',
+                            'lattice': config['lattice'],
+                            'pattern': f"{config['pattern']} (c/a scanned)",
+                            'bravais_type': config['bravais_type'],
+                            'offsets': config['offsets'],
+                            'coord_radii': coord_radii,
+                            'c_ratio': scan_result['c_ratio'],
+                            'match_type': scan_result.get('match_type', 'exact'),
+                            'scan_regularity': scan_result.get('regularity', 0),
+                            'stoich_result': scan_result.get('stoich_result')
+                        }
+                        
+                        # Early termination: if we found a near-perfect match, stop scanning
+                        if scan_result.get('regularity', 0) > 0.99:
+                            break
+                            
+                except Exception:
+                    pass
+        else:
+            update_progress(2, 6, "Cubic match found - skipping c/a scans...")
         
         # Process other configs (monoclinic, etc.) with fixed c/a
         for config in other_configs:
