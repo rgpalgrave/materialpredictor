@@ -1059,17 +1059,44 @@ def run_full_analysis_chain(
                 pass
         
         # Process tetragonal and hexagonal configs with c/a scanning
-        # BUT: Skip if cubic already found a high-regularity match (saves ~5 min for cubic structures!)
+        # BUT: Skip if cubic already found a CORRECT STOICHIOMETRY match
         
-        # Check if cubic configs found a good match
-        best_cubic_regularity = 0
+        # Check if any cubic config produces the correct stoichiometry
+        cubic_stoich_match = False
         for config_id, result in scale_results.items():
-            if result.get('lattice') == 'Cubic':
-                # Quick regularity check for cubic results
-                best_cubic_regularity = max(best_cubic_regularity, 0.9)  # Assume good if cubic matches
+            if result.get('lattice') == 'Cubic' and result.get('s_star'):
+                # Actually check stoichiometry for this cubic config
+                try:
+                    cubic_config = next(c for c in cubic_configs if c['id'] == config_id)
+                    stoich_check = calculate_stoichiometry_for_config(
+                        config_id=config_id,
+                        offsets=cubic_config['offsets'],
+                        bravais_type=cubic_config['bravais_type'],
+                        lattice_type='Cubic',
+                        metals=metals,
+                        anion_symbol=anion_symbol,
+                        scale_s=result['s_star'],
+                        target_cn=target_cn,
+                        anion_radius=anion_radius,
+                        c_ratio=1.0
+                    )
+                    if stoich_check.success:
+                        matches, _ = check_stoichiometry_match(
+                            stoich_check.metal_counts,
+                            stoich_check.anion_count,
+                            expected_metal_counts,
+                            expected_anion_count
+                        )
+                        if matches:
+                            cubic_stoich_match = True
+                            # Store the stoichiometry result
+                            scale_results[config_id]['stoich_result'] = stoich_check
+                            break
+                except Exception:
+                    pass
         
-        # Only do expensive c/a scans if cubic didn't find a great match
-        if best_cubic_regularity < 0.9:
+        # Only skip c/a scans if cubic found correct stoichiometry
+        if not cubic_stoich_match:
             update_progress(2, 6, "Scanning c/a ratios for tetragonal and hexagonal...")
             
             monitor = get_monitor()
@@ -1113,7 +1140,7 @@ def run_full_analysis_chain(
                 except Exception:
                     pass
         else:
-            update_progress(2, 6, "Cubic match found - skipping c/a scans...")
+            update_progress(2, 6, "Cubic stoichiometry match found - skipping c/a scans...")
         
         # Process other configs (monoclinic, etc.) with fixed c/a
         for config in other_configs:
