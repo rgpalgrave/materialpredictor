@@ -937,7 +937,8 @@ def run_full_analysis_chain(
     anion_symbol: str,
     anion_charge: int,
     anion_radius: float,
-    progress_callback=None
+    progress_callback=None,
+    force_full_search: bool = False
 ) -> Dict:
     """
     Run the complete analysis chain:
@@ -955,6 +956,7 @@ def run_full_analysis_chain(
         anion_charge: Anion charge (positive integer)
         anion_radius: Anion ionic radius
         progress_callback: Optional callback(step, total, message) for progress updates
+        force_full_search: If True, run all c/a scans even if cubic/HCP finds a match
     
     Returns:
         Dictionary with all results including:
@@ -1022,17 +1024,30 @@ def run_full_analysis_chain(
         expected_metal_counts = dict(zip([m['symbol'] for m in metals], metal_counts))
         expected_anion_count = anion_count
         
-        # Separate configs into cubic (fixed c/a) and non-cubic (needs c/a scan)
+        # Separate configs into:
+        # 1. Fixed c/a configs (cubic + HCP) - check these first without scanning
+        # 2. Scan configs (tetragonal, hexagonal_P) - need c/a optimization
+        # 3. Other configs (monoclinic, etc.)
         cubic_configs = [c for c in search_configs if c['lattice'] == 'Cubic']
+        
+        # Add HCP (hexagonal_H) to quick-check with ideal c/a = 1.633
+        hcp_configs = [c for c in search_configs 
+                      if c.get('bravais_type') == 'hexagonal_H']
+        
+        # Fixed c/a configs = cubic + HCP (checked first without scanning)
+        fixed_ca_configs = cubic_configs + hcp_configs
+        
+        # Scan configs = tetragonal + primitive hexagonal (need c/a optimization)
         scan_configs = [c for c in search_configs 
-                       if c['lattice'] in ('Tetragonal', 'Hexagonal')]
+                       if c['lattice'] == 'Tetragonal' or 
+                       (c['lattice'] == 'Hexagonal' and c.get('bravais_type') == 'hexagonal_P')]
         other_configs = [c for c in search_configs 
                         if c['lattice'] not in ('Cubic', 'Tetragonal', 'Hexagonal')]
         
         scale_results = {}
         
-        # Process cubic configs with fixed c/a = 1.0
-        for config in cubic_configs:
+        # Process fixed c/a configs (cubic + HCP) first
+        for config in fixed_ca_configs:
             try:
                 lattice_params = {'c_ratio': config['c_ratio']}
                 
@@ -1058,27 +1073,27 @@ def run_full_analysis_chain(
             except Exception:
                 pass
         
-        # Process tetragonal and hexagonal configs with c/a scanning
-        # BUT: Skip if cubic already found a CORRECT STOICHIOMETRY match
+        # Process tetragonal and hexagonal_P configs with c/a scanning
+        # BUT: Skip if fixed c/a configs already found a CORRECT STOICHIOMETRY match
         
-        # Check if any cubic config produces the correct stoichiometry
-        cubic_stoich_match = False
+        # Check if any fixed c/a config produces the correct stoichiometry
+        fixed_ca_stoich_match = False
         for config_id, result in scale_results.items():
-            if result.get('lattice') == 'Cubic' and result.get('s_star'):
-                # Actually check stoichiometry for this cubic config
+            if result.get('s_star'):
+                # Actually check stoichiometry for this config
                 try:
-                    cubic_config = next(c for c in cubic_configs if c['id'] == config_id)
+                    matching_config = next(c for c in fixed_ca_configs if c['id'] == config_id)
                     stoich_check = calculate_stoichiometry_for_config(
                         config_id=config_id,
-                        offsets=cubic_config['offsets'],
-                        bravais_type=cubic_config['bravais_type'],
-                        lattice_type='Cubic',
+                        offsets=matching_config['offsets'],
+                        bravais_type=matching_config['bravais_type'],
+                        lattice_type=matching_config['lattice'],
                         metals=metals,
                         anion_symbol=anion_symbol,
                         scale_s=result['s_star'],
                         target_cn=target_cn,
                         anion_radius=anion_radius,
-                        c_ratio=1.0
+                        c_ratio=matching_config['c_ratio']
                     )
                     if stoich_check.success:
                         matches, _ = check_stoichiometry_match(
@@ -1088,16 +1103,19 @@ def run_full_analysis_chain(
                             expected_anion_count
                         )
                         if matches:
-                            cubic_stoich_match = True
+                            fixed_ca_stoich_match = True
                             # Store the stoichiometry result
                             scale_results[config_id]['stoich_result'] = stoich_check
                             break
                 except Exception:
                     pass
         
-        # Only skip c/a scans if cubic found correct stoichiometry
-        if not cubic_stoich_match:
-            update_progress(2, 6, "Scanning c/a ratios for tetragonal and hexagonal...")
+        # Only skip c/a scans if fixed c/a config matched AND force_full_search is False
+        if not fixed_ca_stoich_match or force_full_search:
+            if fixed_ca_stoich_match and force_full_search:
+                update_progress(2, 6, "Force full search: scanning c/a ratios anyway...")
+            else:
+                update_progress(2, 6, "Scanning c/a ratios for tetragonal and hexagonal...")
             
             monitor = get_monitor()
             for config in scan_configs:
@@ -1133,14 +1151,14 @@ def run_full_analysis_chain(
                             'stoich_result': scan_result.get('stoich_result')
                         }
                         
-                        # Early termination: if we found a near-perfect match, stop scanning
-                        if scan_result.get('regularity', 0) > 0.99:
+                        # Early termination: skip if near-perfect match AND not forcing full search
+                        if not force_full_search and scan_result.get('regularity', 0) > 0.99:
                             break
                             
                 except Exception:
                     pass
         else:
-            update_progress(2, 6, "Cubic stoichiometry match found - skipping c/a scans...")
+            update_progress(2, 6, "Cubic/HCP stoichiometry match found - skipping c/a scans...")
         
         # Process other configs (monoclinic, etc.) with fixed c/a
         for config in other_configs:
@@ -2007,6 +2025,15 @@ def main():
                     # No alternative geometries for this CN
                     metal['geometry'] = None
         
+        # Search options
+        st.markdown("---")
+        force_full_search = st.checkbox(
+            "🔄 Force full search",
+            value=False,
+            help="Run all c/a scans even if cubic/HCP finds a good match. "
+                 "Useful for exploring alternative structures, but takes longer."
+        )
+        
         # Calculate button - runs the full analysis chain
         if st.button("🧮 Calculate Stoichiometry & CN", type="primary", use_container_width=True):
             # Create a progress container
@@ -2026,7 +2053,8 @@ def main():
                     anion_symbol=anion_symbol,
                     anion_charge=anion_charge,
                     anion_radius=anion_radius,
-                    progress_callback=update_progress
+                    progress_callback=update_progress,
+                    force_full_search=force_full_search
                 )
                 
                 progress_bar.empty()

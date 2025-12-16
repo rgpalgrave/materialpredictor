@@ -497,7 +497,8 @@ def identify_contributing_atoms(
     
     OPTIMIZED: 
     - Uses supercell KDTree for O(N log N) instead of O(N * M * 27)
-    - Uses squared distances to avoid sqrt in hot loop
+    - FULLY VECTORIZED using flattened neighbor arrays + numpy grouping
+    - No Python loops over individual neighbor lists
     """
     from scipy.spatial import cKDTree
     
@@ -514,23 +515,15 @@ def identify_contributing_atoms(
         return [[] for _ in range(len(intersection_points))]
     
     n_metals = len(metals.cartesian)
+    n_pts = len(intersection_points)
     
-    # Build supercell KDTree: all metal positions + 27 periodic images
-    all_centers = []
-    all_radii = []
-    all_atom_indices = []
+    # Build supercell: vectorized concatenation
+    n_shifts = len(shifts)
+    all_centers = (metals.cartesian[np.newaxis, :, :] + shifts[:, np.newaxis, :]).reshape(-1, 3)
+    all_radii = np.tile(metals.radius, n_shifts)
+    all_atom_indices = np.tile(np.arange(n_metals, dtype=np.int32), n_shifts)
     
-    for shift in shifts:
-        shifted_centers = metals.cartesian + shift
-        all_centers.append(shifted_centers)
-        all_radii.append(metals.radius)
-        all_atom_indices.append(np.arange(n_metals))
-    
-    all_centers = np.vstack(all_centers)
-    all_radii = np.concatenate(all_radii)
-    all_atom_indices = np.concatenate(all_atom_indices)
-    
-    # Precompute squared radius bounds (avoid sqrt in hot loop)
+    # Precompute squared radius bounds
     r_lo_sq = (all_radii * (1.0 - tol)) ** 2
     r_hi_sq = (all_radii * (1.0 + tol)) ** 2
     
@@ -541,23 +534,54 @@ def identify_contributing_atoms(
     max_radius = np.max(all_radii)
     search_radius = max_radius * (1.0 + tol)
     
-    # Batch query
+    # Batch query - single call for all intersection points
     neighbors_list = supercell_tree.query_ball_point(intersection_points, r=search_radius)
     
-    contributing = []
-    for pt_idx, neighbors in enumerate(neighbors_list):
-        pt = intersection_points[pt_idx]
-        atoms = set()
+    # FULLY VECTORIZED: Flatten all neighbors with point indices
+    all_neigh = []
+    all_pt_idx = []
+    for p_idx, neighbors in enumerate(neighbors_list):
+        if neighbors:
+            all_neigh.extend(neighbors)
+            all_pt_idx.extend([p_idx] * len(neighbors))
+    
+    # Initialize result as empty lists
+    contributing = [[] for _ in range(n_pts)]
+    
+    if not all_neigh:
+        return contributing
+    
+    all_neigh = np.asarray(all_neigh, dtype=np.int32)
+    all_pt_idx = np.asarray(all_pt_idx, dtype=np.int32)
+    
+    # Vectorized squared distance for ALL neighbor pairs at once
+    diff = all_centers[all_neigh] - intersection_points[all_pt_idx]
+    dist_sq = np.einsum('ij,ij->i', diff, diff)
+    
+    # Vectorized range check
+    mask = (r_lo_sq[all_neigh] < dist_sq) & (dist_sq < r_hi_sq[all_neigh])
+    
+    # Get point indices and atom indices for valid matches
+    valid_pt_idx = all_pt_idx[mask]
+    valid_atom_idx = all_atom_indices[all_neigh[mask]]
+    
+    # Group by point index (using numpy for speed)
+    if len(valid_pt_idx) > 0:
+        # Sort by point index for efficient grouping
+        sort_order = np.argsort(valid_pt_idx)
+        sorted_pt_idx = valid_pt_idx[sort_order]
+        sorted_atom_idx = valid_atom_idx[sort_order]
         
-        for neighbor_idx in neighbors:
-            # Use squared distance - no sqrt needed!
-            diff = pt - all_centers[neighbor_idx]
-            dist_sq = diff[0]*diff[0] + diff[1]*diff[1] + diff[2]*diff[2]
-            
-            if r_lo_sq[neighbor_idx] < dist_sq < r_hi_sq[neighbor_idx]:
-                atoms.add(all_atom_indices[neighbor_idx])
+        # Find where point index changes
+        change_points = np.where(np.diff(sorted_pt_idx) != 0)[0] + 1
+        split_indices = np.concatenate([[0], change_points, [len(sorted_pt_idx)]])
         
-        contributing.append(list(atoms))
+        # Extract unique atoms for each point
+        for i in range(len(split_indices) - 1):
+            start, end = split_indices[i], split_indices[i + 1]
+            pt_idx = sorted_pt_idx[start]
+            atoms = set(sorted_atom_idx[start:end].tolist())
+            contributing[pt_idx] = list(atoms)
     
     return contributing
 

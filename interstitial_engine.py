@@ -359,6 +359,10 @@ def max_multiplicity_for_scale_cached(
     """
     Find maximum intersection multiplicity using cached geometry.
     Much faster than max_multiplicity_for_scale for repeated calls.
+    
+    OPTIMIZED: 
+    - Batches all sample points for single KDTree query
+    - FULLY VECTORIZED multiplicity counting using flattened arrays + bincount
     """
     if geom.n_centers == 0:
         return 0, np.empty((0, 3), dtype=float), np.empty((0,), dtype=int)
@@ -369,7 +373,7 @@ def max_multiplicity_for_scale_cached(
     rmax = geom.rmax
     cutoff = 2.0 * rmax
     
-    # Find candidate pairs
+    # Find candidate pairs (using canonical shifts)
     pairs = periodic_candidate_pairs_fast(centers, shifts, cutoff=cutoff)
     if not pairs:
         return 0, np.empty((0, 3), dtype=float), np.empty((0,), dtype=int)
@@ -379,48 +383,64 @@ def max_multiplicity_for_scale_cached(
     
     # Precompute squared thresholds
     radii_thresh_sq = (radii_img + tol_inside) ** 2
-    
-    samples: List[np.ndarray] = []
-    counts: List[int] = []
     search_r = rmax + float(tol_inside)
     
-    for (i, j, s_idx) in pairs:
+    # BATCH ALL SAMPLES
+    all_pts_list = []
+    for i, j, s_idx in pairs:
         c1 = centers[i]
         c2 = centers[j] + shifts[s_idx]
         r1 = float(radii[i])
         r2 = float(radii[j])
         
         pts = pair_circle_samples(c1, r1, c2, r2, k=int(k_samples))
-        if pts.size == 0:
-            continue
-        
-        neigh_lists = tree_img.query_ball_point(pts, r=search_r)
-        
-        total = np.zeros(len(pts), dtype=int)
-        for p_idx, neigh in enumerate(neigh_lists):
-            if not neigh:
-                continue
-            neigh = np.asarray(neigh, dtype=int)
-            diff = centers_img[neigh] - pts[p_idx]
-            d_sq = np.einsum('ij,ij->i', diff, diff)
-            total[p_idx] = int(np.sum(d_sq <= radii_thresh_sq[neigh]))
-        
-        if early_stop_at is not None and int(total.max()) >= int(early_stop_at):
-            keep = np.where(total >= 2)[0][:5]
-            if keep.size:
-                samples.extend(pts[keep])
-                counts.extend([int(x) for x in total[keep]])
-            return int(total.max()), np.array(samples) if samples else pts[keep], np.array(counts, dtype=int) if counts else total[keep].astype(int)
-        
-        good = np.where(total >= 2)[0]
-        if good.size:
-            samples.extend(pts[good])
-            counts.extend([int(x) for x in total[good]])
+        if pts.size > 0:
+            all_pts_list.append(pts)
     
-    if not samples:
+    if not all_pts_list:
         return 0, np.empty((0, 3), dtype=float), np.empty((0,), dtype=int)
     
-    return int(np.max(counts)), np.array(samples, dtype=float), np.array(counts, dtype=int)
+    # Stack all points and do ONE batch query
+    all_pts = np.vstack(all_pts_list)
+    n_pts = len(all_pts)
+    neigh_lists = tree_img.query_ball_point(all_pts, r=search_r)
+    
+    # FULLY VECTORIZED: Flatten all neighbors with point indices
+    all_neigh = []
+    all_pt_idx = []
+    for p_idx, neigh in enumerate(neigh_lists):
+        if neigh:
+            all_neigh.extend(neigh)
+            all_pt_idx.extend([p_idx] * len(neigh))
+    
+    if not all_neigh:
+        return 0, np.empty((0, 3), dtype=float), np.empty((0,), dtype=int)
+    
+    all_neigh = np.asarray(all_neigh, dtype=np.int32)
+    all_pt_idx = np.asarray(all_pt_idx, dtype=np.int32)
+    
+    # Vectorized squared distance for ALL neighbor pairs at once
+    diff = centers_img[all_neigh] - all_pts[all_pt_idx]
+    d_sq = np.einsum('ij,ij->i', diff, diff)
+    
+    # Vectorized threshold check
+    inside = d_sq <= radii_thresh_sq[all_neigh]
+    
+    # Use bincount to sum up counts per point (fully vectorized!)
+    total = np.bincount(all_pt_idx[inside], minlength=n_pts).astype(np.int32)
+    
+    # Early stop check
+    max_mult = int(total.max()) if n_pts > 0 else 0
+    if early_stop_at is not None and max_mult >= int(early_stop_at):
+        keep = np.where(total >= 2)[0][:10]
+        return max_mult, all_pts[keep], total[keep]
+    
+    # Filter to valid samples
+    good = np.where(total >= 2)[0]
+    if len(good) == 0:
+        return 0, np.empty((0, 3), dtype=float), np.empty((0,), dtype=int)
+    
+    return int(total[good].max()), all_pts[good], total[good]
 
 
 def periodic_candidate_pairs_fast(
@@ -431,8 +451,15 @@ def periodic_candidate_pairs_fast(
     """
     Find all pairs of spheres that could intersect within cutoff distance.
     Uses cKDTree neighbor queries - O(n log n) instead of O(n²).
+    
+    OPTIMIZED: Uses canonical half of shifts to avoid duplicate pairs.
+    For shift (dx, dy, dz), only process if:
+    - It's the zero shift (0,0,0) and i < j
+    - OR it's "lexicographically positive" (first non-zero component is positive)
+    
+    This eliminates symmetric duplicates like (i,j,+shift) vs (j,i,-shift).
 
-    Returns list of (i, j, shift_idx) for pairs where center_j + shift is within cutoff of center_i.
+    Returns list of (i, j, shift_idx) for unique pairs.
     """
     n = int(len(centers))
     if n == 0:
@@ -440,9 +467,34 @@ def periodic_candidate_pairs_fast(
 
     tree = cKDTree(centers)
     pairs: List[Tuple[int, int, int]] = []
-    zero_shift_idx = 13  # Index of (0,0,0) shift in the 27 shifts
-
+    
+    # Determine which shifts are in the canonical half
+    # A shift is canonical if:
+    # - It's (0,0,0), OR
+    # - The first non-zero component is positive
+    canonical_shift_indices = []
+    zero_shift_idx = None
+    
     for s_idx, shift in enumerate(shifts):
+        sx, sy, sz = shift[0], shift[1], shift[2]
+        
+        if abs(sx) < 1e-10 and abs(sy) < 1e-10 and abs(sz) < 1e-10:
+            # Zero shift
+            zero_shift_idx = s_idx
+            canonical_shift_indices.append(s_idx)
+        elif sx > 1e-10:
+            # First component positive -> canonical
+            canonical_shift_indices.append(s_idx)
+        elif abs(sx) < 1e-10 and sy > 1e-10:
+            # First is zero, second is positive -> canonical
+            canonical_shift_indices.append(s_idx)
+        elif abs(sx) < 1e-10 and abs(sy) < 1e-10 and sz > 1e-10:
+            # First two zero, third positive -> canonical
+            canonical_shift_indices.append(s_idx)
+        # Otherwise skip (negative canonical counterpart exists)
+
+    for s_idx in canonical_shift_indices:
+        shift = shifts[s_idx]
         shifted_centers = centers + shift
         neighs = tree.query_ball_point(shifted_centers, r=cutoff)
         
@@ -453,7 +505,7 @@ def periodic_candidate_pairs_fast(
                     if i < j:
                         pairs.append((i, j, s_idx))
         else:
-            # Different cells - take all pairs
+            # Canonical non-zero shift - take all pairs (no duplicates possible)
             for j, iset in enumerate(neighs):
                 for i in iset:
                     pairs.append((i, j, s_idx))
@@ -492,7 +544,11 @@ def max_multiplicity_for_scale(
         scale_s is the lattice parameter 'a' in Å.
         Sphere radii are fixed at alpha_ratio (coordination radii).
 
-    OPTIMIZED: Uses squared distances to avoid sqrt in hot loop.
+    OPTIMIZED: 
+    - Uses squared distances (no sqrt)
+    - Batches ALL sample points into single query
+    - FULLY VECTORIZED multiplicity counting (no Python loops over neighbors)
+    - Uses canonical shift half to avoid duplicate pairs
 
     Returns:
         max_mult, sample_positions, multiplicities
@@ -519,62 +575,76 @@ def max_multiplicity_for_scale(
     rmax = float(np.max(radii))
     cutoff = 2.0 * rmax
 
-    # Find candidate pairs using cKDTree
+    # Find candidate pairs using cKDTree (with canonical shifts)
     pairs = periodic_candidate_pairs_fast(centers, shifts, cutoff=cutoff)
     if not pairs:
         return 0, np.empty((0, 3), dtype=float), np.empty((0,), dtype=int)
 
-    # Build tree over all periodic images for fast multiplicity counting
+    # Build tree over all periodic images
     tree_img, centers_img, radii_img = _build_periodic_image_tree(centers, radii, shifts)
     
-    # Precompute squared thresholds (avoid sqrt in hot loop)
+    # Precompute squared thresholds
     radii_thresh_sq = (radii_img + tol_inside) ** 2
 
-    samples: List[np.ndarray] = []
-    counts: List[int] = []
-    search_r = rmax + float(tol_inside)
-
-    for (i, j, s_idx) in pairs:
+    # BATCH ALL SAMPLES: collect all sample points first
+    all_pts_list = []
+    
+    for i, j, s_idx in pairs:
         c1 = centers[i]
         c2 = centers[j] + shifts[s_idx]
         r1 = float(radii[i])
         r2 = float(radii[j])
 
         pts = pair_circle_samples(c1, r1, c2, r2, k=int(k_samples))
-        if pts.size == 0:
-            continue
+        if pts.size > 0:
+            all_pts_list.append(pts)
+    
+    if not all_pts_list:
+        return 0, np.empty((0, 3), dtype=float), np.empty((0,), dtype=int)
+    
+    # Stack all points and do ONE batch query
+    all_pts = np.vstack(all_pts_list)
+    n_pts = len(all_pts)
+    search_r = rmax + float(tol_inside)
+    neigh_lists = tree_img.query_ball_point(all_pts, r=search_r)
+    
+    # FULLY VECTORIZED: Flatten all neighbors with point indices
+    # This eliminates the Python loop over neighbor lists
+    all_neigh = []
+    all_pt_idx = []
+    for p_idx, neigh in enumerate(neigh_lists):
+        if neigh:
+            all_neigh.extend(neigh)
+            all_pt_idx.extend([p_idx] * len(neigh))
+    
+    if not all_neigh:
+        return 0, np.empty((0, 3), dtype=float), np.empty((0,), dtype=int)
+    
+    all_neigh = np.asarray(all_neigh, dtype=np.int32)
+    all_pt_idx = np.asarray(all_pt_idx, dtype=np.int32)
+    
+    # Vectorized squared distance for ALL neighbor pairs at once
+    diff = centers_img[all_neigh] - all_pts[all_pt_idx]
+    d_sq = np.einsum('ij,ij->i', diff, diff)
+    
+    # Vectorized threshold check
+    inside = d_sq <= radii_thresh_sq[all_neigh]
+    
+    # Use bincount to sum up counts per point (fully vectorized!)
+    total = np.bincount(all_pt_idx[inside], minlength=n_pts).astype(np.int32)
 
-        # Batch query neighbors for all sample points
-        neigh_lists = tree_img.query_ball_point(pts, r=search_r)
+    # Early stop check
+    max_mult = int(total.max()) if n_pts > 0 else 0
+    if early_stop_at is not None and max_mult >= int(early_stop_at):
+        keep = np.where(total >= 2)[0][:10]
+        return max_mult, all_pts[keep], total[keep]
 
-        # Compute multiplicity for each point using SQUARED distances
-        total = np.zeros(len(pts), dtype=int)
-        for p_idx, neigh in enumerate(neigh_lists):
-            if not neigh:
-                continue
-            neigh = np.asarray(neigh, dtype=int)
-            diff = centers_img[neigh] - pts[p_idx]
-            d_sq = np.einsum('ij,ij->i', diff, diff)  # Fast squared distance
-            total[p_idx] = int(np.sum(d_sq <= radii_thresh_sq[neigh]))
-
-        if early_stop_at is not None and int(total.max()) >= int(early_stop_at):
-            keep = np.where(total >= 2)[0][:5]
-            if keep.size:
-                samples.extend(pts[keep])
-                counts.extend([int(x) for x in total[keep]])
-            return int(total.max()), np.array(samples) if samples else pts[keep], np.array(counts, dtype=int) if counts else total[keep].astype(int)
-
-        good = np.where(total >= 2)[0]
-        if good.size:
-            samples.extend(pts[good])
-            counts.extend([int(x) for x in total[good]])
-
-    if not samples:
+    # Filter to valid samples
+    good = np.where(total >= 2)[0]
+    if len(good) == 0:
         return 0, np.empty((0, 3), dtype=float), np.empty((0,), dtype=int)
 
-    samples_arr = np.array(samples, dtype=float)
-    counts_arr = np.array(counts, dtype=int)
-    return int(counts_arr.max()), samples_arr, counts_arr
+    return int(total[good].max()), all_pts[good], total[good]
 
 
 def find_threshold_s_for_N(
