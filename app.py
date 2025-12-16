@@ -18,8 +18,7 @@ from ionic_radii import (
     get_all_cations, get_all_anions, IONIC_RADII
 )
 from lattice_configs import (
-    get_configs_for_n, get_all_lattice_types, get_all_bravais_types,
-    LATTICE_COLORS, BRAVAIS_LABELS, LatticeConfig
+    get_configs_for_n, LATTICE_COLORS, BRAVAIS_LABELS
 )
 from interstitial_engine import (
     compute_min_scale_for_cn, LatticeParams, Sublattice, find_threshold_s_for_N,
@@ -1886,260 +1885,212 @@ def main():
         # Show performance report
         monitor.show_report(st)
     
-    # Main content
-    col1, col2 = st.columns([1, 1])
+    # Main content - full width
+    st.header("⚙️ Composition Setup")
     
-    with col1:
-        st.header("⚙️ Composition Setup")
-        
-        # Anion section
-        st.subheader("Anion Properties")
-        anion_cols = st.columns(3)
-        with anion_cols[0]:
-            anion_symbol = st.text_input("Symbol", value=st.session_state.get('anion_symbol', 'O'), key='anion_sym')
-        with anion_cols[1]:
-            anion_charge = st.number_input("Charge", min_value=1, max_value=7, 
-                                           value=st.session_state.get('anion_charge', 2), key='anion_chg')
-        with anion_cols[2]:
-            default_anion_radius = get_ionic_radius(anion_symbol, -anion_charge, 6)
-            anion_radius = st.number_input("Radius (Å)", min_value=0.1, max_value=3.0,
-                                           value=default_anion_radius or 1.40, step=0.01, key='anion_rad')
-        
-        # Number of metal types
-        num_metals = st.number_input("Number of metal types (N)", min_value=1, max_value=8, 
-                                     value=len(st.session_state.metals), key='num_metals')
-        
-        # Adjust metals list
-        while len(st.session_state.metals) < num_metals:
-            defaults = [
-                {'symbol': 'Mg', 'charge': 2, 'ratio': 1, 'cn': 6, 'radius': 0.72},
-                {'symbol': 'Al', 'charge': 3, 'ratio': 2, 'cn': 6, 'radius': 0.535},
-                {'symbol': 'Fe', 'charge': 3, 'ratio': 1, 'cn': 6, 'radius': 0.645},
-                {'symbol': 'Ti', 'charge': 4, 'ratio': 1, 'cn': 6, 'radius': 0.605},
-                {'symbol': 'Ca', 'charge': 2, 'ratio': 1, 'cn': 8, 'radius': 1.12},
-                {'symbol': 'Na', 'charge': 1, 'ratio': 1, 'cn': 6, 'radius': 1.02},
-                {'symbol': 'K', 'charge': 1, 'ratio': 1, 'cn': 8, 'radius': 1.51},
-                {'symbol': 'Zn', 'charge': 2, 'ratio': 1, 'cn': 4, 'radius': 0.60}
-            ]
-            idx = len(st.session_state.metals)
-            st.session_state.metals.append(defaults[idx % len(defaults)])
-        
-        # Clean up tracking for removed metals
-        if len(st.session_state.metals) > num_metals:
-            st.session_state.metals = st.session_state.metals[:num_metals]
-            # Clean up tracking dict
-            if 'metal_last_params' in st.session_state:
-                st.session_state.metal_last_params = {
-                    k: v for k, v in st.session_state.metal_last_params.items() 
-                    if k < num_metals
+    # Anion section
+    st.subheader("Anion Properties")
+    anion_cols = st.columns(3)
+    with anion_cols[0]:
+        anion_symbol = st.text_input("Symbol", value=st.session_state.get('anion_symbol', 'O'), key='anion_sym')
+    with anion_cols[1]:
+        anion_charge = st.number_input("Charge", min_value=1, max_value=7, 
+                                       value=st.session_state.get('anion_charge', 2), key='anion_chg')
+    with anion_cols[2]:
+        default_anion_radius = get_ionic_radius(anion_symbol, -anion_charge, 6)
+        anion_radius = st.number_input("Radius (Å)", min_value=0.1, max_value=3.0,
+                                       value=default_anion_radius or 1.40, step=0.01, key='anion_rad')
+    
+    # Number of metal types
+    num_metals = st.number_input("Number of metal types (N)", min_value=1, max_value=8, 
+                                 value=len(st.session_state.metals), key='num_metals')
+    
+    # Adjust metals list
+    while len(st.session_state.metals) < num_metals:
+        defaults = [
+            {'symbol': 'Mg', 'charge': 2, 'ratio': 1, 'cn': 6, 'radius': 0.72},
+            {'symbol': 'Al', 'charge': 3, 'ratio': 2, 'cn': 6, 'radius': 0.535},
+            {'symbol': 'Fe', 'charge': 3, 'ratio': 1, 'cn': 6, 'radius': 0.645},
+            {'symbol': 'Ti', 'charge': 4, 'ratio': 1, 'cn': 6, 'radius': 0.605},
+            {'symbol': 'Ca', 'charge': 2, 'ratio': 1, 'cn': 8, 'radius': 1.12},
+            {'symbol': 'Na', 'charge': 1, 'ratio': 1, 'cn': 6, 'radius': 1.02},
+            {'symbol': 'K', 'charge': 1, 'ratio': 1, 'cn': 8, 'radius': 1.51},
+            {'symbol': 'Zn', 'charge': 2, 'ratio': 1, 'cn': 4, 'radius': 0.60}
+        ]
+        idx = len(st.session_state.metals)
+        st.session_state.metals.append(defaults[idx % len(defaults)])
+    
+    # Clean up tracking for removed metals
+    if len(st.session_state.metals) > num_metals:
+        st.session_state.metals = st.session_state.metals[:num_metals]
+        # Clean up tracking dict
+        if 'metal_last_params' in st.session_state:
+            st.session_state.metal_last_params = {
+                k: v for k, v in st.session_state.metal_last_params.items() 
+                if k < num_metals
+            }
+    
+    # Metal inputs
+    st.subheader("Metal Cations")
+    
+    # Initialize tracking for auto-radius updates
+    if 'metal_last_params' not in st.session_state:
+        st.session_state.metal_last_params = {}
+    
+    for i, metal in enumerate(st.session_state.metals):
+        with st.expander(f"Metal {i+1}: {metal['symbol']}⁺{metal['charge']}", expanded=True):
+            mcols = st.columns(5)
+            with mcols[0]:
+                new_symbol = st.text_input("Symbol", value=metal['symbol'], key=f'm_sym_{i}')
+            with mcols[1]:
+                new_charge = st.number_input("Charge", min_value=1, max_value=7, 
+                                              value=metal['charge'], key=f'm_chg_{i}')
+            with mcols[2]:
+                metal['ratio'] = st.number_input("Ratio", min_value=1, max_value=20,
+                                                 value=metal['ratio'], key=f'm_rat_{i}')
+            with mcols[3]:
+                avail_cns = get_available_cns(new_symbol, new_charge)
+                new_cn = st.number_input("CN", min_value=1, max_value=12,
+                                          value=metal['cn'], key=f'm_cn_{i}')
+                if avail_cns:
+                    st.caption(f"Available: {', '.join(map(str, avail_cns))}")
+            
+            # Check if symbol, charge, or CN changed - if so, try to auto-update radius
+            last_params = st.session_state.metal_last_params.get(i, {})
+            params_changed = (
+                last_params.get('symbol') != new_symbol or
+                last_params.get('charge') != new_charge or
+                last_params.get('cn') != new_cn
+            )
+            
+            # Update metal dict with new values
+            metal['symbol'] = new_symbol
+            metal['charge'] = new_charge
+            metal['cn'] = new_cn
+            
+            # Determine radius value to show
+            current_radius = metal.get('radius', 0.7)
+            if params_changed:
+                # Try to get radius from database
+                db_radius = get_ionic_radius(new_symbol, new_charge, new_cn)
+                if db_radius is not None:
+                    current_radius = db_radius
+                # Store new params
+                st.session_state.metal_last_params[i] = {
+                    'symbol': new_symbol,
+                    'charge': new_charge,
+                    'cn': new_cn
                 }
-        
-        # Metal inputs
-        st.subheader("Metal Cations")
-        
-        # Initialize tracking for auto-radius updates
-        if 'metal_last_params' not in st.session_state:
-            st.session_state.metal_last_params = {}
-        
-        for i, metal in enumerate(st.session_state.metals):
-            with st.expander(f"Metal {i+1}: {metal['symbol']}⁺{metal['charge']}", expanded=True):
-                mcols = st.columns(5)
-                with mcols[0]:
-                    new_symbol = st.text_input("Symbol", value=metal['symbol'], key=f'm_sym_{i}')
-                with mcols[1]:
-                    new_charge = st.number_input("Charge", min_value=1, max_value=7, 
-                                                  value=metal['charge'], key=f'm_chg_{i}')
-                with mcols[2]:
-                    metal['ratio'] = st.number_input("Ratio", min_value=1, max_value=20,
-                                                     value=metal['ratio'], key=f'm_rat_{i}')
-                with mcols[3]:
-                    avail_cns = get_available_cns(new_symbol, new_charge)
-                    new_cn = st.number_input("CN", min_value=1, max_value=12,
-                                              value=metal['cn'], key=f'm_cn_{i}')
-                    if avail_cns:
-                        st.caption(f"Available: {', '.join(map(str, avail_cns))}")
+            
+            with mcols[4]:
+                db_radius = get_ionic_radius(new_symbol, new_charge, new_cn)
+                metal['radius'] = st.number_input(
+                    "Radius (Å)", 
+                    min_value=0.1, 
+                    max_value=2.5,
+                    value=current_radius,
+                    step=0.01, 
+                    key=f'm_rad_{i}',
+                    help=f"Database: {db_radius:.3f} Å" if db_radius else "No database value"
+                )
+            
+            # Geometry preference selector (only show if CN has alternatives)
+            if new_cn in CN_GEOMETRY_OPTIONS:
+                geom_options = CN_GEOMETRY_OPTIONS[new_cn]
+                geom_labels = [GEOMETRY_LABELS.get(g, g) for g in geom_options]
                 
-                # Check if symbol, charge, or CN changed - if so, try to auto-update radius
-                last_params = st.session_state.metal_last_params.get(i, {})
-                params_changed = (
-                    last_params.get('symbol') != new_symbol or
-                    last_params.get('charge') != new_charge or
-                    last_params.get('cn') != new_cn
+                # Get current geometry or default to first option
+                current_geom = metal.get('geometry', geom_options[0])
+                if current_geom not in geom_options:
+                    current_geom = geom_options[0]
+                
+                current_idx = geom_options.index(current_geom)
+                
+                selected_label = st.selectbox(
+                    "Preferred Geometry",
+                    options=geom_labels,
+                    index=current_idx,
+                    key=f'm_geom_{i}',
+                    help="Select the target coordination geometry for regularity optimization"
                 )
                 
-                # Update metal dict with new values
-                metal['symbol'] = new_symbol
-                metal['charge'] = new_charge
-                metal['cn'] = new_cn
-                
-                # Determine radius value to show
-                current_radius = metal.get('radius', 0.7)
-                if params_changed:
-                    # Try to get radius from database
-                    db_radius = get_ionic_radius(new_symbol, new_charge, new_cn)
-                    if db_radius is not None:
-                        current_radius = db_radius
-                    # Store new params
-                    st.session_state.metal_last_params[i] = {
-                        'symbol': new_symbol,
-                        'charge': new_charge,
-                        'cn': new_cn
-                    }
-                
-                with mcols[4]:
-                    db_radius = get_ionic_radius(new_symbol, new_charge, new_cn)
-                    metal['radius'] = st.number_input(
-                        "Radius (Å)", 
-                        min_value=0.1, 
-                        max_value=2.5,
-                        value=current_radius,
-                        step=0.01, 
-                        key=f'm_rad_{i}',
-                        help=f"Database: {db_radius:.3f} Å" if db_radius else "No database value"
-                    )
-                
-                # Geometry preference selector (only show if CN has alternatives)
-                if new_cn in CN_GEOMETRY_OPTIONS:
-                    geom_options = CN_GEOMETRY_OPTIONS[new_cn]
-                    geom_labels = [GEOMETRY_LABELS.get(g, g) for g in geom_options]
-                    
-                    # Get current geometry or default to first option
-                    current_geom = metal.get('geometry', geom_options[0])
-                    if current_geom not in geom_options:
-                        current_geom = geom_options[0]
-                    
-                    current_idx = geom_options.index(current_geom)
-                    
-                    selected_label = st.selectbox(
-                        "Preferred Geometry",
-                        options=geom_labels,
-                        index=current_idx,
-                        key=f'm_geom_{i}',
-                        help="Select the target coordination geometry for regularity optimization"
-                    )
-                    
-                    # Convert label back to geometry key
-                    selected_idx = geom_labels.index(selected_label)
-                    metal['geometry'] = geom_options[selected_idx]
-                else:
-                    # No alternative geometries for this CN
-                    metal['geometry'] = None
-        
-        # Search options
-        st.markdown("---")
-        force_full_search = st.checkbox(
-            "🔄 Force full search",
-            value=False,
-            help="Run all c/a scans even if cubic/HCP finds a good match. "
-                 "Useful for exploring alternative structures, but takes longer."
-        )
-        
-        # Calculate button - runs the full analysis chain
-        if st.button("🧮 Calculate Stoichiometry & CN", type="primary", use_container_width=True):
-            # Create a progress container
-            progress_container = st.container()
-            
-            with progress_container:
-                progress_bar = st.progress(0)
-                status_text = st.empty()
-                
-                def update_progress(step, total, message):
-                    progress_bar.progress(step / total)
-                    status_text.text(message)
-                
-                # Run the full analysis chain
-                chain_results = run_full_analysis_chain(
-                    metals=st.session_state.metals,
-                    anion_symbol=anion_symbol,
-                    anion_charge=anion_charge,
-                    anion_radius=anion_radius,
-                    progress_callback=update_progress,
-                    force_full_search=force_full_search
-                )
-                
-                progress_bar.empty()
-                status_text.empty()
-            
-            # Store results
-            st.session_state.chain_results = chain_results
-            
-            if chain_results['success'] and chain_results['stoichiometry']:
-                st.session_state.results = chain_results['stoichiometry']
-                st.session_state.scale_results = chain_results['scale_results']
-                st.session_state.stoichiometry_results = chain_results['stoich_results']
-            
-            st.rerun()
-        
-        # Display basic stoichiometry results
-        if st.session_state.results:
-            r = st.session_state.results
-            st.markdown("---")
-            st.subheader("📊 Stoichiometry Results")
-            
-            # Formula display
-            formula_parts = []
-            for m, c in zip(st.session_state.metals, r['metal_counts']):
-                formula_parts.append(f"{m['symbol']}{c if c > 1 else ''}")
-            formula_parts.append(f"{anion_symbol}{r['anion_count'] if r['anion_count'] > 1 else ''}")
-            formula = ''.join(formula_parts)
-            
-            st.markdown(f"### Formula: **{formula}**")
-            
-            # Metrics row
-            rcols = st.columns(4)
-            with rcols[0]:
-                st.metric("Anion CN", f"{r['anion_cn']:.2f}")
-            with rcols[1]:
-                st.metric("Charge Balance", "✓ Balanced" if r['charge_balanced'] else "✗ Imbalanced")
-            with rcols[2]:
-                st.metric("Total +", f"+{r['total_positive']}")
-            with rcols[3]:
-                st.metric("Total −", f"−{r['total_negative']}")
+                # Convert label back to geometry key
+                selected_idx = geom_labels.index(selected_label)
+                metal['geometry'] = geom_options[selected_idx]
+            else:
+                # No alternative geometries for this CN
+                metal['geometry'] = None
     
-    with col2:
-        st.header("🔷 Lattice Configurations")
+    # Search options
+    st.markdown("---")
+    force_full_search = st.checkbox(
+        "🔄 Force full search",
+        value=False,
+        help="Run all c/a scans even if cubic/HCP finds a good match. "
+             "Useful for exploring alternative structures, but takes longer."
+    )
+    
+    # Calculate button - runs the full analysis chain
+    if st.button("🧮 Calculate Stoichiometry & CN", type="primary", use_container_width=True):
+        # Create a progress container
+        progress_container = st.container()
         
-        # Filters
-        fcols = st.columns(2)
-        with fcols[0]:
-            lattice_filter = st.selectbox("Lattice Type", ['all'] + get_all_lattice_types())
-        with fcols[1]:
-            arity_filter = st.selectbox("Arity", ['all', '0 (Fixed)', '1 (Parametric)'])
-            arity_filter = arity_filter.split()[0] if arity_filter != 'all' else 'all'
-        
-        configs = get_configs_for_n(num_metals, lattice_filter, arity_filter)
-        total_configs = len(configs['arity0']) + len(configs['arity1'])
-        
-        st.caption(f"Showing {total_configs} configurations for N={num_metals}")
-        
-        # Display configurations
-        config_container = st.container()
-        with config_container:
-            if configs['arity0']:
-                st.markdown("#### Arity 0 — Fixed Offsets")
-                for config in configs['arity0']:
-                    color = LATTICE_COLORS.get(config.lattice, '#f0f0f0')
-                    with st.container():
-                        st.markdown(f"""
-                        <div style="background-color: {color}; padding: 10px; border-radius: 8px; margin-bottom: 8px; border: 1px solid #ccc;">
-                            <b>{config.id}</b> — {config.lattice}
-                            {f'<span style="float: right; font-size: 0.8em;">{config.pattern}</span>' if config.pattern else ''}
-                            <br><code style="font-size: 0.85em;">{', '.join(str(o) for o in config.offsets)}</code>
-                            <br><small>Params: {config.params}</small>
-                        </div>
-                        """, unsafe_allow_html=True)
+        with progress_container:
+            progress_bar = st.progress(0)
+            status_text = st.empty()
             
-            if configs['arity1']:
-                st.markdown("#### Arity 1 — Parametric")
-                for config in configs['arity1']:
-                    color = LATTICE_COLORS.get(config.lattice, '#f0f0f0')
-                    st.markdown(f"""
-                    <div style="background-color: {color}; padding: 10px; border-radius: 8px; margin-bottom: 8px; border: 1px solid #ccc; opacity: 0.85;">
-                        <b>{config.id}</b> — {config.lattice}
-                        <span style="float: right; font-family: monospace; font-size: 0.85em;">{config.free_param}</span>
-                        <br><small>Params: {config.params}</small>
-                    </div>
-                    """, unsafe_allow_html=True)
+            def update_progress(step, total, message):
+                progress_bar.progress(step / total)
+                status_text.text(message)
+            
+            # Run the full analysis chain
+            chain_results = run_full_analysis_chain(
+                metals=st.session_state.metals,
+                anion_symbol=anion_symbol,
+                anion_charge=anion_charge,
+                anion_radius=anion_radius,
+                progress_callback=update_progress,
+                force_full_search=force_full_search
+            )
+            
+            progress_bar.empty()
+            status_text.empty()
+        
+        # Store results
+        st.session_state.chain_results = chain_results
+        
+        if chain_results['success'] and chain_results['stoichiometry']:
+            st.session_state.results = chain_results['stoichiometry']
+            st.session_state.scale_results = chain_results['scale_results']
+            st.session_state.stoichiometry_results = chain_results['stoich_results']
+        
+        st.rerun()
+    
+    # Display basic stoichiometry results
+    if st.session_state.results:
+        r = st.session_state.results
+        st.markdown("---")
+        st.subheader("📊 Stoichiometry Results")
+        
+        # Formula display
+        formula_parts = []
+        for m, c in zip(st.session_state.metals, r['metal_counts']):
+            formula_parts.append(f"{m['symbol']}{c if c > 1 else ''}")
+        formula_parts.append(f"{anion_symbol}{r['anion_count'] if r['anion_count'] > 1 else ''}")
+        formula = ''.join(formula_parts)
+        
+        st.markdown(f"### Formula: **{formula}**")
+        
+        # Metrics row
+        rcols = st.columns(4)
+        with rcols[0]:
+            st.metric("Anion CN", f"{r['anion_cn']:.2f}")
+        with rcols[1]:
+            st.metric("Charge Balance", "✓ Balanced" if r['charge_balanced'] else "✗ Imbalanced")
+        with rcols[2]:
+            st.metric("Total +", f"+{r['total_positive']}")
+        with rcols[3]:
+            st.metric("Total −", f"−{r['total_negative']}")
     
     # ============================================
     # UNIFIED RESULTS SECTION
