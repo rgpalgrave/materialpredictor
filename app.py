@@ -22,7 +22,8 @@ from lattice_configs import (
 )
 from interstitial_engine import (
     compute_min_scale_for_cn, LatticeParams, Sublattice, find_threshold_s_for_N,
-    scan_c_ratio_for_min_scale, batch_scan_c_ratio, lattice_vectors
+    scan_c_ratio_for_min_scale, batch_scan_c_ratio, lattice_vectors,
+    scan_monoclinic_for_stoichiometry
 )
 from position_calculator import (
     calculate_complete_structure, generate_metal_positions, calculate_intersections,
@@ -196,30 +197,127 @@ class HalfFilledStructure:
             self.intersections.cartesian = np.array([]).reshape(0, 3)
 
 
-def get_default_search_configs(num_metals: int, use_predictor: bool = True) -> List[dict]:
+def get_default_search_configs(num_metals: int, use_predictor: bool = True, 
+                                target_cn: int = None) -> List[dict]:
     """
-    Get default search configurations for initial structure search.
+    Get default search configurations using SublatticeFinder enumeration.
     
-    When the advanced predictor is available, uses multi-source predictions:
-    1. Empirical patterns from 1802 AFLOW structures
-    2. Lattice-type-specific filling rules (templates)
-    3. N-decomposition into (in-plane × z-layers)
-    
-    Always includes common lattice types that are fast to compute:
-    - Cubic: P, I, F (c/a = 1.0)
-    - Tetragonal: P, I (c/a = num_metals)
-    - Hexagonal: H (HCP), P (c/a = 1.633)
-    
-    Falls back to standard search if predictor unavailable.
+    Uses HNF-based sublattice enumeration to find all configurations where
+    all cation sites are equivalent (same coordination topology).
     
     Args:
-        num_metals: Number of metal sublattices (L)
+        num_metals: Number of metal sublattices (N)
         use_predictor: Whether to use advanced predictor if available (default: True)
+        target_cn: Optional target CN for filtering (uses cn1_min filter)
         
     Returns:
         List of config dicts with keys: id, lattice, bravais_type, offsets, pattern, c_ratio
     """
-    # Try to use the advanced predictor
+    # Special case: N=1 (single sublattice) - trivially all sites equivalent
+    if num_metals == 1:
+        return [
+            {'id': 'N1-cubic_P', 'lattice': 'Cubic', 'bravais_type': 'cubic_P',
+             'offsets': [(0.0, 0.0, 0.0)], 'pattern': 'Primitive', 'c_ratio': 1.0, 'CN1': 6},
+            {'id': 'N1-cubic_F', 'lattice': 'Cubic', 'bravais_type': 'cubic_F',
+             'offsets': [(0.0, 0.0, 0.0)], 'pattern': 'FCC', 'c_ratio': 1.0, 'CN1': 12},
+            {'id': 'N1-cubic_I', 'lattice': 'Cubic', 'bravais_type': 'cubic_I',
+             'offsets': [(0.0, 0.0, 0.0)], 'pattern': 'BCC', 'c_ratio': 1.0, 'CN1': 8},
+            {'id': 'N1-tetragonal_P', 'lattice': 'Tetragonal', 'bravais_type': 'tetragonal_P',
+             'offsets': [(0.0, 0.0, 0.0)], 'pattern': 'Tetragonal-P', 'c_ratio': 1.0, 'CN1': 6},
+            {'id': 'N1-hexagonal_P', 'lattice': 'Hexagonal', 'bravais_type': 'hexagonal_P',
+             'offsets': [(0.0, 0.0, 0.0)], 'pattern': 'Hexagonal-P', 'c_ratio': 1.633, 'CN1': 6},
+        ]
+    
+    # Try SublatticeFinder first (new HNF-based enumeration)
+    try:
+        from sublattice_enumeration import SublatticeFinder
+        from pathlib import Path
+        
+        # Find database path
+        db_path = Path(__file__).parent / 'equivalent_configs_full.pkl'
+        if not db_path.exists():
+            db_path = Path('equivalent_configs_full.pkl')
+        
+        if db_path.exists():
+            finder = SublatticeFinder(str(db_path))
+            
+            # Map SublatticeFinder lattice types to our format
+            lattice_mapping = {
+                'cubic_P': {'lattice': 'Cubic', 'c_ratio': 1.0},
+                'cubic_F': {'lattice': 'Cubic', 'c_ratio': 1.0},
+                'cubic_I': {'lattice': 'Cubic', 'c_ratio': 1.0},
+                'tetragonal_P': {'lattice': 'Tetragonal', 'c_ratio': float(num_metals)},
+                'tetragonal_I': {'lattice': 'Tetragonal', 'c_ratio': float(num_metals)},
+                'hexagonal_P': {'lattice': 'Hexagonal', 'c_ratio': 1.633},
+                'orthorhombic_P': {'lattice': 'Orthorhombic', 'c_ratio': 1.0},
+            }
+            
+            search_configs = []
+            config_idx = 0
+            
+            # Set CN filter - use target_cn - 2 as minimum to allow some flexibility
+            cn1_min = max(2, target_cn - 2) if target_cn else 4
+            
+            for bravais_type, lattice_info in lattice_mapping.items():
+                # Query SublatticeFinder for this lattice type
+                try:
+                    if bravais_type.startswith('cubic'):
+                        # Cubic: direct lookup from database
+                        configs = finder.query(
+                            N=num_metals, 
+                            lattice_type=bravais_type,
+                            cn1_min=cn1_min
+                        )
+                    else:
+                        # Non-cubic: scan c/a to find best topology
+                        configs = finder.query(
+                            N=num_metals,
+                            lattice_type=bravais_type,
+                            ca_scan=True,
+                            cn1_min=cn1_min
+                        )
+                    
+                    for cfg in configs:
+                        # Convert offsets to list of tuples (ensure proper format)
+                        offsets = [tuple(float(x) for x in o) for o in cfg['offsets']]
+                        
+                        # Generate config ID
+                        config_id = f"N{num_metals}-{bravais_type}-{config_idx}"
+                        config_idx += 1
+                        
+                        # Get c/a ratio (use from scan for non-cubic, default otherwise)
+                        c_ratio = cfg.get('c_a', lattice_info['c_ratio'])
+                        
+                        # Generate pattern description
+                        cn_seq = [t[1] for t in cfg['topology'][:3]] if cfg.get('topology') else []
+                        pattern = f"CN={cn_seq}" if cn_seq else "HNF-coset"
+                        
+                        search_configs.append({
+                            'id': config_id,
+                            'lattice': lattice_info['lattice'],
+                            'bravais_type': bravais_type,
+                            'offsets': offsets,
+                            'pattern': pattern,
+                            'c_ratio': c_ratio,
+                            'CN1': cfg.get('CN1', 0),
+                            'topology': cfg.get('topology', []),
+                        })
+                        
+                except Exception as e:
+                    # Continue with other lattice types if one fails
+                    continue
+            
+            if search_configs:
+                # Sort by CN1 (higher is better for finding structures)
+                search_configs.sort(key=lambda x: -x.get('CN1', 0))
+                return search_configs
+                
+    except ImportError:
+        pass  # SublatticeFinder not available
+    except Exception as e:
+        print(f"Warning: SublatticeFinder error, using fallback: {e}")
+    
+    # Fallback: Try the advanced predictor
     if use_predictor:
         try:
             from advanced_predictor_integration import get_predictor
@@ -235,28 +333,25 @@ def get_default_search_configs(num_metals: int, use_predictor: bool = True) -> L
                 if configs:
                     return configs
         except ImportError:
-            pass  # Predictor not available, use fallback
+            pass
         except Exception as e:
             print(f"Warning: Predictor error, using fallback: {e}")
     
-    # Fallback: original algorithm
+    # Final fallback: original algorithm using lattice_configs
     from lattice_configs import get_configs_for_n
     
-    # Define which Bravais types to search and their c/a values
     default_bravais = {
-        # Cubic types (c/a = 1.0)
         'cubic_P': {'lattice': 'Cubic', 'c_ratio': 1.0},
         'cubic_F': {'lattice': 'Cubic', 'c_ratio': 1.0},
         'cubic_I': {'lattice': 'Cubic', 'c_ratio': 1.0},
-        # Hexagonal types (c/a = 1.633 ideal for HCP)
         'hexagonal_H': {'lattice': 'Hexagonal', 'c_ratio': 1.633},
         'hexagonal_P': {'lattice': 'Hexagonal', 'c_ratio': 1.633},
-        # Tetragonal types (c/a = L, number of metal sublattices)
         'tetragonal_P': {'lattice': 'Tetragonal', 'c_ratio': float(num_metals)},
         'tetragonal_I': {'lattice': 'Tetragonal', 'c_ratio': float(num_metals)},
+        'monoclinic_P': {'lattice': 'Monoclinic', 'c_ratio': 1.0, 'b_ratio': 1.0, 'beta': 100.0},
+        'monoclinic_C': {'lattice': 'Monoclinic', 'c_ratio': 1.0, 'b_ratio': 1.0, 'beta': 100.0},
     }
     
-    # Get all configs for this number of metals
     all_configs = get_configs_for_n(num_metals)
     arity0_configs = all_configs.get('arity0', [])
     
@@ -937,7 +1032,8 @@ def run_full_analysis_chain(
     anion_charge: int,
     anion_radius: float,
     progress_callback=None,
-    force_full_search: bool = False
+    force_full_search: bool = False,
+    include_monoclinic: bool = False
 ) -> Dict:
     """
     Run the complete analysis chain:
@@ -956,6 +1052,7 @@ def run_full_analysis_chain(
         anion_radius: Anion ionic radius
         progress_callback: Optional callback(step, total, message) for progress updates
         force_full_search: If True, run all c/a scans even if cubic/HCP finds a match
+        include_monoclinic: If True, search monoclinic structures (beta, c/a, b/a scan)
     
     Returns:
         Dictionary with all results including:
@@ -1011,8 +1108,9 @@ def run_full_analysis_chain(
         # Step 2: Get default configurations and calculate minimum scale factors
         update_progress(2, 6, "Finding minimum scale factors...")
         
-        # Get default search configurations (cubic, hex, tet with appropriate c/a)
-        search_configs = get_default_search_configs(num_metals)
+        # Get default search configurations using SublatticeFinder enumeration
+        # Pass target_cn to filter configurations by coordination number
+        search_configs = get_default_search_configs(num_metals, target_cn=target_cn)
         
         # Compute coordination radii as (r_metal + r_anion) for each metal
         coord_radii = tuple(m['radius'] + anion_radius for m in metals)
@@ -1159,7 +1257,64 @@ def run_full_analysis_chain(
         else:
             update_progress(2, 6, "Cubic/HCP stoichiometry match found - skipping c/a scans...")
         
-        # Process other configs (monoclinic, etc.) with fixed c/a
+        # Process monoclinic configs with full parameter scan (beta, c/a, b/a)
+        # Only if include_monoclinic is True
+        monoclinic_configs = [c for c in search_configs 
+                            if c['lattice'] == 'Monoclinic']
+        
+        if include_monoclinic and monoclinic_configs and (not fixed_ca_stoich_match or force_full_search):
+            update_progress(2, 6, "Scanning monoclinic parameter space (beta, c/a, b/a)...")
+            
+            monitor = get_monitor()
+            for config in monoclinic_configs:
+                try:
+                    def mono_progress(msg):
+                        update_progress(2, 6, f"Monoclinic {config['bravais_type']}: {msg}")
+                    
+                    with monitor.time(f"mono_scan_{config['bravais_type']}"):
+                        mono_result = scan_monoclinic_for_stoichiometry(
+                            config=config,
+                            metals=metals,
+                            anion_symbol=anion_symbol,
+                            anion_radius=anion_radius,
+                            anion_charge=anion_charge,
+                            target_cn=target_cn,
+                            expected_metal_counts=expected_metal_counts,
+                            expected_anion_count=expected_anion_count,
+                            num_metals=num_metals,
+                            beta_min=85.0,
+                            beta_max=125.0,
+                            n_beta=9,
+                            n_ca=11,
+                            n_ba=7,
+                            progress_callback=mono_progress
+                        )
+                    
+                    if mono_result is not None:
+                        config_id = f"{config['id']}-mono-b{mono_result['beta']:.0f}-ca{mono_result['c_ratio']:.2f}-ba{mono_result['b_ratio']:.2f}"
+                        scale_results[config_id] = {
+                            's_star': mono_result['s_star'],
+                            'status': 'found',
+                            'lattice': 'Monoclinic',
+                            'pattern': f"{config['pattern']} (β={mono_result['beta']:.1f}°, c/a={mono_result['c_ratio']:.2f}, b/a={mono_result['b_ratio']:.2f})",
+                            'bravais_type': config['bravais_type'],
+                            'offsets': config['offsets'],
+                            'coord_radii': coord_radii,
+                            'c_ratio': mono_result['c_ratio'],
+                            'b_ratio': mono_result['b_ratio'],
+                            'beta': mono_result['beta'],
+                            'match_type': mono_result.get('match_type', 'exact'),
+                            'scan_regularity': mono_result.get('regularity', 0),
+                            'stoich_result': mono_result.get('stoich_result')
+                        }
+                        
+                except Exception as e:
+                    # Log error but continue
+                    pass
+        
+        # Process other configs (triclinic, etc.) with fixed parameters
+        other_configs = [c for c in search_configs 
+                        if c['lattice'] not in ('Cubic', 'Tetragonal', 'Hexagonal', 'Monoclinic')]
         for config in other_configs:
             try:
                 lattice_params = {'c_ratio': config['c_ratio']}
@@ -2023,12 +2178,21 @@ def main():
     
     # Search options
     st.markdown("---")
-    force_full_search = st.checkbox(
-        "🔄 Force full search",
-        value=False,
-        help="Run all c/a scans even if cubic/HCP finds a good match. "
-             "Useful for exploring alternative structures, but takes longer."
-    )
+    search_cols = st.columns(2)
+    with search_cols[0]:
+        force_full_search = st.checkbox(
+            "🔄 Force full search",
+            value=False,
+            help="Run all c/a scans even if cubic/HCP finds a good match. "
+                 "Useful for exploring alternative structures, but takes longer."
+        )
+    with search_cols[1]:
+        include_monoclinic = st.checkbox(
+            "📐 Include monoclinic",
+            value=False,
+            help="Search monoclinic structures by scanning beta angle (85-125°), "
+                 "c/a ratio, and b/a ratio. Takes ~1-2 min extra per configuration."
+        )
     
     # Calculate button - runs the full analysis chain
     if st.button("🧮 Calculate Stoichiometry & CN", type="primary", use_container_width=True):
@@ -2050,7 +2214,8 @@ def main():
                 anion_charge=anion_charge,
                 anion_radius=anion_radius,
                 progress_callback=update_progress,
-                force_full_search=force_full_search
+                force_full_search=force_full_search,
+                include_monoclinic=include_monoclinic
             )
             
             progress_bar.empty()

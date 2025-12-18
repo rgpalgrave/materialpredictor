@@ -894,7 +894,9 @@ def calculate_stoichiometry_for_config(
     target_cn: int,
     anion_radius: float = 1.40,
     cluster_eps_frac: float = 0.03,
-    c_ratio: Optional[float] = None  # Optional c/a ratio override
+    c_ratio: Optional[float] = None,  # Optional c/a ratio override
+    b_ratio: Optional[float] = None,  # Optional b/a ratio override (for monoclinic)
+    beta: Optional[float] = None      # Optional beta angle override (for monoclinic)
 ) -> StoichiometryResult:
     """
     Calculate stoichiometry for a single configuration.
@@ -911,6 +913,8 @@ def calculate_stoichiometry_for_config(
         anion_radius: Anion ionic radius in Å
         cluster_eps_frac: Clustering tolerance
         c_ratio: Optional c/a ratio (if None, uses default for lattice type)
+        b_ratio: Optional b/a ratio (if None, defaults to 1.0)
+        beta: Optional beta angle in degrees (if None, uses default for lattice type)
     
     Returns:
         StoichiometryResult with formula and counts
@@ -935,11 +939,15 @@ def calculate_stoichiometry_for_config(
         elif lattice_type == 'Rhombohedral':
             p_dict['alpha'] = p_dict['beta'] = p_dict['gamma'] = 80.0
         elif lattice_type == 'Monoclinic':
-            p_dict['beta'] = 100.0
+            p_dict['beta'] = 100.0  # Default monoclinic beta
         
-        # Override c_ratio if provided
+        # Override lattice parameters if provided
         if c_ratio is not None:
             p_dict['c_ratio'] = c_ratio
+        if b_ratio is not None:
+            p_dict['b_ratio'] = b_ratio
+        if beta is not None:
+            p_dict['beta'] = beta
         
         p = LatticeParams(**p_dict)
         

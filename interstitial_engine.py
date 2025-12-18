@@ -1024,3 +1024,473 @@ def batch_scan_c_ratio(
             lattice_params
         )
     return results
+
+
+# -----------------------------
+# Monoclinic Structure Search
+# -----------------------------
+
+def scan_monoclinic_structure(
+    config_offsets: List[Tuple[float, float, float]],
+    target_cn: int,
+    alpha_ratio: AlphaLike = 0.5,
+    bravais_type: str = 'monoclinic_P',
+    beta_min: float = 85.0,
+    beta_max: float = 125.0,
+    c_ratio_min: float = 0.5,
+    c_ratio_max: float = 2.5,
+    b_ratio_min: float = 0.7,
+    b_ratio_max: float = 1.4,
+    n_beta_coarse: int = 9,
+    n_ca_coarse: int = 11,
+    n_ba_fine: int = 7,
+    n_refine: int = 5,
+    progress_callback: Optional[Callable[[str], None]] = None
+) -> Optional[Dict]:
+    """
+    Hierarchical search for monoclinic structures.
+    
+    Search strategy:
+    1. Phase 1: Scan beta angle with a=b=c (cubic-like ratios)
+    2. Phase 2: At best beta, scan c/a ratio with a=b
+    3. Phase 3: At best (beta, c/a), scan b/a ratio
+    4. Phase 4: Local refinement around best point
+    
+    Args:
+        config_offsets: Metal sublattice offset positions
+        target_cn: Target coordination number
+        alpha_ratio: Coordination radius (metal + anion radii)
+        bravais_type: 'monoclinic_P' or 'monoclinic_C'
+        beta_min/max: Beta angle range (degrees)
+        c_ratio_min/max: c/a ratio range
+        b_ratio_min/max: b/a ratio range
+        n_beta_coarse: Number of beta points in coarse scan
+        n_ca_coarse: Number of c/a points in coarse scan
+        n_ba_fine: Number of b/a points in fine scan
+        n_refine: Number of points in refinement
+        progress_callback: Optional callback for progress updates
+    
+    Returns:
+        Dict with best parameters, or None if no valid structure found
+    """
+    if isinstance(alpha_ratio, list):
+        alpha_ratio = tuple(alpha_ratio)
+    
+    def report(msg: str):
+        if progress_callback:
+            progress_callback(msg)
+    
+    def compute_volume(a: float, b_ratio: float, c_ratio: float, beta: float) -> float:
+        """Monoclinic volume = a * b * c * sin(beta)"""
+        b = a * b_ratio
+        c = a * c_ratio
+        beta_r = np.radians(beta)
+        return a * b * c * np.sin(beta_r)
+    
+    def evaluate_params(beta: float, c_ratio: float, b_ratio: float) -> Tuple[Optional[float], float, Optional[float]]:
+        """Evaluate structure at given monoclinic parameters."""
+        params = {
+            'a': 1.0,
+            'b_ratio': float(b_ratio),
+            'c_ratio': float(c_ratio),
+            'alpha': 90.0,
+            'beta': float(beta),
+            'gamma': 90.0
+        }
+        p = LatticeParams(**params)
+        sub = Sublattice(
+            name='M',
+            offsets=tuple(tuple(o) for o in config_offsets),
+            alpha_ratio=alpha_ratio,
+            bravais_type=bravais_type
+        )
+        s_star = find_threshold_s_for_N([sub], p, int(target_cn))
+        if s_star is None:
+            return None, 0.0, None
+        volume = compute_volume(float(s_star), b_ratio, c_ratio, beta)
+        # Optimize s³/V (lower is better - more compact structure)
+        metric = (float(s_star) ** 3) / volume if volume > 0 else None
+        return float(s_star), volume, metric
+    
+    all_results = []
+    best_result = None
+    best_metric = float('inf')
+    
+    # ========================================
+    # Phase 1: Scan beta angle with a=b=c
+    # ========================================
+    report(f"Phase 1: Scanning beta angle ({beta_min}°-{beta_max}°) with a=b=c...")
+    
+    beta_values = np.linspace(beta_min, beta_max, n_beta_coarse)
+    phase1_results = []
+    
+    for beta in beta_values:
+        s_star, vol, metric = evaluate_params(beta, c_ratio=1.0, b_ratio=1.0)
+        result = {
+            'beta': float(beta),
+            'c_ratio': 1.0,
+            'b_ratio': 1.0,
+            's_star': s_star,
+            'volume': vol,
+            'metric': metric
+        }
+        phase1_results.append(result)
+        all_results.append(result)
+        
+        if metric is not None and metric < best_metric:
+            best_metric = metric
+            best_result = result
+    
+    if best_result is None:
+        report("Phase 1: No valid structures found")
+        return None
+    
+    best_beta = best_result['beta']
+    report(f"Phase 1: Best beta = {best_beta:.1f}° (s³/V = {best_metric:.4f})")
+    
+    # Narrow beta range around best
+    valid_betas = [r['beta'] for r in phase1_results if r['metric'] is not None]
+    if len(valid_betas) >= 3:
+        valid_betas.sort(key=lambda b: next(r['metric'] for r in phase1_results if r['beta'] == b))
+        beta_window = abs(valid_betas[0] - valid_betas[min(2, len(valid_betas)-1)])
+        beta_lo = max(beta_min, best_beta - beta_window)
+        beta_hi = min(beta_max, best_beta + beta_window)
+    else:
+        beta_lo, beta_hi = best_beta - 5, best_beta + 5
+    
+    # ========================================
+    # Phase 2: Scan c/a ratio at best beta
+    # ========================================
+    report(f"Phase 2: Scanning c/a ratio ({c_ratio_min}-{c_ratio_max}) at beta={best_beta:.1f}°...")
+    
+    ca_values = np.linspace(c_ratio_min, c_ratio_max, n_ca_coarse)
+    phase2_results = []
+    
+    for ca in ca_values:
+        s_star, vol, metric = evaluate_params(best_beta, c_ratio=ca, b_ratio=1.0)
+        result = {
+            'beta': best_beta,
+            'c_ratio': float(ca),
+            'b_ratio': 1.0,
+            's_star': s_star,
+            'volume': vol,
+            'metric': metric
+        }
+        phase2_results.append(result)
+        all_results.append(result)
+        
+        if metric is not None and metric < best_metric:
+            best_metric = metric
+            best_result = result
+    
+    best_ca = best_result['c_ratio']
+    report(f"Phase 2: Best c/a = {best_ca:.3f} (s³/V = {best_metric:.4f})")
+    
+    # Narrow c/a range
+    valid_cas = [r['c_ratio'] for r in phase2_results if r['metric'] is not None]
+    if len(valid_cas) >= 3:
+        valid_cas.sort(key=lambda c: next(r['metric'] for r in phase2_results if r['c_ratio'] == c))
+        ca_window = abs(valid_cas[0] - valid_cas[min(2, len(valid_cas)-1)])
+        ca_lo = max(c_ratio_min, best_ca - ca_window)
+        ca_hi = min(c_ratio_max, best_ca + ca_window)
+    else:
+        ca_lo, ca_hi = max(c_ratio_min, best_ca - 0.3), min(c_ratio_max, best_ca + 0.3)
+    
+    # ========================================
+    # Phase 3: Scan b/a ratio at best (beta, c/a)
+    # ========================================
+    report(f"Phase 3: Scanning b/a ratio ({b_ratio_min}-{b_ratio_max}) at beta={best_beta:.1f}°, c/a={best_ca:.3f}...")
+    
+    ba_values = np.linspace(b_ratio_min, b_ratio_max, n_ba_fine)
+    phase3_results = []
+    
+    for ba in ba_values:
+        s_star, vol, metric = evaluate_params(best_beta, c_ratio=best_ca, b_ratio=ba)
+        result = {
+            'beta': best_beta,
+            'c_ratio': best_ca,
+            'b_ratio': float(ba),
+            's_star': s_star,
+            'volume': vol,
+            'metric': metric
+        }
+        phase3_results.append(result)
+        all_results.append(result)
+        
+        if metric is not None and metric < best_metric:
+            best_metric = metric
+            best_result = result
+    
+    best_ba = best_result['b_ratio']
+    report(f"Phase 3: Best b/a = {best_ba:.3f} (s³/V = {best_metric:.4f})")
+    
+    # ========================================
+    # Phase 4: Local refinement around best point
+    # ========================================
+    report(f"Phase 4: Refining around (beta={best_result['beta']:.1f}°, c/a={best_result['c_ratio']:.3f}, b/a={best_result['b_ratio']:.3f})...")
+    
+    # Refine beta
+    beta_refine = np.linspace(
+        max(beta_min, best_result['beta'] - 3),
+        min(beta_max, best_result['beta'] + 3),
+        n_refine
+    )
+    for beta in beta_refine:
+        s_star, vol, metric = evaluate_params(beta, best_result['c_ratio'], best_result['b_ratio'])
+        if metric is not None and metric < best_metric:
+            best_metric = metric
+            best_result = {
+                'beta': float(beta),
+                'c_ratio': best_result['c_ratio'],
+                'b_ratio': best_result['b_ratio'],
+                's_star': s_star,
+                'volume': vol,
+                'metric': metric
+            }
+    
+    # Refine c/a
+    ca_refine = np.linspace(
+        max(c_ratio_min, best_result['c_ratio'] - 0.15),
+        min(c_ratio_max, best_result['c_ratio'] + 0.15),
+        n_refine
+    )
+    for ca in ca_refine:
+        s_star, vol, metric = evaluate_params(best_result['beta'], ca, best_result['b_ratio'])
+        if metric is not None and metric < best_metric:
+            best_metric = metric
+            best_result = {
+                'beta': best_result['beta'],
+                'c_ratio': float(ca),
+                'b_ratio': best_result['b_ratio'],
+                's_star': s_star,
+                'volume': vol,
+                'metric': metric
+            }
+    
+    # Refine b/a
+    ba_refine = np.linspace(
+        max(b_ratio_min, best_result['b_ratio'] - 0.1),
+        min(b_ratio_max, best_result['b_ratio'] + 0.1),
+        n_refine
+    )
+    for ba in ba_refine:
+        s_star, vol, metric = evaluate_params(best_result['beta'], best_result['c_ratio'], ba)
+        if metric is not None and metric < best_metric:
+            best_metric = metric
+            best_result = {
+                'beta': best_result['beta'],
+                'c_ratio': best_result['c_ratio'],
+                'b_ratio': float(ba),
+                's_star': s_star,
+                'volume': vol,
+                'metric': metric
+            }
+    
+    report(f"Phase 4: Final result - beta={best_result['beta']:.1f}°, c/a={best_result['c_ratio']:.3f}, b/a={best_result['b_ratio']:.3f}")
+    
+    return {
+        'best': best_result,
+        'all_results': all_results,
+        'bravais_type': bravais_type,
+        'phases': {
+            'phase1_beta': phase1_results,
+            'phase2_ca': phase2_results,
+            'phase3_ba': phase3_results
+        }
+    }
+
+
+def scan_monoclinic_for_stoichiometry(
+    config: Dict,
+    metals: List[Dict],
+    anion_symbol: str,
+    anion_radius: float,
+    anion_charge: int,
+    target_cn: int,
+    expected_metal_counts: Dict[str, int],
+    expected_anion_count: int,
+    num_metals: int,
+    beta_min: float = 85.0,
+    beta_max: float = 125.0,
+    n_beta: int = 9,
+    n_ca: int = 11,
+    n_ba: int = 7,
+    progress_callback: Optional[Callable[[str], None]] = None
+) -> Optional[Dict]:
+    """
+    Scan monoclinic parameter space to find structures matching target stoichiometry.
+    
+    Similar to run_ca_scan_for_stoichiometry but for monoclinic with 3 parameters.
+    """
+    from position_calculator import (
+        calculate_stoichiometry_for_config,
+        check_stoichiometry_match
+    )
+    
+    coord_radii = tuple(m['radius'] + anion_radius for m in metals)
+    if len(coord_radii) == 1:
+        coord_radii = coord_radii[0]
+    
+    def report(msg: str):
+        if progress_callback:
+            progress_callback(msg)
+    
+    def evaluate_and_check_stoich(beta: float, c_ratio: float, b_ratio: float) -> Optional[Dict]:
+        """Evaluate structure and check stoichiometry match."""
+        # First get s* for this configuration
+        params = {
+            'a': 1.0,
+            'b_ratio': float(b_ratio),
+            'c_ratio': float(c_ratio),
+            'alpha': 90.0,
+            'beta': float(beta),
+            'gamma': 90.0
+        }
+        p = LatticeParams(**params)
+        sub = Sublattice(
+            name='M',
+            offsets=tuple(tuple(o) for o in config['offsets']),
+            alpha_ratio=coord_radii,
+            bravais_type=config['bravais_type']
+        )
+        s_star = find_threshold_s_for_N([sub], p, int(target_cn))
+        if s_star is None:
+            return None
+        
+        # Calculate stoichiometry
+        stoich = calculate_stoichiometry_for_config(
+            config_id=config['id'],
+            offsets=config['offsets'],
+            bravais_type=config['bravais_type'],
+            lattice_type='Monoclinic',
+            metals=metals,
+            anion_symbol=anion_symbol,
+            scale_s=s_star,
+            target_cn=target_cn,
+            anion_radius=anion_radius,
+            c_ratio=c_ratio,
+            b_ratio=b_ratio,
+            beta=beta
+        )
+        
+        if not stoich.success:
+            return None
+        
+        # Check match
+        matches, match_type = check_stoichiometry_match(
+            stoich.metal_counts,
+            stoich.anion_count,
+            expected_metal_counts,
+            expected_anion_count
+        )
+        
+        if not matches:
+            return None
+        
+        # Compute volume and metric
+        b = s_star * b_ratio
+        c = s_star * c_ratio
+        volume = s_star * b * c * np.sin(np.radians(beta))
+        metric = (s_star ** 3) / volume if volume > 0 else float('inf')
+        
+        return {
+            'beta': float(beta),
+            'c_ratio': float(c_ratio),
+            'b_ratio': float(b_ratio),
+            's_star': float(s_star),
+            'volume': float(volume),
+            'metric': float(metric),
+            'match_type': match_type,
+            'stoich_result': stoich,
+            'regularity': stoich.regularity if hasattr(stoich, 'regularity') else 0.0
+        }
+    
+    best_result = None
+    best_metric = float('inf')
+    all_matches = []
+    
+    # Phase 1: Scan beta with a=b=c
+    report(f"Monoclinic Phase 1: Scanning beta ({beta_min}°-{beta_max}°)...")
+    beta_values = np.linspace(beta_min, beta_max, n_beta)
+    
+    for beta in beta_values:
+        result = evaluate_and_check_stoich(beta, c_ratio=1.0, b_ratio=1.0)
+        if result is not None:
+            all_matches.append(result)
+            if result['metric'] < best_metric:
+                best_metric = result['metric']
+                best_result = result
+    
+    if best_result is None:
+        # No matches at a=b=c, try scanning c/a at different betas
+        report("Phase 1: No matches at a=b=c, expanding search...")
+        for beta in beta_values[::2]:  # Every other beta
+            for ca in np.linspace(0.6, 2.0, 8):
+                result = evaluate_and_check_stoich(beta, c_ratio=ca, b_ratio=1.0)
+                if result is not None:
+                    all_matches.append(result)
+                    if result['metric'] < best_metric:
+                        best_metric = result['metric']
+                        best_result = result
+    
+    if best_result is None:
+        return None
+    
+    best_beta = best_result['beta']
+    report(f"Phase 1: Found match at beta={best_beta:.1f}°")
+    
+    # Phase 2: Scan c/a at best beta
+    report(f"Monoclinic Phase 2: Scanning c/a at beta={best_beta:.1f}°...")
+    ca_values = np.linspace(0.5, 2.5, n_ca)
+    
+    for ca in ca_values:
+        result = evaluate_and_check_stoich(best_beta, c_ratio=ca, b_ratio=1.0)
+        if result is not None:
+            all_matches.append(result)
+            if result['metric'] < best_metric:
+                best_metric = result['metric']
+                best_result = result
+    
+    best_ca = best_result['c_ratio']
+    report(f"Phase 2: Best c/a={best_ca:.3f}")
+    
+    # Phase 3: Scan b/a at best (beta, c/a)
+    report(f"Monoclinic Phase 3: Scanning b/a at beta={best_beta:.1f}°, c/a={best_ca:.3f}...")
+    ba_values = np.linspace(0.7, 1.4, n_ba)
+    
+    for ba in ba_values:
+        result = evaluate_and_check_stoich(best_beta, c_ratio=best_ca, b_ratio=ba)
+        if result is not None:
+            all_matches.append(result)
+            if result['metric'] < best_metric:
+                best_metric = result['metric']
+                best_result = result
+    
+    best_ba = best_result['b_ratio']
+    report(f"Phase 3: Best b/a={best_ba:.3f}")
+    
+    # Phase 4: Local refinement
+    report("Monoclinic Phase 4: Refining...")
+    for beta in np.linspace(best_beta - 2, best_beta + 2, 5):
+        for ca in np.linspace(best_ca - 0.1, best_ca + 0.1, 3):
+            for ba in np.linspace(best_ba - 0.05, best_ba + 0.05, 3):
+                result = evaluate_and_check_stoich(beta, c_ratio=ca, b_ratio=ba)
+                if result is not None:
+                    all_matches.append(result)
+                    if result['metric'] < best_metric:
+                        best_metric = result['metric']
+                        best_result = result
+    
+    report(f"Final: beta={best_result['beta']:.1f}°, c/a={best_result['c_ratio']:.3f}, b/a={best_result['b_ratio']:.3f}")
+    
+    return {
+        'best': best_result,
+        'all_matches': all_matches,
+        's_star': best_result['s_star'],
+        'beta': best_result['beta'],
+        'c_ratio': best_result['c_ratio'],
+        'b_ratio': best_result['b_ratio'],
+        'match_type': best_result['match_type'],
+        'stoich_result': best_result['stoich_result'],
+        'regularity': best_result.get('regularity', 0.0)
+    }
