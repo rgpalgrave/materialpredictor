@@ -34,6 +34,18 @@ from position_calculator import (
     scan_ca_for_stoichiometry, CN_GEOMETRY_OPTIONS, GEOMETRY_LABELS
 )
 
+# Chemistry-based lattice prediction (new system)
+try:
+    from chemistry_predictor_integration import (
+        get_chemistry_predictor,
+        get_default_search_configs_chemistry,
+        get_chemistry_search_configs
+    )
+    CHEMISTRY_PREDICTOR_AVAILABLE = True
+except ImportError:
+    CHEMISTRY_PREDICTOR_AVAILABLE = False
+    print("Warning: chemistry_predictor_integration not available, using fallback")
+
 
 # =============================================================================
 # PERFORMANCE MONITORING SYSTEM
@@ -198,17 +210,23 @@ class HalfFilledStructure:
 
 
 def get_default_search_configs(num_metals: int, use_predictor: bool = True, 
-                                target_cn: int = None) -> List[dict]:
+                                target_cn: int = None,
+                                metals: List[dict] = None,
+                                anion_symbol: str = None,
+                                anion_charge: int = None) -> List[dict]:
     """
-    Get default search configurations using SublatticeFinder enumeration.
+    Get default search configurations using chemistry-based prediction.
     
-    Uses HNF-based sublattice enumeration to find all configurations where
-    all cation sites are equivalent (same coordination topology).
+    Now uses Pauling radius-ratio rules and bond allocation models to predict
+    likely lattice configurations from chemistry input.
     
     Args:
         num_metals: Number of metal sublattices (N)
         use_predictor: Whether to use advanced predictor if available (default: True)
         target_cn: Optional target CN for filtering (uses cn1_min filter)
+        metals: List of metal dicts with symbol, charge, ratio, cn, radius (NEW)
+        anion_symbol: Anion element symbol e.g. 'O', 'F' (NEW)
+        anion_charge: Anion charge magnitude (positive integer) (NEW)
         
     Returns:
         List of config dicts with keys: id, lattice, bravais_type, offsets, pattern, c_ratio
@@ -228,7 +246,34 @@ def get_default_search_configs(num_metals: int, use_predictor: bool = True,
              'offsets': [(0.0, 0.0, 0.0)], 'pattern': 'Hexagonal-P', 'c_ratio': 1.633, 'CN1': 6},
         ]
     
-    # Try SublatticeFinder first (new HNF-based enumeration)
+    # =========================================================================
+    # NEW: Try chemistry-based predictor first (if chemistry info provided)
+    # =========================================================================
+    if CHEMISTRY_PREDICTOR_AVAILABLE and metals is not None and anion_symbol is not None:
+        try:
+            predictor = get_chemistry_predictor()
+            if predictor.is_available():
+                configs = predictor.get_search_configs(
+                    metals=metals,
+                    anion_symbol=anion_symbol,
+                    anion_charge=anion_charge or 2,
+                    top_k=20,
+                    always_include_cubic=True,
+                    always_include_common=True,
+                    run_lattice_search=False  # Set True for full enumeration (slower)
+                )
+                if configs:
+                    # Add source tag for UI display
+                    for c in configs:
+                        if 'source' not in c:
+                            c['source'] = 'chemistry_predictor'
+                    return configs
+        except Exception as e:
+            print(f"Warning: Chemistry predictor failed, using fallback: {e}")
+    
+    # =========================================================================
+    # FALLBACK: Try SublatticeFinder (HNF-based enumeration)
+    # =========================================================================
     try:
         from sublattice_enumeration import SublatticeFinder
         from pathlib import Path
@@ -1108,9 +1153,15 @@ def run_full_analysis_chain(
         # Step 2: Get default configurations and calculate minimum scale factors
         update_progress(2, 6, "Finding minimum scale factors...")
         
-        # Get default search configurations using SublatticeFinder enumeration
-        # Pass target_cn to filter configurations by coordination number
-        search_configs = get_default_search_configs(num_metals, target_cn=target_cn)
+        # Get search configurations using chemistry-based prediction
+        # Pass full chemistry info for Pauling radius-ratio rule predictions
+        search_configs = get_default_search_configs(
+            num_metals, 
+            target_cn=target_cn,
+            metals=metals,
+            anion_symbol=anion_symbol,
+            anion_charge=anion_charge
+        )
         
         # Compute coordination radii as (r_metal + r_anion) for each metal
         coord_radii = tuple(m['radius'] + anion_radius for m in metals)
@@ -2039,6 +2090,16 @@ def main():
         
         # Show performance report
         monitor.show_report(st)
+        
+        # Chemistry predictor status
+        st.divider()
+        st.header("🧪 Predictor Status")
+        if CHEMISTRY_PREDICTOR_AVAILABLE:
+            st.success("Chemistry predictor: ✅ Active")
+            st.caption("Using Pauling radius-ratio rules and bond allocation models")
+        else:
+            st.warning("Chemistry predictor: ⚠️ Unavailable")
+            st.caption("Using fallback empirical predictor")
     
     # Main content - full width
     st.header("⚙️ Composition Setup")
