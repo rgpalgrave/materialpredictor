@@ -124,6 +124,10 @@ def get_chemistry_search_configs(
     
     Uses Pauling radius-ratio rules and bond allocation models
     to predict likely lattice configurations.
+    
+    Note: The CN values in SearchSpecs refer to cation-ANION coordination
+    (chemistry), while lattice_search computes cation-CATION neighbors
+    (geometry). We filter by geometry constraints only during lattice search.
     """
     if not _ensure_imports():
         return []
@@ -159,7 +163,7 @@ def get_chemistry_search_configs(
         orbit_species = spec.get('orbit_species', [m['symbol'] for m in metals])
         m_list = spec.get('M_list', [2, 4, 8])
         
-        # Get CN targets from chemistry echo
+        # Get CN targets from chemistry echo (for labeling, not constraint filtering)
         chem_echo = spec.get('chemistry', {})
         cn_targets = chem_echo.get('cn_targets', {})
         
@@ -183,7 +187,7 @@ def get_chemistry_search_configs(
             offsets = _generate_simple_offsets(orbit_sizes, M, bravais_type)
             
             # Build config ID
-            cn_str = "_".join([f"{sp}CN{cn_targets.get(sp, '?')}" 
+            cn_str = "_".join([f"{sp}CN{_format_cn(cn_targets.get(sp, '?'))}" 
                               for sp in orbit_species])
             config_id = f"CHEM-{parent_name}-{cn_str}-{i}"
             
@@ -216,16 +220,17 @@ def get_chemistry_search_configs(
                 'orbit_species': orbit_species,
             })
     
-    # If requested, also run full lattice search
+    # If requested, also run full lattice search with GEOMETRY-ONLY constraints
     if run_lattice_search and specs:
         try:
-            lattice_configs = _run_lattice_search(
+            lattice_configs = _run_lattice_search_geometry(
                 specs[:3],
                 metals,
                 top_k=top_k,
                 diagonal_only=diagonal_only,
                 verbose=verbose
             )
+            # Prepend lattice search results
             configs = lattice_configs + configs
         except Exception as e:
             if verbose:
@@ -241,6 +246,13 @@ def get_chemistry_search_configs(
             unique_configs.append(c)
     
     return unique_configs[:top_k]
+
+
+def _format_cn(cn_val):
+    """Format CN value for display."""
+    if isinstance(cn_val, list):
+        return str(cn_val[0]) if cn_val else '?'
+    return str(cn_val)
 
 
 def _generate_simple_offsets(
@@ -273,6 +285,113 @@ def _generate_simple_offsets(
     return offsets
 
 
+def _run_lattice_search_geometry(
+    specs: List[Dict],
+    metals: List[Dict],
+    top_k: int = 10,
+    diagonal_only: bool = True,
+    verbose: bool = False
+) -> List[Dict]:
+    """
+    Run lattice search with GEOMETRY-ONLY constraints.
+    
+    Uses only: min separation, shell gap, uniformity
+    Does NOT use CN constraints (those are for cation-anion, not cation-cation).
+    """
+    if not _ensure_imports():
+        return []
+    
+    all_configs = []
+    
+    # Import lattice matrices
+    from lattice_search import (
+        search_and_analyze, 
+        SC_PRIMITIVE, BCC_PRIMITIVE, FCC_PRIMITIVE
+    )
+    
+    parent_lattices = {
+        'SC': SC_PRIMITIVE,
+        'BCC': BCC_PRIMITIVE,
+        'FCC': FCC_PRIMITIVE,
+    }
+    
+    for spec in specs:
+        orbit_sizes = spec.get('orbit_sizes', [1])
+        orbit_species = spec.get('orbit_species', [m['symbol'] for m in metals])
+        m_list = spec.get('M_list', [2, 4, 8])
+        
+        for parent in spec.get('parent_lattices', []):
+            parent_name = parent.get('name', 'SC')
+            if parent_name not in parent_lattices:
+                continue
+                
+            lattice_matrix = parent_lattices[parent_name]
+            
+            try:
+                raw_configs = search_and_analyze(
+                    lattice=lattice_matrix,
+                    a=1.0,
+                    orbit_sizes=orbit_sizes,
+                    M_list=m_list[:3],  # Limit M values
+                    diagonal_only=diagonal_only,
+                    max_per_hnf=20,
+                    verbose=False,
+                    parent_basis_name=f'{parent_name}-primitive'
+                )
+                
+                # Filter by GEOMETRY only
+                for cfg in raw_configs:
+                    # Geometry constraints
+                    if cfg.min_distance < 0.25:
+                        continue
+                    if cfg.shell_gap < 0.05:
+                        continue
+                    if not cfg.is_uniform:
+                        continue
+                    
+                    # Extract offsets
+                    offsets = []
+                    for orbit_idx in range(len(orbit_sizes)):
+                        coords = cfg.get_fractional_coords(orbit_idx)
+                        if len(coords) > 0:
+                            offsets.append(tuple(coords[0].tolist()))
+                    
+                    if not offsets:
+                        continue
+                    
+                    # Get CN info (for display only)
+                    cn1_list = [cfg.signatures[j].cn1 for j in range(len(orbit_sizes))]
+                    
+                    # Map to bravais type
+                    bravais_map = {'SC': 'cubic_P', 'BCC': 'cubic_I', 'FCC': 'cubic_F'}
+                    bravais_type = bravais_map.get(parent_name, 'cubic_P')
+                    
+                    config_id = f"ENUM-{parent_name}-M{len(cfg.G)}-{len(all_configs)}"
+                    
+                    all_configs.append({
+                        'id': config_id,
+                        'lattice': 'Cubic',
+                        'bravais_type': bravais_type,
+                        'offsets': list(offsets),
+                        'pattern': f"M={len(cfg.G)} geom_CN={cn1_list}",
+                        'c_ratio': 1.0,
+                        'CN1': sum(cn1_list) // len(cn1_list) if cn1_list else 6,
+                        'source': 'lattice_enumeration',
+                        'min_distance': cfg.min_distance,
+                        'shell_gap': cfg.shell_gap,
+                        'orbit_species': orbit_species,
+                    })
+                    
+            except Exception as e:
+                if verbose:
+                    print(f"Error searching {parent_name}: {e}")
+    
+    # Sort by min_distance (larger = better separation)
+    all_configs.sort(key=lambda x: -x.get('min_distance', 0))
+    
+    return all_configs[:top_k]
+
+
 def _run_lattice_search(
     specs: List[Dict],
     metals: List[Dict],
@@ -280,69 +399,8 @@ def _run_lattice_search(
     diagonal_only: bool = True,
     verbose: bool = False
 ) -> List[Dict]:
-    """Run full lattice search for given specs."""
-    if not _ensure_imports():
-        return []
-    
-    all_configs = []
-    
-    for spec in specs:
-        try:
-            cation_configs = lattice_search_integration.run_search_spec(
-                spec,
-                top_K=top_k,
-                diagonal_only=diagonal_only,
-                max_per_hnf=30,
-                verbose=verbose
-            )
-            
-            for j, cc in enumerate(cation_configs):
-                lattice_name = cc['lattice']['name']
-                
-                if 'FCC' in lattice_name:
-                    bravais_type = 'cubic_F'
-                elif 'BCC' in lattice_name:
-                    bravais_type = 'cubic_I'
-                elif 'SC' in lattice_name:
-                    bravais_type = 'cubic_P'
-                else:
-                    bravais_type = 'cubic_P'
-                
-                lattice_type = BRAVAIS_TO_LATTICE.get(bravais_type, 'Cubic')
-                
-                offsets = []
-                for orbit_data in cc.get('offsets', []):
-                    frac_coords = orbit_data.get('frac_coords', [])
-                    if frac_coords:
-                        offsets.append(tuple(frac_coords[0]))
-                
-                if not offsets:
-                    continue
-                
-                cn1_list = cc.get('cn_shells', {}).get('CN1', [])
-                cn1_avg = sum(cn1_list) // len(cn1_list) if cn1_list else 6
-                
-                config_id = f"ENUM-{lattice_name}-M{cc['M']}-{j}"
-                
-                all_configs.append({
-                    'id': config_id,
-                    'lattice': lattice_type,
-                    'bravais_type': bravais_type,
-                    'offsets': offsets,
-                    'pattern': f"M={cc['M']} CN1={cn1_list}",
-                    'c_ratio': 1.0,
-                    'CN1': cn1_avg,
-                    'source': 'lattice_enumeration',
-                    'score': cc.get('score', 0),
-                    'min_distance': cc.get('min_distance', 0),
-                })
-                
-        except Exception as e:
-            if verbose:
-                print(f"Error in lattice search: {e}")
-    
-    all_configs.sort(key=lambda x: -x.get('score', 0))
-    return all_configs[:top_k]
+    """Alias for geometry-based search."""
+    return _run_lattice_search_geometry(specs, metals, top_k, diagonal_only, verbose)
 
 
 class ChemistryPredictor:
