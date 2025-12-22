@@ -301,9 +301,18 @@ def get_chemistry_search_configs(
     # If requested, also run full lattice search with GEOMETRY-ONLY constraints
     if run_lattice_search and specs:
         try:
-            # Limit specs to first 10 for lattice search (function deduplicates anyway)
+            # Select specs that cover ALL unique orbit_sizes (not just first 10)
+            # This ensures we search [1,2], [2,4], etc. for spinel-type structures
+            selected_specs = []
+            seen_orbit_sizes = set()
+            for spec in specs:
+                orbit_key = tuple(spec.get('orbit_sizes', []))
+                if orbit_key not in seen_orbit_sizes:
+                    seen_orbit_sizes.add(orbit_key)
+                    selected_specs.append(spec)
+            
             lattice_configs = _run_lattice_search_geometry(
-                specs[:10],  # Limit to first 10 specs (deduplicates internally)
+                selected_specs,  # All unique orbit_sizes
                 metals,
                 top_k=top_k * 2,  # Get more from enumeration
                 diagonal_only=diagonal_only,
@@ -399,6 +408,11 @@ def _generate_offset_patterns(n_offsets: int, bravais_type: str) -> List[List[Tu
     edge_x = (0.5, 0.0, 0.0)
     edge_y = (0.0, 0.5, 0.0)
     edge_z = (0.0, 0.0, 0.5)
+    # Spinel tetrahedral sites (1/8 positions)
+    eighth = (0.125, 0.125, 0.125)
+    eighth_alt = (0.375, 0.375, 0.375)
+    eighth_5 = (0.625, 0.625, 0.625)
+    eighth_7 = (0.875, 0.875, 0.875)
     
     if n_offsets == 1:
         return [[origin]]
@@ -412,6 +426,10 @@ def _generate_offset_patterns(n_offsets: int, bravais_type: str) -> List[List[Tu
     
     elif n_offsets == 3:
         return [
+            # True spinel-like: 1 tetrahedral (1/8) + 2 octahedral
+            [eighth, edge_x, edge_y],
+            [eighth, face_xy, face_xz],
+            # Original patterns
             [origin, quarter, body_center],           # Spinel-like
             [origin, quarter, three_quarter],         # Tetrahedral sites
             [origin, face_xy, face_xz],               # Face centers
@@ -427,7 +445,12 @@ def _generate_offset_patterns(n_offsets: int, bravais_type: str) -> List[List[Tu
     
     elif n_offsets == 6:
         return [
-            # Spinel: 2 tetrahedral + 4 octahedral-like
+            # True spinel: 2 tetrahedral (1/8 sites) + 4 octahedral (edge centers)
+            # For orbit_species=['Mg','Mg','Al','Al','Al','Al']
+            [eighth, eighth_5, edge_x, edge_y, edge_z, body_center],
+            # Alternate spinel arrangement
+            [eighth, eighth_alt, face_xy, face_xz, face_yz, origin],
+            # Original patterns
             [origin, quarter, body_center, three_quarter, face_xy, face_xz],
             [origin, quarter, edge_x, edge_y, edge_z, body_center],
         ]
@@ -695,11 +718,18 @@ def _run_lattice_search_geometry(
                 lattice_matrix, bravais_type, lattice_type = parent_lattices[lattice_name]
             
                 try:
+                    # Use fewer M values for larger orbit sizes (more HNFs to search)
+                    n_atoms = sum(orbit_sizes)
+                    if n_atoms > 4:
+                        m_vals = m_list[:1]  # Just first M value for large orbits
+                    else:
+                        m_vals = m_list[:2]
+                    
                     raw_configs = search_and_analyze(
                         lattice=lattice_matrix,
                         a=1.0,
                         orbit_sizes=orbit_sizes,
-                        M_list=m_list[:2],  # Use first 2 M values for speed (e.g., [4, 8])
+                        M_list=m_vals,
                         diagonal_only=diagonal_only,
                         max_per_hnf=10,  # Reduced for speed
                         verbose=False,
