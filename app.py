@@ -231,23 +231,10 @@ def get_default_search_configs(num_metals: int, use_predictor: bool = True,
     Returns:
         List of config dicts with keys: id, lattice, bravais_type, offsets, pattern, c_ratio
     """
-    # Special case: N=1 (single sublattice) - trivially all sites equivalent
-    if num_metals == 1:
-        return [
-            {'id': 'N1-cubic_P', 'lattice': 'Cubic', 'bravais_type': 'cubic_P',
-             'offsets': [(0.0, 0.0, 0.0)], 'pattern': 'Primitive', 'c_ratio': 1.0, 'CN1': 6},
-            {'id': 'N1-cubic_F', 'lattice': 'Cubic', 'bravais_type': 'cubic_F',
-             'offsets': [(0.0, 0.0, 0.0)], 'pattern': 'FCC', 'c_ratio': 1.0, 'CN1': 12},
-            {'id': 'N1-cubic_I', 'lattice': 'Cubic', 'bravais_type': 'cubic_I',
-             'offsets': [(0.0, 0.0, 0.0)], 'pattern': 'BCC', 'c_ratio': 1.0, 'CN1': 8},
-            {'id': 'N1-tetragonal_P', 'lattice': 'Tetragonal', 'bravais_type': 'tetragonal_P',
-             'offsets': [(0.0, 0.0, 0.0)], 'pattern': 'Tetragonal-P', 'c_ratio': 1.0, 'CN1': 6},
-            {'id': 'N1-hexagonal_P', 'lattice': 'Hexagonal', 'bravais_type': 'hexagonal_P',
-             'offsets': [(0.0, 0.0, 0.0)], 'pattern': 'Hexagonal-P', 'c_ratio': 1.633, 'CN1': 6},
-        ]
-    
     # =========================================================================
     # NEW: Try chemistry-based predictor first (if chemistry info provided)
+    # The chemistry predictor handles N=1 cases properly by generating
+    # multiple atoms per cell (e.g., rutile has 2 Ti even though there's 1 Ti species)
     # =========================================================================
     if CHEMISTRY_PREDICTOR_AVAILABLE and metals is not None and anion_symbol is not None:
         try:
