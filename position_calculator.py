@@ -896,7 +896,8 @@ def calculate_stoichiometry_for_config(
     cluster_eps_frac: float = 0.03,
     c_ratio: Optional[float] = None,  # Optional c/a ratio override
     b_ratio: Optional[float] = None,  # Optional b/a ratio override (for monoclinic)
-    beta: Optional[float] = None      # Optional beta angle override (for monoclinic)
+    beta: Optional[float] = None,     # Optional beta angle override (for monoclinic)
+    orbit_species: Optional[List[str]] = None  # NEW: Explicit species for each offset
 ) -> StoichiometryResult:
     """
     Calculate stoichiometry for a single configuration.
@@ -978,7 +979,10 @@ def calculate_stoichiometry_for_config(
         
         for offset_idx, offset in enumerate(offsets):
             # Get metal symbol for this offset
-            if offset_idx < len(metals):
+            # Priority: orbit_species > metals list > fallback "M{n}"
+            if orbit_species is not None and offset_idx < len(orbit_species):
+                symbol = orbit_species[offset_idx]
+            elif offset_idx < len(metals):
                 symbol = metals[offset_idx]['symbol']
             else:
                 symbol = f"M{offset_idx+1}"

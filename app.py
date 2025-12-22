@@ -531,7 +531,8 @@ def run_ca_scan_for_stoichiometry(
                         target_cn=target_cn,
                         anion_radius=anion_radius,
                         cluster_eps_frac=0.03,
-                        c_ratio=c_ratio
+                        c_ratio=c_ratio,
+                        orbit_species=config.get('orbit_species')
                     )
                 
                 if not stoich_result.success:
@@ -624,7 +625,8 @@ def run_ca_scan_for_stoichiometry(
                             target_cn=target_cn,
                             anion_radius=anion_radius,
                             cluster_eps_frac=0.03,
-                            c_ratio=c_ratio
+                            c_ratio=c_ratio,
+                        orbit_species=config.get('orbit_species')
                         )
                     
                     if not stoich_result.success:
@@ -764,7 +766,8 @@ def run_ca_scan_for_stoichiometry(
                             target_cn=target_cn,
                             anion_radius=anion_radius,
                             cluster_eps_frac=0.03,
-                            c_ratio=c_ratio
+                            c_ratio=c_ratio,
+                        orbit_species=config.get('orbit_species')
                         )
                     
                     if not stoich_result.success:
@@ -1213,7 +1216,8 @@ def run_full_analysis_chain(
                         'bravais_type': config['bravais_type'],
                         'offsets': config['offsets'],
                         'coord_radii': coord_radii,
-                        'c_ratio': config['c_ratio']
+                        'c_ratio': config['c_ratio'],
+                        'orbit_species': config.get('orbit_species')
                     }
             except Exception:
                 pass
@@ -1238,7 +1242,8 @@ def run_full_analysis_chain(
                         scale_s=result['s_star'],
                         target_cn=target_cn,
                         anion_radius=anion_radius,
-                        c_ratio=matching_config['c_ratio']
+                        c_ratio=matching_config['c_ratio'],
+                        orbit_species=matching_config.get('orbit_species')
                     )
                     if stoich_check.success:
                         matches, _ = check_stoichiometry_match(
@@ -1384,7 +1389,8 @@ def run_full_analysis_chain(
                         'bravais_type': config['bravais_type'],
                         'offsets': config['offsets'],
                         'coord_radii': coord_radii,
-                        'c_ratio': config['c_ratio']
+                        'c_ratio': config['c_ratio'],
+                        'orbit_species': config.get('orbit_species')
                     }
             except Exception:
                 pass
@@ -1417,7 +1423,8 @@ def run_full_analysis_chain(
                     target_cn=target_cn,
                     anion_radius=anion_radius,
                     cluster_eps_frac=0.03,
-                    c_ratio=config_data.get('c_ratio')  # Pass the c/a ratio used
+                    c_ratio=config_data.get('c_ratio'),
+                    orbit_species=config_data.get('orbit_species')
                 )
                 stoich_results[config_id] = stoich_result
             except Exception:
@@ -3287,7 +3294,8 @@ def main():
                                 scale_s=config_data['s_star'],
                                 target_cn=target_cn,
                                 anion_radius=anion_rad,
-                                cluster_eps_frac=0.03
+                                cluster_eps_frac=0.03,
+                                orbit_species=config_data.get('orbit_species')
                             )
                             stoich_results[config_id] = result
                         
