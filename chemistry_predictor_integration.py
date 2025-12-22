@@ -210,6 +210,26 @@ def get_chemistry_search_configs(
                                   for sp in orbit_species])
                 config_id = f"CHEM-{parent_name}-{cn_str}-{i}-p{pattern_idx}"
                 
+                # IMPORTANT: Expand orbit_species to match offsets
+                # orbit_species=['Ti'] with orbit_sizes=[2] → expanded=['Ti', 'Ti']
+                # orbit_species=['Mg','Al'] with orbit_sizes=[1,2] → expanded=['Mg', 'Al', 'Al']
+                expanded_species = []
+                for sp, size in zip(orbit_species, orbit_sizes):
+                    expanded_species.extend([sp] * size)
+                
+                # If we have more offsets than expanded_species (from diverse patterns),
+                # repeat the last species or use the pattern
+                while len(expanded_species) < len(offsets):
+                    # For single-species systems, just repeat that species
+                    if len(set(orbit_species)) == 1:
+                        expanded_species.append(orbit_species[0])
+                    else:
+                        # Multi-species: this shouldn't happen with proper generation
+                        expanded_species.append(expanded_species[-1] if expanded_species else 'M')
+                
+                # Trim if we have too many
+                expanded_species = expanded_species[:len(offsets)]
+                
                 configs.append({
                     'id': config_id,
                     'lattice': lattice_type,
@@ -222,7 +242,7 @@ def get_chemistry_search_configs(
                     'source': 'chemistry_predictor',
                     'spec_index': i,
                     'orbit_sizes': orbit_sizes,
-                    'orbit_species': orbit_species,
+                    'orbit_species': expanded_species,  # Use expanded list
                 })
     
     # If requested, also run full lattice search with GEOMETRY-ONLY constraints
@@ -583,16 +603,21 @@ class ChemistryPredictor:
         )
         
         if always_include_cubic:
-            configs = self._ensure_cubic(configs, len(metals))
+            configs = self._ensure_cubic(configs, metals)
         
         if always_include_common:
-            configs = self._ensure_common(configs, len(metals))
+            configs = self._ensure_common(configs, metals)
         
         return configs
     
-    def _ensure_cubic(self, configs: List[Dict], num_metals: int) -> List[Dict]:
+    def _ensure_cubic(self, configs: List[Dict], metals: List[Dict]) -> List[Dict]:
         """Ensure cubic P/I/F are always included."""
         existing = set(c['bravais_type'] for c in configs)
+        num_metals = len(metals)
+        
+        # For single-species systems, all offsets are the same element
+        # For multi-species, use the first metal as default
+        default_species = metals[0]['symbol'] if metals else 'M'
         
         cubic_templates = {
             'cubic_P': 6,
@@ -603,6 +628,8 @@ class ChemistryPredictor:
         for bravais, cn1 in cubic_templates.items():
             if bravais not in existing:
                 offsets = _generate_simple_offsets([1]*num_metals, num_metals, bravais)
+                # Create orbit_species matching offsets
+                orbit_species = [default_species] * len(offsets)
                 configs.append({
                     'id': f'CUBIC-{bravais}-N{num_metals}',
                     'lattice': 'Cubic',
@@ -612,11 +639,12 @@ class ChemistryPredictor:
                     'c_ratio': 1.0,
                     'CN1': cn1,
                     'source': 'always_cubic',
+                    'orbit_species': orbit_species,
                 })
         
         return configs
     
-    def _ensure_common(self, configs: List[Dict], num_metals: int) -> List[Dict]:
+    def _ensure_common(self, configs: List[Dict], metals: List[Dict]) -> List[Dict]:
         """
         Ensure common lattice types are included.
         
@@ -627,6 +655,9 @@ class ChemistryPredictor:
         
         For primitive lattices (P), we need explicit offsets for multi-atom cells.
         """
+        num_metals = len(metals)
+        default_species = metals[0]['symbol'] if metals else 'M'
+        
         # Track existing configs by (bravais_type, n_offsets)
         existing = set((c['bravais_type'], len(c.get('offsets', []))) for c in configs)
         
@@ -654,6 +685,7 @@ class ChemistryPredictor:
                         'c_ratio': c_ratio,
                         'CN1': 6,
                         'source': 'always_common',
+                        'orbit_species': [default_species],  # 1 offset
                     })
             else:
                 # Primitive lattice: generate N=1 and N=2 versions
@@ -674,6 +706,7 @@ class ChemistryPredictor:
                             'c_ratio': c_ratio,
                             'CN1': 6,
                             'source': 'always_common',
+                            'orbit_species': [default_species] * len(offsets),
                         })
         
         return configs
