@@ -211,9 +211,28 @@ def get_chemistry_search_configs(
             bravais_variants = parent_to_bravais_list.get(parent_name, [('cubic_P', 'Cubic', 1.0)])
             
             for bravais_type, lattice_type, fixed_c_ratio in bravais_variants:
-                # Generate MULTIPLE diverse offset patterns
-                N = sum(orbit_sizes)
-                offset_patterns = _generate_diverse_offsets(N, bravais_type)
+                # Determine centering factor
+                centering_factor = 1
+                if bravais_type.endswith('_I') or bravais_type.endswith('_C') or bravais_type == 'hexagonal_H':
+                    centering_factor = 2
+                elif bravais_type.endswith('_F'):
+                    centering_factor = 4
+                
+                # For multi-species: find valid offset counts
+                # n_offsets × centering must be divisible by sum(ratios)
+                metal_ratios = [m.get('ratio', 1) for m in metals]
+                ratio_sum = sum(metal_ratios)
+                
+                # Generate offset patterns with valid counts for stoichiometry
+                offset_patterns = _generate_diverse_offsets_stoich(
+                    orbit_sizes=orbit_sizes,
+                    bravais_type=bravais_type,
+                    centering_factor=centering_factor,
+                    ratio_sum=ratio_sum
+                )
+                
+                if not offset_patterns:
+                    continue  # Skip if no valid patterns for this centering
                 
                 # Get c/a ratio
                 if fixed_c_ratio is not None:
@@ -239,25 +258,30 @@ def get_chemistry_search_configs(
                                       for sp in orbit_species])
                     config_id = f"CHEM-{parent_name}-{bravais_type}-{cn_str}-{i}-p{pattern_idx}"
                     
-                    # IMPORTANT: Expand orbit_species to match offsets
-                    # orbit_species=['Ti'] with orbit_sizes=[2] → expanded=['Ti', 'Ti']
-                    # orbit_species=['Mg','Al'] with orbit_sizes=[1,2] → expanded=['Mg', 'Al', 'Al']
-                    expanded_species = []
-                    for sp, size in zip(orbit_species, orbit_sizes):
-                        expanded_species.extend([sp] * size)
+                    # Assign species to offsets based on stoichiometric ratios
+                    # With centering, total_atoms = n_offsets × centering_factor
+                    # Species assigned proportionally: for Mg:Al=1:2 with 3 offsets → 1 Mg, 2 Al
+                    n_offsets = len(offsets)
+                    total_atoms = n_offsets * centering_factor
                     
-                    # If we have more offsets than expanded_species (from diverse patterns),
-                    # repeat the last species or use the pattern
-                    while len(expanded_species) < len(offsets):
-                        # For single-species systems, just repeat that species
-                        if len(set(orbit_species)) == 1:
-                            expanded_species.append(orbit_species[0])
-                        else:
-                            # Multi-species: this shouldn't happen with proper generation
-                            expanded_species.append(expanded_species[-1] if expanded_species else 'M')
+                    # Distribute species based on ratio
+                    assigned_species = []
+                    remaining = n_offsets
+                    for idx, (sp, ratio) in enumerate(zip(orbit_species, metal_ratios)):
+                        # Proportion of this species
+                        n_for_species = round(n_offsets * ratio / ratio_sum)
+                        # Ensure at least 1 for each species if we have enough offsets
+                        if n_for_species == 0 and remaining > 0 and idx < len(orbit_species) - 1:
+                            n_for_species = 1
+                        n_for_species = min(n_for_species, remaining)
+                        assigned_species.extend([sp] * n_for_species)
+                        remaining -= n_for_species
                     
-                    # Trim if we have too many
-                    expanded_species = expanded_species[:len(offsets)]
+                    # Assign any remaining to last species
+                    while len(assigned_species) < n_offsets:
+                        assigned_species.append(orbit_species[-1])
+                    
+                    expanded_species = assigned_species[:n_offsets]
                     
                     configs.append({
                         'id': config_id,
@@ -311,6 +335,111 @@ def _format_cn(cn_val):
     return str(cn_val)
 
 
+def _generate_diverse_offsets_stoich(
+    orbit_sizes: List[int],
+    bravais_type: str,
+    centering_factor: int,
+    ratio_sum: int
+) -> List[List[Tuple[float, float, float]]]:
+    """
+    Generate offset patterns that are compatible with stoichiometry.
+    
+    For multi-species: n_offsets × centering_factor must equal total atoms
+    where total atoms maintains the stoichiometric ratio.
+    
+    Args:
+        orbit_sizes: [n1, n2, ...] atoms per species
+        bravais_type: Bravais lattice type
+        centering_factor: 1 (P), 2 (I/C/H), 4 (F)
+        ratio_sum: sum of metal ratios (e.g., 3 for Mg:Al = 1:2)
+    """
+    total_atoms_needed = sum(orbit_sizes)
+    
+    # Find valid offset counts: n_offsets × centering = k × ratio_sum
+    # where k is an integer multiplier
+    valid_offset_counts = []
+    for k in range(1, 10):  # Try multipliers 1-9
+        total_atoms = k * ratio_sum
+        if total_atoms % centering_factor == 0:
+            n_offsets = total_atoms // centering_factor
+            if n_offsets >= 1 and n_offsets <= 8:  # Reasonable range
+                valid_offset_counts.append(n_offsets)
+    
+    # Remove duplicates and sort
+    valid_offset_counts = sorted(set(valid_offset_counts))
+    
+    if not valid_offset_counts:
+        # Fallback: use total_atoms_needed directly for primitive
+        if centering_factor == 1:
+            valid_offset_counts = [total_atoms_needed]
+        else:
+            return []
+    
+    # Generate patterns for each valid count
+    all_patterns = []
+    for n_offsets in valid_offset_counts:
+        patterns = _generate_offset_patterns(n_offsets, bravais_type)
+        all_patterns.extend(patterns)
+    
+    return all_patterns
+
+
+def _generate_offset_patterns(n_offsets: int, bravais_type: str) -> List[List[Tuple[float, float, float]]]:
+    """Generate diverse offset patterns for a given count."""
+    
+    # Common offset positions (fractional coordinates)
+    origin = (0.0, 0.0, 0.0)
+    body_center = (0.5, 0.5, 0.5)
+    quarter = (0.25, 0.25, 0.25)
+    three_quarter = (0.75, 0.75, 0.75)
+    face_xy = (0.5, 0.5, 0.0)
+    face_xz = (0.5, 0.0, 0.5)
+    face_yz = (0.0, 0.5, 0.5)
+    edge_x = (0.5, 0.0, 0.0)
+    edge_y = (0.0, 0.5, 0.0)
+    edge_z = (0.0, 0.0, 0.5)
+    
+    if n_offsets == 1:
+        return [[origin]]
+    
+    elif n_offsets == 2:
+        return [
+            [origin, body_center],
+            [origin, quarter],
+            [origin, face_xy],
+        ]
+    
+    elif n_offsets == 3:
+        return [
+            [origin, quarter, body_center],           # Spinel-like
+            [origin, quarter, three_quarter],         # Tetrahedral sites
+            [origin, face_xy, face_xz],               # Face centers
+            [origin, edge_x, edge_y],                 # Edge centers
+        ]
+    
+    elif n_offsets == 4:
+        return [
+            [origin, quarter, body_center, three_quarter],  # Full tetrahedral
+            [origin, face_xy, face_xz, face_yz],            # All face centers
+            [origin, quarter, face_xy, edge_x],             # Mixed
+        ]
+    
+    elif n_offsets == 6:
+        return [
+            # Spinel: 2 tetrahedral + 4 octahedral-like
+            [origin, quarter, body_center, three_quarter, face_xy, face_xz],
+            [origin, quarter, edge_x, edge_y, edge_z, body_center],
+        ]
+    
+    else:
+        # Generic: origin plus evenly spaced along body diagonal
+        pattern = [origin]
+        for i in range(1, n_offsets):
+            frac = i / n_offsets
+            pattern.append((frac, frac, frac))
+        return [pattern]
+
+
 def _generate_diverse_offsets(
     N: int,
     bravais_type: str
@@ -343,8 +472,22 @@ def _generate_diverse_offsets(
             return [[(0.0, 0.0, 0.0)]]  # 4 atoms via centering
         elif N <= 8:
             return [
-                [(0.0, 0.0, 0.0), (0.25, 0.25, 0.25)],  # 8 atoms
-                [(0.0, 0.0, 0.0), (0.5, 0.5, 0.5)],      # 8 atoms, different
+                [(0.0, 0.0, 0.0), (0.25, 0.25, 0.25)],  # 8 atoms - spinel-type
+                [(0.0, 0.0, 0.0), (0.5, 0.5, 0.5)],      # 8 atoms, BCC-like
+            ]
+        elif N <= 12:
+            # Spinel-type: tetrahedral + octahedral sites
+            return [
+                # Spinel pattern: 2 tetrahedral + 1 octahedral offset
+                [(0.0, 0.0, 0.0), (0.25, 0.25, 0.25), (0.5, 0.0, 0.0)],
+                [(0.0, 0.0, 0.0), (0.25, 0.25, 0.25), (0.5, 0.5, 0.0)],
+            ]
+        elif N <= 24:
+            # Full spinel with all cation sites
+            return [
+                # All tetrahedral + octahedral
+                [(0.0, 0.0, 0.0), (0.25, 0.25, 0.25), (0.5, 0.0, 0.0), (0.5, 0.25, 0.25)],
+                [(0.0, 0.0, 0.0), (0.25, 0.25, 0.25), (0.75, 0.75, 0.75), (0.5, 0.5, 0.0)],
             ]
         else:
             return [[(0.0, 0.0, 0.0)]]
