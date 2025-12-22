@@ -138,11 +138,12 @@ def get_chemistry_search_configs(
     if verbose:
         print(f"Chemistry: {chemistry}")
     
-    # Generate search specs
+    # Generate search specs with higher top_X to ensure diverse orbit structures
+    # We'll filter final configs to top_k later
     try:
         specs = orbit_search_generator.generate_search_specs(
             chemistry, 
-            top_X=top_k,
+            top_X=max(top_k * 3, 50),  # Get more specs for diversity
             m_max=4,
             M_max=32
         )
@@ -182,14 +183,9 @@ def get_chemistry_search_configs(
             bravais_type = parent_to_bravais.get(parent_name, 'cubic_P')
             lattice_type = BRAVAIS_TO_LATTICE.get(bravais_type, 'Cubic')
             
-            # Generate offsets from orbit structure
-            M = m_list[0] if m_list else sum(orbit_sizes)
-            offsets = _generate_simple_offsets(orbit_sizes, M, bravais_type)
-            
-            # Build config ID
-            cn_str = "_".join([f"{sp}CN{_format_cn(cn_targets.get(sp, '?'))}" 
-                              for sp in orbit_species])
-            config_id = f"CHEM-{parent_name}-{cn_str}-{i}"
+            # Generate MULTIPLE diverse offset patterns
+            N = sum(orbit_sizes)
+            offset_patterns = _generate_diverse_offsets(N, bravais_type)
             
             # Get c/a ratio
             c_ratio = DEFAULT_C_RATIOS.get(lattice_type, 1.0)
@@ -205,44 +201,53 @@ def get_chemistry_search_configs(
                 else:
                     cn1_values.append(cn_val)
             
-            configs.append({
-                'id': config_id,
-                'lattice': lattice_type,
-                'bravais_type': bravais_type,
-                'offsets': offsets,
-                'pattern': label,
-                'c_ratio': c_ratio,
-                'CN1': sum(cn1_values) // len(cn1_values) if cn1_values else 6,
-                'cn_targets': cn_targets,
-                'source': 'chemistry_predictor',
-                'spec_index': i,
-                'orbit_sizes': orbit_sizes,
-                'orbit_species': orbit_species,
-            })
+            # Create config for EACH offset pattern
+            for pattern_idx, offsets in enumerate(offset_patterns):
+                # Build config ID
+                cn_str = "_".join([f"{sp}CN{_format_cn(cn_targets.get(sp, '?'))}" 
+                                  for sp in orbit_species])
+                config_id = f"CHEM-{parent_name}-{cn_str}-{i}-p{pattern_idx}"
+                
+                configs.append({
+                    'id': config_id,
+                    'lattice': lattice_type,
+                    'bravais_type': bravais_type,
+                    'offsets': offsets,
+                    'pattern': label,
+                    'c_ratio': c_ratio,
+                    'CN1': sum(cn1_values) // len(cn1_values) if cn1_values else 6,
+                    'cn_targets': cn_targets,
+                    'source': 'chemistry_predictor',
+                    'spec_index': i,
+                    'orbit_sizes': orbit_sizes,
+                    'orbit_species': orbit_species,
+                })
     
     # If requested, also run full lattice search with GEOMETRY-ONLY constraints
     if run_lattice_search and specs:
         try:
             lattice_configs = _run_lattice_search_geometry(
-                specs[:3],
+                specs,  # Pass ALL specs - function deduplicates internally
                 metals,
-                top_k=top_k,
+                top_k=top_k * 2,  # Get more from enumeration
                 diagonal_only=diagonal_only,
                 verbose=verbose
             )
-            # Prepend lattice search results
+            # Prepend lattice search results (higher quality)
             configs = lattice_configs + configs
         except Exception as e:
             if verbose:
                 print(f"Lattice search failed: {e}")
     
-    # Deduplicate by offsets
-    seen_offsets = set()
+    # Deduplicate by (bravais_type, offsets) - not just offsets!
+    # For N=1, all lattices have same offsets but different bravais types
+    seen_keys = set()
     unique_configs = []
     for c in configs:
-        offset_key = tuple(tuple(o) for o in c['offsets'])
-        if offset_key not in seen_offsets:
-            seen_offsets.add(offset_key)
+        # Include bravais_type in dedup key
+        offset_key = (c['bravais_type'], tuple(tuple(o) for o in c['offsets']))
+        if offset_key not in seen_keys:
+            seen_keys.add(offset_key)
             unique_configs.append(c)
     
     return unique_configs[:top_k]
@@ -255,34 +260,168 @@ def _format_cn(cn_val):
     return str(cn_val)
 
 
+def _generate_diverse_offsets(
+    N: int,
+    bravais_type: str
+) -> List[List[Tuple[float, float, float]]]:
+    """
+    Generate MULTIPLE diverse offset patterns for a given N and Bravais type.
+    
+    Returns a list of different offset configurations, providing pattern
+    diversity without expensive HNF enumeration.
+    """
+    is_body_centered = bravais_type.endswith('_I')
+    is_face_centered = bravais_type.endswith('_F')
+    is_hcp = bravais_type == 'hexagonal_H'
+    
+    if is_body_centered:
+        # I-centering: 1 offset → 2 atoms
+        if N <= 2:
+            return [[(0.0, 0.0, 0.0)]]  # 2 atoms via centering
+        elif N <= 4:
+            return [
+                [(0.0, 0.0, 0.0), (0.5, 0.0, 0.0)],  # 4 atoms
+                [(0.0, 0.0, 0.0), (0.0, 0.5, 0.0)],  # 4 atoms, different arrangement
+            ]
+        else:
+            return [[(0.0, 0.0, 0.0)]]
+            
+    elif is_face_centered:
+        # F-centering: 1 offset → 4 atoms
+        if N <= 4:
+            return [[(0.0, 0.0, 0.0)]]  # 4 atoms via centering
+        elif N <= 8:
+            return [
+                [(0.0, 0.0, 0.0), (0.25, 0.25, 0.25)],  # 8 atoms
+                [(0.0, 0.0, 0.0), (0.5, 0.5, 0.5)],      # 8 atoms, different
+            ]
+        else:
+            return [[(0.0, 0.0, 0.0)]]
+            
+    elif is_hcp:
+        # H-centering: 1 offset → 2 atoms
+        if N <= 2:
+            return [[(0.0, 0.0, 0.0)]]
+        elif N <= 4:
+            return [
+                [(0.0, 0.0, 0.0), (1/3, 2/3, 0.0)],
+                [(0.0, 0.0, 0.0), (0.0, 0.0, 0.5)],
+            ]
+        else:
+            return [[(0.0, 0.0, 0.0)]]
+    
+    else:
+        # Primitive lattice: explicit offsets
+        patterns_by_n = {
+            1: [
+                [(0.0, 0.0, 0.0)],
+            ],
+            2: [
+                [(0.0, 0.0, 0.0), (0.5, 0.5, 0.5)],   # Body-centered
+                [(0.0, 0.0, 0.0), (0.5, 0.5, 0.0)],   # Face-centered z
+                [(0.0, 0.0, 0.0), (0.5, 0.0, 0.5)],   # Face-centered y
+                [(0.0, 0.0, 0.0), (0.0, 0.5, 0.5)],   # Face-centered x
+                [(0.0, 0.0, 0.0), (0.0, 0.0, 0.5)],   # c-axis stacking
+            ],
+            3: [
+                [(0.0, 0.0, 0.0), (1/3, 1/3, 1/3), (2/3, 2/3, 2/3)],  # Diagonal
+                [(0.0, 0.0, 0.0), (0.5, 0.5, 0.0), (0.5, 0.0, 0.5)],  # Three faces
+                [(0.0, 0.0, 0.0), (0.5, 0.0, 0.0), (0.0, 0.5, 0.0)],  # Planar
+                [(0.0, 0.0, 0.0), (0.0, 0.0, 1/3), (0.0, 0.0, 2/3)],  # c-axis
+            ],
+            4: [
+                [(0.0, 0.0, 0.0), (0.5, 0.5, 0.0), (0.5, 0.0, 0.5), (0.0, 0.5, 0.5)],  # FCC-like
+                [(0.0, 0.0, 0.0), (0.5, 0.0, 0.0), (0.0, 0.5, 0.0), (0.0, 0.0, 0.5)],  # Edge centers
+                [(0.0, 0.0, 0.0), (0.5, 0.5, 0.5), (0.5, 0.0, 0.0), (0.0, 0.5, 0.5)],  # Mixed
+                [(0.0, 0.0, 0.0), (0.25, 0.25, 0.25), (0.5, 0.5, 0.5), (0.75, 0.75, 0.75)],  # Diagonal chain
+            ],
+        }
+        
+        if N in patterns_by_n:
+            return patterns_by_n[N]
+        else:
+            # Fallback: diagonal spacing
+            return [[(i/N, i/N, i/N) for i in range(N)]]
+
+
 def _generate_simple_offsets(
     orbit_sizes: List[int],
     M: int,
     bravais_type: str
 ) -> List[Tuple[float, float, float]]:
-    """Generate simple offset positions for a given orbit structure."""
+    """
+    Generate offset positions for a given orbit structure and Bravais type.
+    
+    For CENTERED lattices (_I, _F, _H), the centering translations are built-in,
+    so we generate fewer explicit offsets:
+    - cubic_I/tetragonal_I: centering adds (0.5,0.5,0.5) automatically
+    - cubic_F: centering adds 3 extra positions automatically  
+    - hexagonal_H: centering adds (2/3,1/3,1/2) automatically
+    
+    For PRIMITIVE lattices (_P), we need all offsets explicitly.
+    """
     N = sum(orbit_sizes)
     
-    templates = {
-        1: [(0.0, 0.0, 0.0)],
-        2: [(0.0, 0.0, 0.0), (0.5, 0.5, 0.5)],
-        3: [(0.0, 0.0, 0.0), (0.5, 0.5, 0.0), (0.5, 0.0, 0.5)],
-        4: [(0.0, 0.0, 0.0), (0.5, 0.5, 0.0), (0.5, 0.0, 0.5), (0.0, 0.5, 0.5)],
-        6: [(0.0, 0.0, 0.0), (0.5, 0.5, 0.0), (0.5, 0.0, 0.5), 
-            (0.0, 0.5, 0.5), (0.5, 0.5, 0.5), (0.0, 0.0, 0.5)],
-        8: [(x/2, y/2, z/2) for x in range(2) for y in range(2) for z in range(2)],
-    }
+    # Check if this is a centered lattice
+    is_body_centered = bravais_type.endswith('_I')  # BCC-type
+    is_face_centered = bravais_type.endswith('_F')  # FCC-type
+    is_hcp = bravais_type == 'hexagonal_H'
     
-    if N in templates:
-        return templates[N][:N]
+    # For centered lattices, the centering multiplies positions
+    # So we need fewer explicit offsets
+    if is_body_centered:
+        # I-centering doubles positions: 1 offset → 2 atoms
+        n_needed = (N + 1) // 2  # ceiling division
+        templates = {
+            1: [(0.0, 0.0, 0.0)],  # → 2 atoms via centering
+            2: [(0.0, 0.0, 0.0)],  # → 2 atoms (for N=2 like rutile)
+            3: [(0.0, 0.0, 0.0), (0.5, 0.0, 0.0)],  # → 4 atoms, closest to 3
+            4: [(0.0, 0.0, 0.0), (0.5, 0.0, 0.0)],  # → 4 atoms
+        }
+        return templates.get(N, [(0.0, 0.0, 0.0)])
     
-    # Fallback: evenly spaced
-    offsets = []
-    for i in range(N):
-        t = i / N
-        offsets.append((t, t, t))
+    elif is_face_centered:
+        # F-centering quadruples positions: 1 offset → 4 atoms
+        templates = {
+            1: [(0.0, 0.0, 0.0)],  # → 4 atoms
+            2: [(0.0, 0.0, 0.0)],  # → 4 atoms (closest to 2)
+            3: [(0.0, 0.0, 0.0)],  # → 4 atoms (closest to 3)
+            4: [(0.0, 0.0, 0.0)],  # → 4 atoms
+            8: [(0.0, 0.0, 0.0), (0.5, 0.5, 0.5)],  # → 8 atoms
+        }
+        return templates.get(N, [(0.0, 0.0, 0.0)])
     
-    return offsets
+    elif is_hcp:
+        # H-centering (HCP) doubles positions: 1 offset → 2 atoms
+        templates = {
+            1: [(0.0, 0.0, 0.0)],
+            2: [(0.0, 0.0, 0.0)],  # → 2 atoms via HCP centering
+            4: [(0.0, 0.0, 0.0), (1/3, 2/3, 0.0)],  # → 4 atoms
+        }
+        return templates.get(N, [(0.0, 0.0, 0.0)])
+    
+    else:
+        # Primitive lattice: need explicit offsets for all atoms
+        templates = {
+            1: [(0.0, 0.0, 0.0)],
+            2: [(0.0, 0.0, 0.0), (0.5, 0.5, 0.5)],
+            3: [(0.0, 0.0, 0.0), (0.5, 0.5, 0.0), (0.5, 0.0, 0.5)],
+            4: [(0.0, 0.0, 0.0), (0.5, 0.5, 0.0), (0.5, 0.0, 0.5), (0.0, 0.5, 0.5)],
+            6: [(0.0, 0.0, 0.0), (0.5, 0.5, 0.0), (0.5, 0.0, 0.5), 
+                (0.0, 0.5, 0.5), (0.5, 0.5, 0.5), (0.0, 0.0, 0.5)],
+            8: [(x/2, y/2, z/2) for x in range(2) for y in range(2) for z in range(2)],
+        }
+        
+        if N in templates:
+            return templates[N][:N]
+        
+        # Fallback: evenly spaced
+        offsets = []
+        for i in range(N):
+            t = i / N
+            offsets.append((t, t, t))
+        
+        return offsets
 
 
 def _run_lattice_search_geometry(
@@ -295,15 +434,13 @@ def _run_lattice_search_geometry(
     """
     Run lattice search with GEOMETRY-ONLY constraints.
     
-    Uses only: min separation, shell gap, uniformity
-    Does NOT use CN constraints (those are for cation-anion, not cation-cation).
+    Searches ONCE per unique (orbit_sizes, parent) combination to avoid
+    redundant enumeration. Different specs with same orbit structure
+    would produce identical lattice configurations.
     """
     if not _ensure_imports():
         return []
     
-    all_configs = []
-    
-    # Import lattice matrices
     from lattice_search import (
         search_and_analyze, 
         SC_PRIMITIVE, BCC_PRIMITIVE, FCC_PRIMITIVE
@@ -315,16 +452,25 @@ def _run_lattice_search_geometry(
         'FCC': FCC_PRIMITIVE,
     }
     
+    all_configs = []
+    searched = set()  # Track (orbit_sizes, parent) already searched
+    
+    # Collect unique (orbit_sizes, parent) pairs
     for spec in specs:
-        orbit_sizes = spec.get('orbit_sizes', [1])
-        orbit_species = spec.get('orbit_species', [m['symbol'] for m in metals])
+        orbit_sizes = tuple(spec.get('orbit_sizes', [1]))
         m_list = spec.get('M_list', [2, 4, 8])
+        orbit_species = spec.get('orbit_species', [m['symbol'] for m in metals])
         
         for parent in spec.get('parent_lattices', []):
             parent_name = parent.get('name', 'SC')
             if parent_name not in parent_lattices:
                 continue
-                
+            
+            key = (orbit_sizes, parent_name)
+            if key in searched:
+                continue
+            searched.add(key)
+            
             lattice_matrix = parent_lattices[parent_name]
             
             try:
@@ -332,7 +478,7 @@ def _run_lattice_search_geometry(
                     lattice=lattice_matrix,
                     a=1.0,
                     orbit_sizes=orbit_sizes,
-                    M_list=m_list[:3],  # Limit M values
+                    M_list=m_list[:3],
                     diagonal_only=diagonal_only,
                     max_per_hnf=20,
                     verbose=False,
@@ -341,7 +487,6 @@ def _run_lattice_search_geometry(
                 
                 # Filter by GEOMETRY only
                 for cfg in raw_configs:
-                    # Geometry constraints
                     if cfg.min_distance < 0.25:
                         continue
                     if cfg.shell_gap < 0.05:
@@ -349,12 +494,12 @@ def _run_lattice_search_geometry(
                     if not cfg.is_uniform:
                         continue
                     
-                    # Extract offsets
+                    # Extract ALL offsets from all orbits
                     offsets = []
                     for orbit_idx in range(len(orbit_sizes)):
                         coords = cfg.get_fractional_coords(orbit_idx)
-                        if len(coords) > 0:
-                            offsets.append(tuple(coords[0].tolist()))
+                        for coord in coords:
+                            offsets.append(tuple(float(x) for x in coord))
                     
                     if not offsets:
                         continue
@@ -366,25 +511,26 @@ def _run_lattice_search_geometry(
                     bravais_map = {'SC': 'cubic_P', 'BCC': 'cubic_I', 'FCC': 'cubic_F'}
                     bravais_type = bravais_map.get(parent_name, 'cubic_P')
                     
-                    config_id = f"ENUM-{parent_name}-M{len(cfg.G)}-{len(all_configs)}"
+                    config_id = f"ENUM-{parent_name}-{list(orbit_sizes)}-{len(all_configs)}"
                     
                     all_configs.append({
                         'id': config_id,
                         'lattice': 'Cubic',
                         'bravais_type': bravais_type,
                         'offsets': list(offsets),
-                        'pattern': f"M={len(cfg.G)} geom_CN={cn1_list}",
+                        'pattern': f"N={sum(orbit_sizes)} orbits={list(orbit_sizes)} CN={cn1_list}",
                         'c_ratio': 1.0,
                         'CN1': sum(cn1_list) // len(cn1_list) if cn1_list else 6,
                         'source': 'lattice_enumeration',
                         'min_distance': cfg.min_distance,
                         'shell_gap': cfg.shell_gap,
                         'orbit_species': orbit_species,
+                        'orbit_sizes': list(orbit_sizes),
                     })
                     
             except Exception as e:
                 if verbose:
-                    print(f"Error searching {parent_name}: {e}")
+                    print(f"Error searching {parent_name} {orbit_sizes}: {e}")
     
     # Sort by min_distance (larger = better separation)
     all_configs.sort(key=lambda x: -x.get('min_distance', 0))
@@ -469,29 +615,64 @@ class ChemistryPredictor:
         return configs
     
     def _ensure_common(self, configs: List[Dict], num_metals: int) -> List[Dict]:
-        """Ensure common lattice types are included."""
-        existing = set(c['bravais_type'] for c in configs)
+        """
+        Ensure common lattice types are included.
         
+        For centered lattices (I, F, H), the centering translations are built-in,
+        so we only need offset [(0,0,0)] to get multiple atoms per conventional cell:
+        - tetragonal_I with [(0,0,0)] → 2 atoms (at 0,0,0 and 0.5,0.5,0.5)
+        - hexagonal_H with [(0,0,0)] → 2 atoms (at 0,0,0 and 2/3,1/3,1/2)
+        
+        For primitive lattices (P), we need explicit offsets for multi-atom cells.
+        """
+        # Track existing configs by (bravais_type, n_offsets)
+        existing = set((c['bravais_type'], len(c.get('offsets', []))) for c in configs)
+        
+        # Common lattice types: (bravais, lattice_name, c_ratio, is_centered)
         common_types = [
-            ('tetragonal_P', 'Tetragonal', float(num_metals)),
-            ('tetragonal_I', 'Tetragonal', float(num_metals)),
-            ('hexagonal_P', 'Hexagonal', 1.633),
-            ('hexagonal_H', 'Hexagonal', 1.633),
+            ('tetragonal_P', 'Tetragonal', float(num_metals), False),
+            ('tetragonal_I', 'Tetragonal', float(num_metals), True),   # I-centered
+            ('hexagonal_P', 'Hexagonal', 1.633, False),
+            ('hexagonal_H', 'Hexagonal', 1.633, True),   # HCP-centered
         ]
         
-        for bravais, lattice, c_ratio in common_types:
-            if bravais not in existing:
-                offsets = _generate_simple_offsets([1]*num_metals, num_metals, bravais)
-                configs.append({
-                    'id': f'COMMON-{bravais}-N{num_metals}',
-                    'lattice': lattice,
-                    'bravais_type': bravais,
-                    'offsets': offsets,
-                    'pattern': f'{lattice.lower()} (always)',
-                    'c_ratio': c_ratio,
-                    'CN1': 6,
-                    'source': 'always_common',
-                })
+        for bravais, lattice, c_ratio, is_centered in common_types:
+            # For centered lattices: 1 offset gives multiple atoms automatically
+            # For primitive lattices: generate both 1-offset and 2-offset versions
+            if is_centered:
+                # Centered lattice: only need N=1 offset
+                key = (bravais, 1)
+                if key not in existing:
+                    configs.append({
+                        'id': f'COMMON-{bravais}-N1',
+                        'lattice': lattice,
+                        'bravais_type': bravais,
+                        'offsets': [(0.0, 0.0, 0.0)],
+                        'pattern': f'{lattice.lower()} centered (always)',
+                        'c_ratio': c_ratio,
+                        'CN1': 6,
+                        'source': 'always_common',
+                    })
+            else:
+                # Primitive lattice: generate N=1 and N=2 versions
+                for n_sites in [1, 2]:
+                    key = (bravais, n_sites)
+                    if key not in existing:
+                        if n_sites == 1:
+                            offsets = [(0.0, 0.0, 0.0)]
+                        else:
+                            offsets = [(0.0, 0.0, 0.0), (0.5, 0.5, 0.5)]
+                        
+                        configs.append({
+                            'id': f'COMMON-{bravais}-N{n_sites}',
+                            'lattice': lattice,
+                            'bravais_type': bravais,
+                            'offsets': offsets,
+                            'pattern': f'{lattice.lower()} N={n_sites} (always)',
+                            'c_ratio': c_ratio,
+                            'CN1': 6,
+                            'source': 'always_common',
+                        })
         
         return configs
 
