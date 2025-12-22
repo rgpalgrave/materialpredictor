@@ -12,6 +12,8 @@ This replaces the empirical predictor with a first-principles approach:
 5. Return ranked configurations for the sphere intersection model
 """
 
+__version__ = "2.1.0"  # With diverse offsets and orbit splitting
+
 import sys
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple, Any

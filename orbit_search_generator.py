@@ -154,11 +154,20 @@ def generate_orbit_plans(
     For stoichiometry A:B = 1:1, generates plans with orbit_sizes:
     (1,1), (2,2), (3,3), (4,4) for m in 1..m_max
     
+    For SINGLE-SPECIES systems (e.g., TiO2), also generates SPLIT orbits:
+    - [1], [2], [3], [4] (standard single orbit)
+    - [1,1], [2,2] (split into equal orbits - for body-centered, etc.)
+    - [2,1], [3,1] (asymmetric splits)
+    
+    This allows finding structures like rutile where the same element
+    occupies multiple distinct Wyckoff positions.
+    
     Skips plans where sum(orbit_sizes) > M_max (no valid M possible).
     """
     plans = []
     species = [c["element"] for c in cations]
     
+    # Standard plans: one orbit per species, scaled by m
     for m in range(1, m_max + 1):
         sizes = [coeff * m for coeff in cation_coeffs]
         N = sum(sizes)
@@ -173,7 +182,73 @@ def generate_orbit_plans(
             multiplier=m
         ))
     
+    # For SINGLE-SPECIES systems, also generate split orbit plans
+    # This handles cases like rutile (TiO2) where Ti occupies 2 distinct sites
+    if len(cations) == 1:
+        element = cations[0]["element"]
+        base_coeff = cation_coeffs[0]
+        
+        for m in range(1, m_max + 1):
+            N = base_coeff * m
+            
+            if N > M_max:
+                continue
+            
+            # Generate partitions of N (ways to split into multiple orbits)
+            # Only consider partitions with 2-4 parts (more is rarely physical)
+            for partition in _partitions_limited(N, max_parts=4, min_parts=2):
+                # Skip single-part partitions (already covered above)
+                if len(partition) == 1:
+                    continue
+                
+                # Skip if too many parts (unlikely to be physical)
+                if len(partition) > 4:
+                    continue
+                    
+                # Create orbit plan with split orbits
+                # All orbits have the same species
+                split_species = [element] * len(partition)
+                
+                plans.append(OrbitPlan(
+                    orbit_sizes=list(partition),
+                    orbit_species=split_species,
+                    multiplier=m
+                ))
+    
     return plans
+
+
+def _partitions_limited(n: int, max_parts: int = 4, min_parts: int = 2) -> List[List[int]]:
+    """
+    Generate integer partitions of n with limited number of parts.
+    
+    For orbit splitting, we want partitions like:
+    - n=2: [1,1]
+    - n=3: [2,1], [1,1,1]
+    - n=4: [2,2], [3,1], [2,1,1], [1,1,1,1]
+    
+    Returns partitions in descending order (largest part first).
+    """
+    result = []
+    _partition_helper(n, n, [], result, max_parts, min_parts)
+    return result
+
+
+def _partition_helper(n: int, max_val: int, current: List[int], 
+                      result: List[List[int]], max_parts: int, min_parts: int):
+    """Recursive helper for partition generation."""
+    if n == 0:
+        if min_parts <= len(current) <= max_parts:
+            result.append(current[:])
+        return
+    
+    if len(current) >= max_parts:
+        return
+    
+    for i in range(min(n, max_val), 0, -1):
+        current.append(i)
+        _partition_helper(n - i, i, current, result, max_parts, min_parts)
+        current.pop()
 
 
 # ─────────────────────────────────────────────────────────────────────────────

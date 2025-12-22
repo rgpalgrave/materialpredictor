@@ -1163,6 +1163,16 @@ def run_full_analysis_chain(
             anion_charge=anion_charge
         )
         
+        # Display search config count in sidebar for debugging
+        with st.sidebar:
+            st.caption(f"🔍 Searching {len(search_configs)} lattice configurations")
+            # Show breakdown by lattice type
+            from collections import Counter
+            by_lattice = Counter(c['lattice'] for c in search_configs)
+            by_n = Counter(len(c.get('offsets', [])) for c in search_configs)
+            st.caption(f"   Lattices: {dict(by_lattice)}")
+            st.caption(f"   N sites: {dict(sorted(by_n.items()))}")
+        
         # Compute coordination radii as (r_metal + r_anion) for each metal
         coord_radii = tuple(m['radius'] + anion_radius for m in metals)
         if len(coord_radii) == 1:
@@ -2096,6 +2106,15 @@ def main():
         st.header("🧪 Predictor Status")
         if CHEMISTRY_PREDICTOR_AVAILABLE:
             st.success("Chemistry predictor: ✅ Active")
+            # Show version if available
+            try:
+                from chemistry_predictor_integration import __version__ as cpi_version
+                st.caption(f"Version: {cpi_version}")
+                # Check for key features
+                from chemistry_predictor_integration import _generate_diverse_offsets
+                st.caption("✓ Diverse offsets enabled")
+            except ImportError:
+                st.caption("Version: < 2.0 (no diverse offsets)")
             st.caption("Using Pauling radius-ratio rules and bond allocation models")
         else:
             st.warning("Chemistry predictor: ⚠️ Unavailable")
