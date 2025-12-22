@@ -52,9 +52,10 @@ BRAVAIS_TO_LATTICE = {
     'orthorhombic_I': 'Orthorhombic',
     'orthorhombic_F': 'Orthorhombic',
     'orthorhombic_C': 'Orthorhombic',
-    'rhombohedral_P': 'Rhombohedral',
+    'rhombohedral_R': 'Rhombohedral',
     'monoclinic_P': 'Monoclinic',
     'monoclinic_C': 'Monoclinic',
+    'triclinic_P': 'Triclinic',
 }
 
 # Default c/a ratios by lattice type
@@ -65,6 +66,7 @@ DEFAULT_C_RATIOS = {
     'Orthorhombic': 1.0,
     'Rhombohedral': 1.0,
     'Monoclinic': 1.0,
+    'Triclinic': 1.0,
 }
 
 
@@ -174,76 +176,103 @@ def get_chemistry_search_configs(
         for parent in spec.get('parent_lattices', []):
             parent_name = parent.get('name', 'SC')
             
-            # Map parent to bravais_type
-            parent_to_bravais = {
-                'SC': 'cubic_P',
-                'BCC': 'cubic_I', 
-                'FCC': 'cubic_F',
-                'TRICLINIC': 'tetragonal_P',
+            # Map parent to MULTIPLE bravais_types
+            # Crystallographic hierarchy: cubic → tetragonal → orthorhombic → monoclinic → triclinic
+            # Each parent generates variants across this hierarchy
+            parent_to_bravais_list = {
+                'SC': [
+                    # Primitive lattices: SC with different axis ratios
+                    ('cubic_P', 'Cubic', 1.0),
+                    ('tetragonal_P', 'Tetragonal', None),
+                    ('orthorhombic_P', 'Orthorhombic', None),
+                    ('monoclinic_P', 'Monoclinic', None),
+                    ('triclinic_P', 'Triclinic', None),
+                    ('rhombohedral_R', 'Rhombohedral', None),
+                ],
+                'BCC': [
+                    # Body-centered lattices
+                    ('cubic_I', 'Cubic', 1.0),
+                    ('tetragonal_I', 'Tetragonal', None),
+                    ('orthorhombic_I', 'Orthorhombic', None),
+                ],
+                'FCC': [
+                    # Face-centered lattices
+                    ('cubic_F', 'Cubic', 1.0),
+                    ('orthorhombic_F', 'Orthorhombic', None),
+                ],
+                'TRICLINIC': [
+                    # Base-centered and other variants
+                    ('tetragonal_P', 'Tetragonal', None),
+                    ('orthorhombic_C', 'Orthorhombic', None),
+                    ('monoclinic_C', 'Monoclinic', None),
+                ],
             }
             
-            bravais_type = parent_to_bravais.get(parent_name, 'cubic_P')
-            lattice_type = BRAVAIS_TO_LATTICE.get(bravais_type, 'Cubic')
+            bravais_variants = parent_to_bravais_list.get(parent_name, [('cubic_P', 'Cubic', 1.0)])
             
-            # Generate MULTIPLE diverse offset patterns
-            N = sum(orbit_sizes)
-            offset_patterns = _generate_diverse_offsets(N, bravais_type)
-            
-            # Get c/a ratio
-            c_ratio = DEFAULT_C_RATIOS.get(lattice_type, 1.0)
-            if lattice_type == 'Tetragonal':
-                c_ratio = float(num_metals)
-            
-            # Extract CN1 values (handle list or int)
-            cn1_values = []
-            for sp in orbit_species:
-                cn_val = cn_targets.get(sp, 6)
-                if isinstance(cn_val, list):
-                    cn1_values.append(cn_val[0] if cn_val else 6)
+            for bravais_type, lattice_type, fixed_c_ratio in bravais_variants:
+                # Generate MULTIPLE diverse offset patterns
+                N = sum(orbit_sizes)
+                offset_patterns = _generate_diverse_offsets(N, bravais_type)
+                
+                # Get c/a ratio
+                if fixed_c_ratio is not None:
+                    c_ratio = fixed_c_ratio
                 else:
-                    cn1_values.append(cn_val)
-            
-            # Create config for EACH offset pattern
-            for pattern_idx, offsets in enumerate(offset_patterns):
-                # Build config ID
-                cn_str = "_".join([f"{sp}CN{_format_cn(cn_targets.get(sp, '?'))}" 
-                                  for sp in orbit_species])
-                config_id = f"CHEM-{parent_name}-{cn_str}-{i}-p{pattern_idx}"
+                    c_ratio = DEFAULT_C_RATIOS.get(lattice_type, 1.0)
+                    if lattice_type == 'Tetragonal':
+                        c_ratio = float(num_metals) if num_metals > 1 else 1.0
                 
-                # IMPORTANT: Expand orbit_species to match offsets
-                # orbit_species=['Ti'] with orbit_sizes=[2] → expanded=['Ti', 'Ti']
-                # orbit_species=['Mg','Al'] with orbit_sizes=[1,2] → expanded=['Mg', 'Al', 'Al']
-                expanded_species = []
-                for sp, size in zip(orbit_species, orbit_sizes):
-                    expanded_species.extend([sp] * size)
-                
-                # If we have more offsets than expanded_species (from diverse patterns),
-                # repeat the last species or use the pattern
-                while len(expanded_species) < len(offsets):
-                    # For single-species systems, just repeat that species
-                    if len(set(orbit_species)) == 1:
-                        expanded_species.append(orbit_species[0])
+                # Extract CN1 values (handle list or int)
+                cn1_values = []
+                for sp in orbit_species:
+                    cn_val = cn_targets.get(sp, 6)
+                    if isinstance(cn_val, list):
+                        cn1_values.append(cn_val[0] if cn_val else 6)
                     else:
-                        # Multi-species: this shouldn't happen with proper generation
-                        expanded_species.append(expanded_species[-1] if expanded_species else 'M')
+                        cn1_values.append(cn_val)
                 
-                # Trim if we have too many
-                expanded_species = expanded_species[:len(offsets)]
-                
-                configs.append({
-                    'id': config_id,
-                    'lattice': lattice_type,
-                    'bravais_type': bravais_type,
-                    'offsets': offsets,
-                    'pattern': label,
-                    'c_ratio': c_ratio,
-                    'CN1': sum(cn1_values) // len(cn1_values) if cn1_values else 6,
-                    'cn_targets': cn_targets,
-                    'source': 'chemistry_predictor',
-                    'spec_index': i,
-                    'orbit_sizes': orbit_sizes,
-                    'orbit_species': expanded_species,  # Use expanded list
-                })
+                # Create config for EACH offset pattern
+                for pattern_idx, offsets in enumerate(offset_patterns):
+                    # Build config ID
+                    cn_str = "_".join([f"{sp}CN{_format_cn(cn_targets.get(sp, '?'))}" 
+                                      for sp in orbit_species])
+                    config_id = f"CHEM-{parent_name}-{bravais_type}-{cn_str}-{i}-p{pattern_idx}"
+                    
+                    # IMPORTANT: Expand orbit_species to match offsets
+                    # orbit_species=['Ti'] with orbit_sizes=[2] → expanded=['Ti', 'Ti']
+                    # orbit_species=['Mg','Al'] with orbit_sizes=[1,2] → expanded=['Mg', 'Al', 'Al']
+                    expanded_species = []
+                    for sp, size in zip(orbit_species, orbit_sizes):
+                        expanded_species.extend([sp] * size)
+                    
+                    # If we have more offsets than expanded_species (from diverse patterns),
+                    # repeat the last species or use the pattern
+                    while len(expanded_species) < len(offsets):
+                        # For single-species systems, just repeat that species
+                        if len(set(orbit_species)) == 1:
+                            expanded_species.append(orbit_species[0])
+                        else:
+                            # Multi-species: this shouldn't happen with proper generation
+                            expanded_species.append(expanded_species[-1] if expanded_species else 'M')
+                    
+                    # Trim if we have too many
+                    expanded_species = expanded_species[:len(offsets)]
+                    
+                    configs.append({
+                        'id': config_id,
+                        'lattice': lattice_type,
+                        'bravais_type': bravais_type,
+                        'offsets': offsets,
+                        'pattern': label,
+                        'c_ratio': c_ratio,
+                        'CN1': sum(cn1_values) // len(cn1_values) if cn1_values else 6,
+                        'cn_targets': cn_targets,
+                        'source': 'chemistry_predictor',
+                        'spec_index': i,
+                        'orbit_sizes': orbit_sizes,
+                        'orbit_species': expanded_species,  # Use expanded list
+                    })
     
     # If requested, also run full lattice search with GEOMETRY-ONLY constraints
     if run_lattice_search and specs:
