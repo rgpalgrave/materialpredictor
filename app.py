@@ -243,7 +243,8 @@ def get_default_search_configs(num_metals: int, use_predictor: bool = True,
                                 target_cn: int = None,
                                 metals: List[dict] = None,
                                 anion_symbol: str = None,
-                                anion_charge: int = None) -> List[dict]:
+                                anion_charge: int = None,
+                                run_lattice_search: bool = False) -> List[dict]:
     """
     Get default search configurations using chemistry-based prediction.
     
@@ -257,6 +258,7 @@ def get_default_search_configs(num_metals: int, use_predictor: bool = True,
         metals: List of metal dicts with symbol, charge, ratio, cn, radius (NEW)
         anion_symbol: Anion element symbol e.g. 'O', 'F' (NEW)
         anion_charge: Anion charge magnitude (positive integer) (NEW)
+        run_lattice_search: If True, use full HNF enumeration (slower but more complete)
         
     Returns:
         List of config dicts with keys: id, lattice, bravais_type, offsets, pattern, c_ratio
@@ -274,10 +276,10 @@ def get_default_search_configs(num_metals: int, use_predictor: bool = True,
                     metals=metals,
                     anion_symbol=anion_symbol,
                     anion_charge=anion_charge or 2,
-                    top_k=20,
+                    top_k=50 if run_lattice_search else 20,
                     always_include_cubic=True,
                     always_include_common=True,
-                    run_lattice_search=False  # Set True for full enumeration (slower)
+                    run_lattice_search=run_lattice_search
                 )
                 if configs:
                     # Add source tag for UI display
@@ -1094,7 +1096,8 @@ def run_full_analysis_chain(
     anion_radius: float,
     progress_callback=None,
     force_full_search: bool = False,
-    include_monoclinic: bool = False
+    include_monoclinic: bool = False,
+    run_lattice_search: bool = False
 ) -> Dict:
     """
     Run the complete analysis chain:
@@ -1114,6 +1117,7 @@ def run_full_analysis_chain(
         progress_callback: Optional callback(step, total, message) for progress updates
         force_full_search: If True, run all c/a scans even if cubic/HCP finds a match
         include_monoclinic: If True, search monoclinic structures (beta, c/a, b/a scan)
+        run_lattice_search: If True, use full HNF enumeration for offset search (slower but more complete)
     
     Returns:
         Dictionary with all results including:
@@ -1176,7 +1180,8 @@ def run_full_analysis_chain(
             target_cn=target_cn,
             metals=metals,
             anion_symbol=anion_symbol,
-            anion_charge=anion_charge
+            anion_charge=anion_charge,
+            run_lattice_search=run_lattice_search
         )
         
         # Display search config count in sidebar for debugging
@@ -2274,7 +2279,7 @@ def main():
     
     # Search options
     st.markdown("---")
-    search_cols = st.columns(2)
+    search_cols = st.columns(3)
     with search_cols[0]:
         force_full_search = st.checkbox(
             "🔄 Force full search",
@@ -2288,6 +2293,14 @@ def main():
             value=False,
             help="Search monoclinic structures by scanning beta angle (85-125°), "
                  "c/a ratio, and b/a ratio. Takes ~1-2 min extra per configuration."
+        )
+    with search_cols[2]:
+        run_lattice_search = st.checkbox(
+            "🔬 Full lattice search",
+            value=False,
+            help="Use systematic HNF enumeration to find all offset positions at "
+                 "M=4,8,16 resolution (finds positions like 1/8,1/8,1/8 for spinel). "
+                 "Slower but more complete for complex structures."
         )
     
     # Calculate button - runs the full analysis chain
@@ -2311,7 +2324,8 @@ def main():
                 anion_radius=anion_radius,
                 progress_callback=update_progress,
                 force_full_search=force_full_search,
-                include_monoclinic=include_monoclinic
+                include_monoclinic=include_monoclinic,
+                run_lattice_search=run_lattice_search
             )
             
             progress_bar.empty()

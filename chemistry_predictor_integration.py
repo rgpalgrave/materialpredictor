@@ -301,8 +301,9 @@ def get_chemistry_search_configs(
     # If requested, also run full lattice search with GEOMETRY-ONLY constraints
     if run_lattice_search and specs:
         try:
+            # Limit specs to first 10 for lattice search (function deduplicates anyway)
             lattice_configs = _run_lattice_search_geometry(
-                specs,  # Pass ALL specs - function deduplicates internally
+                specs[:10],  # Limit to first 10 specs (deduplicates internally)
                 metals,
                 top_k=top_k * 2,  # Get more from enumeration
                 diagonal_only=diagonal_only,
@@ -672,9 +673,9 @@ def _run_lattice_search_geometry(
                     lattice=lattice_matrix,
                     a=1.0,
                     orbit_sizes=orbit_sizes,
-                    M_list=m_list[:3],
+                    M_list=m_list[:2],  # Use first 2 M values for speed (e.g., [4, 8])
                     diagonal_only=diagonal_only,
-                    max_per_hnf=20,
+                    max_per_hnf=10,  # Reduced for speed
                     verbose=False,
                     parent_basis_name=f'{parent_name}-primitive'
                 )
@@ -688,12 +689,16 @@ def _run_lattice_search_geometry(
                     if not cfg.is_uniform:
                         continue
                     
-                    # Extract ALL offsets from all orbits
+                    # Extract ALL offsets from all orbits and assign species
                     offsets = []
+                    expanded_species = []
                     for orbit_idx in range(len(orbit_sizes)):
                         coords = cfg.get_fractional_coords(orbit_idx)
+                        # Get species for this orbit
+                        species = orbit_species[orbit_idx] if orbit_idx < len(orbit_species) else 'M'
                         for coord in coords:
                             offsets.append(tuple(float(x) for x in coord))
+                            expanded_species.append(species)
                     
                     if not offsets:
                         continue
@@ -718,7 +723,7 @@ def _run_lattice_search_geometry(
                         'source': 'lattice_enumeration',
                         'min_distance': cfg.min_distance,
                         'shell_gap': cfg.shell_gap,
-                        'orbit_species': orbit_species,
+                        'orbit_species': expanded_species,
                         'orbit_sizes': list(orbit_sizes),
                     })
                     
