@@ -638,13 +638,34 @@ def _run_lattice_search_geometry(
     
     from lattice_search import (
         search_and_analyze, 
-        SC_PRIMITIVE, BCC_PRIMITIVE, FCC_PRIMITIVE
+        SC_PRIMITIVE, BCC_PRIMITIVE, FCC_PRIMITIVE,
+        lattice_matrix_from_params
     )
     
+    # Define lattice matrices for all major Bravais types
+    # Format: (matrix, bravais_type, lattice_type)
     parent_lattices = {
-        'SC': SC_PRIMITIVE,
-        'BCC': BCC_PRIMITIVE,
-        'FCC': FCC_PRIMITIVE,
+        # Cubic
+        'SC': (SC_PRIMITIVE, 'cubic_P', 'Cubic'),
+        'BCC': (BCC_PRIMITIVE, 'cubic_I', 'Cubic'),
+        'FCC': (FCC_PRIMITIVE, 'cubic_F', 'Cubic'),
+        # Tetragonal (c/a = 1.4 as representative)
+        'TET_P': (lattice_matrix_from_params(1, 1, 1.4, 90, 90, 90), 'tetragonal_P', 'Tetragonal'),
+        'TET_I': (lattice_matrix_from_params(1, 1, 1.4, 90, 90, 90), 'tetragonal_I', 'Tetragonal'),
+        # Hexagonal (c/a = 1.633 ideal HCP)
+        'HEX': (lattice_matrix_from_params(1, 1, 1.633, 90, 90, 120), 'hexagonal_P', 'Hexagonal'),
+        # Orthorhombic (b/a=1.2, c/a=1.5 as representative)
+        'ORTHO': (lattice_matrix_from_params(1, 1.2, 1.5, 90, 90, 90), 'orthorhombic_P', 'Orthorhombic'),
+        # Rhombohedral (α=80° as representative)
+        'RHOMB': (lattice_matrix_from_params(1, 1, 1, 80, 80, 80), 'rhombohedral_R', 'Rhombohedral'),
+    }
+    
+    # Map spec parent names to our extended lattice list
+    parent_mapping = {
+        'SC': ['SC', 'TET_P', 'ORTHO'],
+        'BCC': ['BCC', 'TET_I'],
+        'FCC': ['FCC'],
+        'TRICLINIC': ['HEX', 'RHOMB'],
     }
     
     all_configs = []
@@ -658,78 +679,89 @@ def _run_lattice_search_geometry(
         
         for parent in spec.get('parent_lattices', []):
             parent_name = parent.get('name', 'SC')
-            if parent_name not in parent_lattices:
-                continue
             
-            key = (orbit_sizes, parent_name)
-            if key in searched:
-                continue
-            searched.add(key)
+            # Get all lattices to search for this parent
+            lattices_to_search = parent_mapping.get(parent_name, [parent_name])
             
-            lattice_matrix = parent_lattices[parent_name]
-            
-            try:
-                raw_configs = search_and_analyze(
-                    lattice=lattice_matrix,
-                    a=1.0,
-                    orbit_sizes=orbit_sizes,
-                    M_list=m_list[:2],  # Use first 2 M values for speed (e.g., [4, 8])
-                    diagonal_only=diagonal_only,
-                    max_per_hnf=10,  # Reduced for speed
-                    verbose=False,
-                    parent_basis_name=f'{parent_name}-primitive'
-                )
+            for lattice_name in lattices_to_search:
+                if lattice_name not in parent_lattices:
+                    continue
                 
-                # Filter by GEOMETRY only
-                for cfg in raw_configs:
-                    if cfg.min_distance < 0.25:
-                        continue
-                    if cfg.shell_gap < 0.05:
-                        continue
-                    if not cfg.is_uniform:
-                        continue
+                key = (orbit_sizes, lattice_name)
+                if key in searched:
+                    continue
+                searched.add(key)
+                
+                lattice_matrix, bravais_type, lattice_type = parent_lattices[lattice_name]
+            
+                try:
+                    raw_configs = search_and_analyze(
+                        lattice=lattice_matrix,
+                        a=1.0,
+                        orbit_sizes=orbit_sizes,
+                        M_list=m_list[:2],  # Use first 2 M values for speed (e.g., [4, 8])
+                        diagonal_only=diagonal_only,
+                        max_per_hnf=10,  # Reduced for speed
+                        verbose=False,
+                        parent_basis_name=f'{lattice_name}-primitive'
+                    )
+                
+                    # Filter by GEOMETRY only
+                    for cfg in raw_configs:
+                        if cfg.min_distance < 0.25:
+                            continue
+                        if cfg.shell_gap < 0.05:
+                            continue
+                        if not cfg.is_uniform:
+                            continue
+                        
+                        # Extract ALL offsets from all orbits and assign species
+                        offsets = []
+                        expanded_species = []
+                        for orbit_idx in range(len(orbit_sizes)):
+                            coords = cfg.get_fractional_coords(orbit_idx)
+                            # Get species for this orbit
+                            species = orbit_species[orbit_idx] if orbit_idx < len(orbit_species) else 'M'
+                            for coord in coords:
+                                offsets.append(tuple(float(x) for x in coord))
+                                expanded_species.append(species)
+                        
+                        if not offsets:
+                            continue
+                        
+                        # Get CN info (for display only) - handle both old and new signature formats
+                        try:
+                            cn1_list = [cfg.signatures[j].cn1 for j in range(len(orbit_sizes))]
+                        except (AttributeError, TypeError):
+                            cn1_list = [6] * len(orbit_sizes)  # Default if signatures unavailable
+                        
+                        config_id = f"ENUM-{lattice_name}-{list(orbit_sizes)}-{len(all_configs)}"
+                        
+                        # Determine c_ratio from lattice type
+                        c_ratio = 1.0
+                        if lattice_type == 'Tetragonal':
+                            c_ratio = 1.4
+                        elif lattice_type == 'Hexagonal':
+                            c_ratio = 1.633
+                        
+                        all_configs.append({
+                            'id': config_id,
+                            'lattice': lattice_type,
+                            'bravais_type': bravais_type,
+                            'offsets': list(offsets),
+                            'pattern': f"N={sum(orbit_sizes)} orbits={list(orbit_sizes)} CN={cn1_list}",
+                            'c_ratio': c_ratio,
+                            'CN1': sum(cn1_list) // len(cn1_list) if cn1_list else 6,
+                            'source': 'lattice_enumeration',
+                            'min_distance': cfg.min_distance,
+                            'shell_gap': cfg.shell_gap,
+                            'orbit_species': expanded_species,
+                            'orbit_sizes': list(orbit_sizes),
+                        })
                     
-                    # Extract ALL offsets from all orbits and assign species
-                    offsets = []
-                    expanded_species = []
-                    for orbit_idx in range(len(orbit_sizes)):
-                        coords = cfg.get_fractional_coords(orbit_idx)
-                        # Get species for this orbit
-                        species = orbit_species[orbit_idx] if orbit_idx < len(orbit_species) else 'M'
-                        for coord in coords:
-                            offsets.append(tuple(float(x) for x in coord))
-                            expanded_species.append(species)
-                    
-                    if not offsets:
-                        continue
-                    
-                    # Get CN info (for display only)
-                    cn1_list = [cfg.signatures[j].cn1 for j in range(len(orbit_sizes))]
-                    
-                    # Map to bravais type
-                    bravais_map = {'SC': 'cubic_P', 'BCC': 'cubic_I', 'FCC': 'cubic_F'}
-                    bravais_type = bravais_map.get(parent_name, 'cubic_P')
-                    
-                    config_id = f"ENUM-{parent_name}-{list(orbit_sizes)}-{len(all_configs)}"
-                    
-                    all_configs.append({
-                        'id': config_id,
-                        'lattice': 'Cubic',
-                        'bravais_type': bravais_type,
-                        'offsets': list(offsets),
-                        'pattern': f"N={sum(orbit_sizes)} orbits={list(orbit_sizes)} CN={cn1_list}",
-                        'c_ratio': 1.0,
-                        'CN1': sum(cn1_list) // len(cn1_list) if cn1_list else 6,
-                        'source': 'lattice_enumeration',
-                        'min_distance': cfg.min_distance,
-                        'shell_gap': cfg.shell_gap,
-                        'orbit_species': expanded_species,
-                        'orbit_sizes': list(orbit_sizes),
-                    })
-                    
-            except Exception as e:
-                if verbose:
-                    print(f"Error searching {parent_name} {orbit_sizes}: {e}")
+                except Exception as e:
+                    if verbose:
+                        print(f"Error searching {lattice_name} {orbit_sizes}: {e}")
     
     # Sort by min_distance (larger = better separation)
     all_configs.sort(key=lambda x: -x.get('min_distance', 0))
