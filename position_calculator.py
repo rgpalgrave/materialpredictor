@@ -22,6 +22,34 @@ from interstitial_engine import (
 
 
 # -----------------
+# Lattice angle helper
+# -----------------
+
+def get_lattice_angles(lattice_type: str) -> Dict[str, float]:
+    """
+    Get the appropriate unit cell angles for a lattice type.
+    
+    Standard conventions:
+    - Cubic, Tetragonal, Orthorhombic: α=β=γ=90°
+    - Hexagonal: α=β=90°, γ=120°
+    - Rhombohedral: α=β=γ=80° (typical value)
+    - Monoclinic: α=γ=90°, β=100° (typical)
+    - Triclinic: α=85°, β=80°, γ=75° (arbitrary non-special angles)
+    """
+    if lattice_type == 'Hexagonal':
+        return {'alpha': 90.0, 'beta': 90.0, 'gamma': 120.0}
+    elif lattice_type == 'Rhombohedral':
+        return {'alpha': 80.0, 'beta': 80.0, 'gamma': 80.0}
+    elif lattice_type == 'Monoclinic':
+        return {'alpha': 90.0, 'beta': 100.0, 'gamma': 90.0}
+    elif lattice_type == 'Triclinic':
+        return {'alpha': 85.0, 'beta': 80.0, 'gamma': 75.0}
+    else:
+        # Cubic, Tetragonal, Orthorhombic
+        return {'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
+
+
+# -----------------
 # Coordinate conversion utilities
 # -----------------
 
@@ -931,16 +959,11 @@ def calculate_stoichiometry_for_config(
         # Set up lattice parameters with real 'a' value
         # Use 0.9999 factor to ensure intersections occur (s* is the max where CN >= target)
         a_real = scale_s * 0.9999
-        p_dict = {'a': a_real, 'b_ratio': 1.0, 'c_ratio': 1.0,
-                  'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
+        angles = get_lattice_angles(lattice_type)
+        p_dict = {'a': a_real, 'b_ratio': 1.0, 'c_ratio': 1.0, **angles}
         
         if lattice_type == 'Hexagonal':
-            p_dict['gamma'] = 120.0
             p_dict['c_ratio'] = 1.633  # Default for hexagonal
-        elif lattice_type == 'Rhombohedral':
-            p_dict['alpha'] = p_dict['beta'] = p_dict['gamma'] = 80.0
-        elif lattice_type == 'Monoclinic':
-            p_dict['beta'] = 100.0  # Default monoclinic beta
         
         # Override lattice parameters if provided
         if c_ratio is not None:
@@ -1213,11 +1236,8 @@ def scan_ca_for_stoichiometry(
             # s_star is the MAX lattice param where CN >= target
             # Use slightly smaller 'a' to ensure intersections occur
             a_real = s_star * 0.9999
-            p_dict = {'a': a_real, 'b_ratio': 1.0, 'c_ratio': c_ratio,
-                      'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
-            
-            if lattice_type == 'Hexagonal':
-                p_dict['gamma'] = 120.0
+            angles = get_lattice_angles(lattice_type)
+            p_dict = {'a': a_real, 'b_ratio': 1.0, 'c_ratio': c_ratio, **angles}
             
             p = LatticeParams(**p_dict)
             
@@ -1410,10 +1430,8 @@ def scan_ca_for_best_regularity(
                 )
                 
                 a_real = s_star * 0.9999  # Slightly smaller to ensure sphere overlap
-                p_dict = {'a': a_real, 'b_ratio': 1.0, 'c_ratio': c_ratio,
-                         'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
-                if lattice_type == 'Hexagonal':
-                    p_dict['gamma'] = 120.0
+                angles = get_lattice_angles(lattice_type)
+                p_dict = {'a': a_real, 'b_ratio': 1.0, 'c_ratio': c_ratio, **angles}
                 
                 p = LatticeParams(**p_dict)
                 

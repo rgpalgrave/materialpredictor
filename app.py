@@ -48,6 +48,36 @@ except ImportError:
 
 
 # =============================================================================
+# LATTICE ANGLE HELPER
+# =============================================================================
+
+def get_lattice_angles(lattice_type: str) -> Dict[str, float]:
+    """
+    Get the appropriate unit cell angles for a lattice type.
+    
+    Returns dict with 'alpha', 'beta', 'gamma' keys.
+    
+    Standard conventions:
+    - Cubic, Tetragonal, Orthorhombic: α=β=γ=90°
+    - Hexagonal: α=β=90°, γ=120°
+    - Rhombohedral: α=β=γ=80° (typical value for visualization)
+    - Monoclinic: α=γ=90°, β=100° (typical)
+    - Triclinic: α=85°, β=80°, γ=75° (arbitrary non-special angles)
+    """
+    if lattice_type == 'Hexagonal':
+        return {'alpha': 90.0, 'beta': 90.0, 'gamma': 120.0}
+    elif lattice_type == 'Rhombohedral':
+        return {'alpha': 80.0, 'beta': 80.0, 'gamma': 80.0}
+    elif lattice_type == 'Monoclinic':
+        return {'alpha': 90.0, 'beta': 100.0, 'gamma': 90.0}
+    elif lattice_type == 'Triclinic':
+        return {'alpha': 85.0, 'beta': 80.0, 'gamma': 75.0}
+    else:
+        # Cubic, Tetragonal, Orthorhombic
+        return {'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
+
+
+# =============================================================================
 # PERFORMANCE MONITORING SYSTEM
 # =============================================================================
 
@@ -653,10 +683,8 @@ def run_ca_scan_for_stoichiometry(
                     )
                     
                     a_real = s_star * 0.9999
-                    p_dict = {'a': a_real, 'b_ratio': 1.0, 'c_ratio': c_ratio,
-                              'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
-                    if config['lattice'] == 'Hexagonal':
-                        p_dict['gamma'] = 120.0
+                    angles = get_lattice_angles(config['lattice'])
+                    p_dict = {'a': a_real, 'b_ratio': 1.0, 'c_ratio': c_ratio, **angles}
                     
                     p = LatticeParams(**p_dict)
                     
@@ -792,10 +820,8 @@ def run_ca_scan_for_stoichiometry(
                     )
                     
                     a_real = s_star * 0.9999
-                    p_dict = {'a': a_real, 'b_ratio': 1.0, 'c_ratio': c_ratio,
-                              'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
-                    if config['lattice'] == 'Hexagonal':
-                        p_dict['gamma'] = 120.0
+                    angles = get_lattice_angles(config['lattice'])
+                    p_dict = {'a': a_real, 'b_ratio': 1.0, 'c_ratio': c_ratio, **angles}
                     
                     p = LatticeParams(**p_dict)
                     
@@ -1581,10 +1607,8 @@ def run_full_analysis_chain(
                 
                 # Use stored c_ratio if available
                 c_ratio = config_data.get('c_ratio', 1.0)
-                p_dict = {'a': a_real, 'b_ratio': 1.0, 'c_ratio': c_ratio,
-                          'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
-                if lattice_type == 'Hexagonal':
-                    p_dict['gamma'] = 120.0
+                angles = get_lattice_angles(lattice_type)
+                p_dict = {'a': a_real, 'b_ratio': 1.0, 'c_ratio': c_ratio, **angles}
                 
                 p = LatticeParams(**p_dict)
                 
@@ -1652,10 +1676,8 @@ def run_full_analysis_chain(
                 
                 # Use stored c_ratio if available
                 c_ratio = config_data.get('c_ratio', 1.0)
-                p_dict = {'a': a_real, 'b_ratio': 1.0, 'c_ratio': c_ratio,
-                          'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
-                if lattice_type == 'Hexagonal':
-                    p_dict['gamma'] = 120.0
+                angles = get_lattice_angles(lattice_type)
+                p_dict = {'a': a_real, 'b_ratio': 1.0, 'c_ratio': c_ratio, **angles}
                 
                 p = LatticeParams(**p_dict)
                 
@@ -3050,11 +3072,9 @@ def main():
                                 # Use 0.99 factor to ensure intersections occur
                                 a_real = opt_result['best_s_star'] * 0.9999
                                 
+                                angles = get_lattice_angles(lattice)
                                 p_dict = {'a': a_real, 'b_ratio': 1.0, 
-                                         'c_ratio': opt_result['best_c_ratio'],
-                                         'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
-                                if lattice == 'Hexagonal':
-                                    p_dict['gamma'] = 120.0
+                                         'c_ratio': opt_result['best_c_ratio'], **angles}
                                 
                                 p = LatticeParams(**p_dict)
                                 
@@ -3940,11 +3960,10 @@ def main():
                     
                     # Determine lattice type and set parameters
                     lattice_type = config_data.get('lattice', 'Cubic')
-                    p_dict = {'a': a_real, 'b_ratio': 1.0, 'c_ratio': 1.0,
-                              'alpha': 90.0, 'beta': 90.0, 'gamma': 90.0}
+                    angles = get_lattice_angles(lattice_type)
+                    p_dict = {'a': a_real, 'b_ratio': 1.0, 'c_ratio': 1.0, **angles}
                     
                     if lattice_type == 'Hexagonal':
-                        p_dict['gamma'] = 120.0
                         p_dict['c_ratio'] = 1.633  # Ideal HCP
                     
                     # Check if we have c/a scan results for this config

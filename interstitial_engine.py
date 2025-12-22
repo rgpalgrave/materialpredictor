@@ -68,6 +68,7 @@ BRAVAIS_BASIS: Dict[str, List[Tuple[float, float, float]]] = {
 
     # Rhombohedral
     'rhombohedral_P': [(0, 0, 0)],
+    'rhombohedral_R': [(0, 0, 0)],  # R = rhombohedral setting (same as P for primitive)
 
     # Monoclinic
     'monoclinic_P': [(0, 0, 0)],
